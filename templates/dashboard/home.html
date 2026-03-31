@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% block title %}Dashboard — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-subtitle">Welcome back, {{ user.first_name|default:user.username }}</p>
+    </div>
+    <a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Active engagements</div>
+        <div class="stat-value">{{ active_engagements }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Total findings</div>
+        <div class="stat-value">{{ total_findings }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Critical</div>
+        <div class="stat-value critical">{{ severity_counts.critical }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">High</div>
+        <div class="stat-value high">{{ severity_counts.high }}</div>
+    </div>
+</div>
+
+<div class="grid-3">
+    <div>
+        {% if urgent_findings %}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Urgent findings</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>CVSS</th></tr></thead>
+                    <tbody>
+                    {% for f in urgent_findings %}
+                    <tr>
+                        <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
+                        <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                        <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
+                        <td style="font-family:var(--font-mono)">{{ f.cvss_score|floatformat:1 }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Recent engagements</h2>
+                <a href="{% url 'engagements:list' %}" class="btn btn-sm">View all</a>
+            </div>
+            {% if recent_engagements %}
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
+                    <tbody>
+                    {% for e in recent_engagements %}
+                    <tr>
+                        <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
+                        <td>{{ e.client_name }}</td>
+                        <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+                        <td style="font-family:var(--font-mono)">{{ e.finding_count }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No engagements yet.</p>
+                <a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Recent activity</h2>
+            </div>
+            {% for log in recent_activity %}
+            <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div>
+                    <div><strong>{{ log.user }}</strong> {{ log.action }}</div>
+                    <div class="activity-time">{{ log.timestamp|timesince }} ago</div>
+                </div>
+            </div>
+            {% empty %}
+            <p style="color:var(--text-secondary);font-size:13px">No activity yet.</p>
+            {% endfor %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:12px">Severity breakdown</h2>
+            {% for sev, count in severity_counts.items %}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+                <span class="badge badge-{{ sev }}">{{ sev|title }}</span>
+                <span style="font-family:var(--font-mono);font-size:15px;font-weight:600">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,5 @@
+Django>=4.2,<5.1
+celery>=5.3
+redis>=5.0
+reportlab>=4.0
+dj-database-url>=2.1

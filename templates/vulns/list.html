@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Findings — {{ engagement.name }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Findings</h1>
+        <p class="page-subtitle">{{ engagement.name }} &middot; {{ findings|length }} total</p>
+    </div>
+    <div class="btn-group">
+        <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">+ Add finding</a>
+        <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import</a>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;width:100%">
+        <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search findings..." class="form-input search-input">
+        <select name="severity" class="form-input" onchange="this.form.submit()">
+            <option value="">All severities</option>
+            {% for val, label in severity_choices %}
+            <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="status" class="form-input" onchange="this.form.submit()">
+            <option value="">All statuses</option>
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">Filter</button>
+    </form>
+</div>
+
+<div class="card">
+    {% if findings %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Severity</th>
+                    <th>CVSS</th>
+                    <th>Status</th>
+                    <th>Found by</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in findings %}
+            <tr>
+                <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:60 }}</strong></a></td>
+                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                <td style="font-family:var(--font-mono);font-weight:600">{{ f.cvss_score|floatformat:1 }}</td>
+                <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
+                <td style="font-size:12px;color:var(--text-secondary)">{{ f.found_by|default:"—" }}</td>
+                <td style="font-size:12px;color:var(--text-secondary)">{{ f.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No findings yet for this engagement.</p>
+        <div class="btn-group" style="justify-content:center">
+            <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">Add first finding</a>
+            <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import from tool</a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

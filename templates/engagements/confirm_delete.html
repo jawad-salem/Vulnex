@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ engagement.name }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete engagement</h1>
+        <p class="page-subtitle">This action cannot be undone.</p>
+    </div>
+</div>
+
+<div class="card" style="max-width:560px">
+    <div style="margin-bottom:20px">
+        <p style="font-size:15px;margin-bottom:12px">You are about to permanently delete:</p>
+        <div style="background:var(--bg-primary);border-radius:var(--radius);padding:16px;border:1px solid var(--border)">
+            <div style="font-weight:600;font-size:15px">{{ engagement.name }}</div>
+            <div style="color:var(--text-secondary);font-size:13px;margin-top:4px">{{ engagement.client_name }} &middot; {{ engagement.get_engagement_type_display }}</div>
+        </div>
+    </div>
+
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px">
+        This will delete all associated findings ({{ engagement.finding_count }}), notes, recon scans, checklist progress, reports, and activity logs.
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Delete permanently</button>
+            <a href="{{ engagement.get_absolute_url }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

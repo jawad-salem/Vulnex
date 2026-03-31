@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Engagements — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Engagements</h1>
+        <p class="page-subtitle">{{ engagements.count }} total</p>
+    </div>
+    <a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>
+</div>
+
+<div class="filter-bar">
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;width:100%">
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search engagements..." class="form-input search-input">
+        <select name="status" class="form-input" onchange="this.form.submit()">
+            <option value="">All statuses</option>
+            {% for val, label in status_choices %}
+            <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <select name="type" class="form-input" onchange="this.form.submit()">
+            <option value="">All types</option>
+            {% for val, label in type_choices %}
+            <option value="{{ val }}" {% if current_type == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn">Filter</button>
+    </form>
+</div>
+
+<div class="card">
+    {% if engagements %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Client</th><th>Type</th><th>Status</th><th>Progress</th><th>Findings</th><th>Dates</th></tr>
+            </thead>
+            <tbody>
+            {% for e in engagements %}
+            <tr>
+                <td><a href="{{ e.get_absolute_url }}"><strong>{{ e.name }}</strong></a></td>
+                <td>{{ e.client_name }}</td>
+                <td style="font-size:12px">{{ e.get_engagement_type_display }}</td>
+                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+                <td style="width:100px">
+                    <div class="progress-bar"><div class="progress-fill" style="width:{{ e.progress_percent }}%"></div></div>
+                </td>
+                <td style="font-family:var(--font-mono)">
+                    {{ e.finding_count }}
+                    {% if e.critical_count %}<span style="color:var(--critical);font-size:11px">({{ e.critical_count }}C)</span>{% endif %}
+                </td>
+                <td style="font-size:12px;color:var(--text-secondary)">
+                    {% if e.start_date %}{{ e.start_date|date:"M d" }}{% endif %}
+                    {% if e.end_date %} — {{ e.end_date|date:"M d" }}{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No engagements found.</p>
+        <a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">{% if engagement %}Editing {{ engagement.name }}{% else %}Create a new pentest engagement{% endif %}</p>
+    </div>
+    <a href="{% if engagement %}{{ engagement.get_absolute_url }}{% else %}{% url 'engagements:list' %}{% endif %}" class="btn">Cancel</a>
+</div>
+
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="alert alert-error" style="margin-bottom:16px">
+            Please fix the errors below.
+        </div>
+        {% endif %}
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.name.id_for_label }}">Name</label>
+                {{ form.name }}
+                {% if form.name.errors %}<span class="field-error">{{ form.name.errors.0 }}</span>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.client_name.id_for_label }}">Client</label>
+                {{ form.client_name }}
+                {% if form.client_name.errors %}<span class="field-error">{{ form.client_name.errors.0 }}</span>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.engagement_type.id_for_label }}">Type</label>
+                {{ form.engagement_type }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.status.id_for_label }}">Status</label>
+                {{ form.status }}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.start_date.id_for_label }}">Start date</label>
+                {{ form.start_date }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.end_date.id_for_label }}">End date</label>
+                {{ form.end_date }}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.lead.id_for_label }}">Lead</label>
+            {{ form.lead }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.in_scope.id_for_label }}">In scope</label>
+            {{ form.in_scope }}
+            <span class="form-help">One target per line — IPs, domains, URLs</span>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.out_of_scope.id_for_label }}">Out of scope</label>
+            {{ form.out_of_scope }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.rules_of_engagement.id_for_label }}">Rules of engagement</label>
+            {{ form.rules_of_engagement }}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if engagement %}Save changes{% else %}Create engagement{% endif %}</button>
+            <a href="{% if engagement %}{{ engagement.get_absolute_url }}{% else %}{% url 'engagements:list' %}{% endif %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

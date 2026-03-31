@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}{{ scan.get_scan_type_display }} — {{ scan.target }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ scan.get_scan_type_display }}</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'recon:dashboard' scan.engagement.pk %}">{{ scan.engagement.name }} — Recon</a>
+            &middot; {{ scan.target }}
+        </p>
+    </div>
+    <a href="{% url 'recon:dashboard' scan.engagement.pk %}" class="btn">Back to recon</a>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Status</div>
+        <span class="badge badge-{{ scan.status }}" style="font-size:14px;padding:4px 12px">{{ scan.get_status_display }}</span>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Results</div>
+        <div class="stat-value">{{ scan.result_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Duration</div>
+        <div style="font-family:var(--font-mono);font-size:18px;font-weight:600;margin-top:4px">{{ scan.duration|default:"—" }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Started</div>
+        <div style="font-size:13px;margin-top:4px">{{ scan.created_at|date:"M d, Y H:i" }}</div>
+    </div>
+</div>
+
+<div class="grid-3">
+    <div>
+        <!-- Parsed results -->
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:16px">Results</h2>
+            {% if scan.parsed_results %}
+                {% for result in scan.parsed_results %}
+                <div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;background:var(--bg-primary)">
+                    {% firstof result.hostname result.host as display_host %}
+                    {% if display_host %}
+                    <div style="font-family:var(--font-mono);font-size:14px;font-weight:600;margin-bottom:8px">
+                        {{ display_host }}
+                        {% if result.ip %}<span style="color:var(--text-secondary);font-size:12px;font-weight:400"> ({{ result.ip }})</span>{% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if result.ports %}
+                    <div style="margin-top:8px">
+                        <div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600">Open Ports</div>
+                        <table style="font-size:12px">
+                            <thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>State</th></tr></thead>
+                            <tbody>
+                            {% for port in result.ports %}
+                            <tr>
+                                <td style="font-family:var(--font-mono)">{{ port.port }}</td>
+                                <td>{{ port.protocol|default:"tcp" }}</td>
+                                <td>{{ port.service|default:"unknown" }}</td>
+                                <td><span class="badge badge-completed" style="font-size:10px">{{ port.state|default:"open" }}</span></td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% endif %}
+
+                    {% if result.technologies %}
+                    <div style="margin-top:8px">
+                        <div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600">Technologies</div>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap">
+                            {% for tech in result.technologies %}
+                            <span style="font-size:11px;background:var(--accent-bg);color:var(--accent-light);padding:2px 8px;border-radius:4px">{{ tech }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if result.note %}
+                    <div style="color:var(--text-secondary);font-size:13px;margin-top:4px">{{ result.note }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+            <p style="color:var(--text-secondary);font-size:13px">No results.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        <!-- Scan details -->
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:12px">Scan info</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <span class="detail-label">Type</span>
+                    <span>{{ scan.get_scan_type_display }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Target</span>
+                    <span style="font-family:var(--font-mono)">{{ scan.target }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Started by</span>
+                    <span>{{ scan.started_by|default:"—" }}</span>
+                </div>
+                {% if scan.started_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Started at</span>
+                    <span>{{ scan.started_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+                {% if scan.completed_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Completed at</span>
+                    <span>{{ scan.completed_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if scan.error_message %}
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:12px;color:var(--critical)">Error</h2>
+            <div style="font-family:var(--font-mono);font-size:12px;background:var(--bg-primary);padding:12px;border-radius:var(--radius);color:var(--critical)">{{ scan.error_message }}</div>
+        </div>
+        {% endif %}
+
+        {% if scan.raw_output %}
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:12px">Raw output</h2>
+            <div style="font-family:var(--font-mono);font-size:11px;background:var(--bg-primary);padding:12px;border-radius:var(--radius);max-height:400px;overflow:auto;white-space:pre-wrap">{{ scan.raw_output }}</div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

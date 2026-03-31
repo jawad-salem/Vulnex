@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+            {% if finding %} &middot; Editing {{ finding.title|truncatechars:40 }}{% endif %}
+        </p>
+    </div>
+    <a href="{% if finding %}{{ finding.get_absolute_url }}{% else %}{% url 'vulns:list' engagement.pk %}{% endif %}" class="btn">Cancel</a>
+</div>
+
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="alert alert-error" style="margin-bottom:16px">
+            Please fix the errors below.
+        </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="{{ form.title.id_for_label }}">Title</label>
+            {{ form.title }}
+            {% if form.title.errors %}<span class="field-error">{{ form.title.errors.0 }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.description.id_for_label }}">Description</label>
+            {{ form.description }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.status.id_for_label }}">Status</label>
+            {{ form.status }}
+        </div>
+
+        <!-- CVSS v3.1 vectors -->
+        <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px;color:var(--accent-light)">CVSS v3.1 Base Score</h3>
+            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Severity and CVSS score are automatically calculated from these vectors.</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.attack_vector.id_for_label }}">Attack Vector</label>
+                    {{ form.attack_vector }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.attack_complexity.id_for_label }}">Attack Complexity</label>
+                    {{ form.attack_complexity }}
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.privileges_required.id_for_label }}">Privileges Required</label>
+                    {{ form.privileges_required }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.user_interaction.id_for_label }}">User Interaction</label>
+                    {{ form.user_interaction }}
+                </div>
+            </div>
+            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="form-group">
+                    <label for="{{ form.confidentiality_impact.id_for_label }}">Confidentiality</label>
+                    {{ form.confidentiality_impact }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.integrity_impact.id_for_label }}">Integrity</label>
+                    {{ form.integrity_impact }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.availability_impact.id_for_label }}">Availability</label>
+                    {{ form.availability_impact }}
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.affected_hosts.id_for_label }}">Affected hosts</label>
+            {{ form.affected_hosts }}
+            <span class="form-help">One host per line</span>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.proof_of_concept.id_for_label }}">Proof of concept</label>
+            {{ form.proof_of_concept }}
+            <span class="form-help">Steps to reproduce the vulnerability</span>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.remediation.id_for_label }}">Remediation</label>
+            {{ form.remediation }}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.cwe_id.id_for_label }}">CWE ID</label>
+                {{ form.cwe_id }}
+                <span class="form-help">e.g. CWE-79</span>
+            </div>
+            <div class="form-group">
+                <label for="{{ form.tool_source.id_for_label }}">Tool source</label>
+                {{ form.tool_source }}
+                <span class="form-help">e.g. Burp Suite, Manual</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.references.id_for_label }}">References</label>
+            {{ form.references }}
+            <span class="form-help">CVE IDs, URLs — one per line</span>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if finding %}Save changes{% else %}Create finding{% endif %}</button>
+            <a href="{% if finding %}{{ finding.get_absolute_url }}{% else %}{% url 'vulns:list' engagement.pk %}{% endif %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
