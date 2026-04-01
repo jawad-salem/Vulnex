@@ -1,11 +1,12 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Q
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence
 from .forms import FindingForm, EvidenceForm, ToolImportForm
-from .parsers import parse_nmap_xml, parse_nuclei_json, parse_nikto_json
+from .parsers import parse_nuclei_json, parse_nikto_json
 from accounts.decorators import role_required
 
 
@@ -25,9 +26,23 @@ def finding_list(request, engagement_pk):
     if search:
         findings = findings.filter(Q(title__icontains=search) | Q(description__icontains=search))
 
+    paginator = Paginator(findings, 20)
+    page = paginator.get_page(request.GET.get('page'))
+
+    qs_parts = []
+    if severity_filter:
+        qs_parts.append(f'severity={severity_filter}')
+    if status_filter:
+        qs_parts.append(f'status={status_filter}')
+    if search:
+        qs_parts.append(f'q={search}')
+    query_string = '&'.join(qs_parts) + ('&' if qs_parts else '')
+
     context = {
         'engagement': engagement,
-        'findings': findings,
+        'findings': page,
+        'page_obj': page,
+        'query_string': query_string,
         'severity_choices': Finding.Severity.choices,
         'status_choices': Finding.Status.choices,
     }
@@ -101,6 +116,26 @@ def finding_edit(request, pk):
 
 @login_required
 @role_required('admin', 'pentester')
+def finding_delete(request, pk):
+    finding = get_object_or_404(Finding, pk=pk)
+    engagement = finding.engagement
+    if request.method == 'POST':
+        title = finding.title
+        finding.delete()
+        ActivityLog.objects.create(
+            engagement=engagement,
+            user=request.user,
+            action=f'Deleted finding: {title}'
+        )
+        messages.success(request, f'Finding "{title}" deleted.')
+        return redirect('vulns:list', engagement_pk=engagement.pk)
+    return render(request, 'vulns/confirm_delete.html', {
+        'finding': finding, 'engagement': engagement,
+    })
+
+
+@login_required
+@role_required('admin', 'pentester')
 def tool_import(request, engagement_pk):
     engagement = get_object_or_404(Engagement, pk=engagement_pk)
     if request.method == 'POST':
@@ -111,7 +146,6 @@ def tool_import(request, engagement_pk):
             content = uploaded.read()
 
             parsers = {
-                'nmap': parse_nmap_xml,
                 'nuclei': parse_nuclei_json,
                 'nikto': parse_nikto_json,
             }

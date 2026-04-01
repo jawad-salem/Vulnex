@@ -15,3 +15,12 @@ class ReconScanForm(forms.ModelForm):
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
 
+
+class NmapImportForm(forms.Form):
+    file = forms.FileField(label='Nmap XML file')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['file'].widget.attrs['class'] = 'form-input'
+        self.fields['file'].widget.attrs['accept'] = '.xml'
+

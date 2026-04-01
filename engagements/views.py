@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Engagement, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
@@ -23,8 +24,23 @@ def engagement_list(request):
             Q(name__icontains=search) | Q(client_name__icontains=search)
         )
 
+    paginator = Paginator(engagements, 15)
+    page = paginator.get_page(request.GET.get('page'))
+
+    # Build query string for pagination links (preserve filters)
+    qs_parts = []
+    if status_filter:
+        qs_parts.append(f'status={status_filter}')
+    if type_filter:
+        qs_parts.append(f'type={type_filter}')
+    if search:
+        qs_parts.append(f'q={search}')
+    query_string = '&'.join(qs_parts) + ('&' if qs_parts else '')
+
     context = {
-        'engagements': engagements,
+        'engagements': page,
+        'page_obj': page,
+        'query_string': query_string,
         'status_choices': Engagement.Status.choices,
         'type_choices': Engagement.EngagementType.choices,
         'current_status': status_filter,

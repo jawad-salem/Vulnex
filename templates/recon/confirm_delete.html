@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Delete scan — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete scan</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'recon:dashboard' engagement.pk %}">{{ engagement.name }} — Recon</a>
+        </p>
+    </div>
+</div>
+
+<div style="max-width:500px">
+    <div class="card">
+        <h2 class="card-title" style="margin-bottom:16px;color:var(--critical)">Are you sure?</h2>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+            This will permanently delete this scan and its associated discovered hosts:
+        </p>
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px">
+            <div style="font-weight:600">{{ scan.get_scan_type_display }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">
+                Target: <span style="font-family:var(--font-mono)">{{ scan.target }}</span>
+                &middot; {{ scan.result_count }} result{{ scan.result_count|pluralize }}
+                &middot; {{ scan.created_at|date:"M d, Y H:i" }}
+            </div>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions" style="margin-top:0;border-top:none;padding-top:0">
+                <button type="submit" class="btn btn-danger">Delete scan</button>
+                <a href="{% url 'recon:scan_detail' scan.pk %}" class="btn">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

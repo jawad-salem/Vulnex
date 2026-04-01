@@ -40,8 +40,8 @@ class ReconScan(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-    def __str__(self):
-        return f"{self.get_scan_type_display()} — {self.target}"
+    def __str__(self) -> str:
+        return f"{self.get_scan_type_display()} — {self.target}"  # type: ignore[attr-defined]
 
     @property
     def duration(self):

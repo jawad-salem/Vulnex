@@ -10,7 +10,11 @@
 <body>
     {% if user.is_authenticated %}
     <div class="layout">
-        <aside class="sidebar">
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -35,6 +39,7 @@
                 <a href="{% url 'vulns:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'vulns' %}active{% endif %}">Findings</a>
                 <a href="{% url 'recon:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'recon' %}active{% endif %}">Recon</a>
                 <a href="{% url 'methodology:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'methodology' %}active{% endif %}">Methodology</a>
+                <a href="{% url 'reports:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">Reports</a>
             </div>
             {% endif %}
 
@@ -43,10 +48,13 @@
                     <div class="avatar-sm" style="background:{{ user.avatar_color }}">{{ user.initials }}</div>
                     {{ user.get_full_name|default:user.username }}
                 </a>
-                <a href="{% url 'accounts:logout' %}" class="nav-item">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                    Log out
-                </a>
+                <form method="post" action="{% url 'accounts:logout' %}" style="margin:0">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-item" style="width:100%;border:none;background:none;cursor:pointer;text-align:left;font-family:var(--font);font-size:13px">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Log out
+                    </button>
+                </form>
             </div>
         </aside>
 
@@ -69,6 +77,42 @@
         {% block auth_content %}{% endblock %}
     {% endif %}
 
+    <script>
+    // Toast auto-dismiss
+    document.querySelectorAll('.alert').forEach(function(el) {
+        setTimeout(function() {
+            el.classList.add('toast-out');
+            setTimeout(function() { el.remove(); }, 400);
+        }, 5000);
+    });
+
+    // Mobile sidebar toggle
+    (function() {
+        var toggle = document.getElementById('mobileToggle');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', function() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            });
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            });
+        }
+    })();
+
+    // Loading state on form submit
+    document.querySelectorAll('form').forEach(function(form) {
+        form.addEventListener('submit', function() {
+            var btn = form.querySelector('button[type="submit"].btn-primary, input[type="submit"]');
+            if (btn && !btn.classList.contains('loading')) {
+                btn.classList.add('loading');
+            }
+        });
+    });
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

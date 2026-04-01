@@ -32,6 +32,20 @@
             </form>
         </div>
 
+        <!-- Import Nmap XML -->
+        <div class="card">
+            <h2 class="card-title" style="margin-bottom:16px">Import Nmap scan</h2>
+            <form method="post" action="{% url 'recon:import_nmap' engagement.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ import_form.file.id_for_label }}">Nmap XML file</label>
+                    {{ import_form.file }}
+                    <span class="form-help">Upload Nmap XML output (<code>nmap -oX scan.xml target</code>)</span>
+                </div>
+                <button type="submit" class="btn btn-primary">Import hosts</button>
+            </form>
+        </div>
+
         <!-- Scan history -->
         <div class="card">
             <div class="card-header">
@@ -57,7 +71,10 @@
                 </table>
             </div>
             {% else %}
-            <p style="color:var(--text-secondary);font-size:13px">No scans yet. Start one above.</p>
+            <div class="empty-state" style="padding:24px">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                <p>No scans yet. Start one above.</p>
+            </div>
             {% endif %}
         </div>
     </div>

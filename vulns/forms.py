@@ -40,7 +40,6 @@ class EvidenceForm(forms.ModelForm):
 
 class ToolImportForm(forms.Form):
     TOOL_CHOICES = [
-        ('nmap', 'Nmap XML'),
         ('nuclei', 'Nuclei JSON'),
         ('nikto', 'Nikto JSON'),
     ]

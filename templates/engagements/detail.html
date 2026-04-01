@@ -94,19 +94,11 @@
         <div class="card">
             <h2 class="card-title" style="margin-bottom:12px">Quick actions</h2>
             <div class="btn-group" style="flex-wrap:wrap">
+                <a href="{% url 'recon:dashboard' engagement.pk %}" class="btn">Recon</a>
                 <a href="{% url 'vulns:create' engagement.pk %}" class="btn">+ Add finding</a>
-                <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import tool output</a>
-                <a href="{% url 'recon:dashboard' engagement.pk %}" class="btn">Run recon</a>
+                <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import vulns</a>
                 <a href="{% url 'methodology:dashboard' engagement.pk %}" class="btn">Methodology</a>
-                <form method="post" action="{% url 'reports:generate' engagement.pk %}" style="display:inline-flex;gap:6px">
-                    {% csrf_token %}
-                    <select name="report_type" class="form-input" style="width:auto;padding:6px 30px 6px 10px;font-size:12px">
-                        <option value="full">Full Report</option>
-                        <option value="executive">Executive Summary</option>
-                        <option value="technical">Technical Detail</option>
-                    </select>
-                    <button type="submit" class="btn btn-primary">Generate report</button>
-                </form>
+                <a href="{% url 'reports:dashboard' engagement.pk %}" class="btn btn-primary">Reports</a>
             </div>
         </div>
     </div>

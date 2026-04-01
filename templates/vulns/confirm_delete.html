@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Delete finding — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete finding</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+        </p>
+    </div>
+</div>
+
+<div style="max-width:500px">
+    <div class="card">
+        <h2 class="card-title" style="margin-bottom:16px;color:var(--critical)">Are you sure?</h2>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
+            This will permanently delete the following finding and all its evidence:
+        </p>
+        <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:16px">
+            <div style="font-weight:600">{{ finding.title }}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">
+                <span class="badge badge-{{ finding.severity }}">{{ finding.get_severity_display }}</span>
+                &middot; CVSS {{ finding.cvss_score|floatformat:1 }}
+                &middot; {{ finding.evidence.count }} evidence file{{ finding.evidence.count|pluralize }}
+            </div>
+        </div>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-actions" style="margin-top:0;border-top:none;padding-top:0">
+                <button type="submit" class="btn btn-danger">Delete finding</button>
+                <a href="{% url 'vulns:detail' finding.pk %}" class="btn">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

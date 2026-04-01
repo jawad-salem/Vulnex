@@ -11,6 +11,7 @@
     </div>
     <div class="btn-group">
         <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
+        <a href="{% url 'vulns:delete' finding.pk %}" class="btn btn-danger">Delete</a>
         <a href="{% url 'vulns:list' finding.engagement.pk %}" class="btn">All findings</a>
     </div>
 </div>

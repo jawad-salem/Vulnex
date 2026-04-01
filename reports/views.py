@@ -1,4 +1,4 @@
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse
@@ -6,6 +6,17 @@ from engagements.models import Engagement, ActivityLog
 from .models import Report
 from .generator import generate_report_pdf
 from accounts.decorators import role_required
+
+
+@login_required
+def report_dashboard(request, engagement_pk):
+    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    reports = engagement.reports.all()
+    context = {
+        'engagement': engagement,
+        'reports': reports,
+    }
+    return render(request, 'reports/dashboard.html', context)
 
 
 @login_required
@@ -36,7 +47,7 @@ def generate_report(request, engagement_pk):
         action=f'Generated {report.get_report_type_display()} report'
     )
     messages.success(request, 'Report generated successfully.')
-    return redirect('engagements:detail', pk=engagement_pk)
+    return redirect('reports:dashboard', engagement_pk=engagement_pk)
 
 
 @login_required

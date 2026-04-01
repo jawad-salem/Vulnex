@@ -4,7 +4,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Engagements</h1>
-        <p class="page-subtitle">{{ engagements.count }} total</p>
+        <p class="page-subtitle">{{ page_obj.paginator.count }} total</p>
     </div>
     <a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>
 </div>
@@ -58,8 +58,10 @@
             </tbody>
         </table>
     </div>
+    {% include "includes/pagination.html" %}
     {% else %}
     <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
         <p>No engagements found.</p>
         <a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>
     </div>

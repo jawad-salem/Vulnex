@@ -3,10 +3,10 @@
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">Import findings</h1>
+        <h1 class="page-title">Import vulnerabilities</h1>
         <p class="page-subtitle">
             <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
-            &middot; Import from security tools
+            &middot; Import from vulnerability scanners
         </p>
     </div>
     <a href="{% url 'vulns:list' engagement.pk %}" class="btn">Cancel</a>
@@ -45,10 +45,6 @@
             <h2 class="card-title" style="margin-bottom:12px">Supported formats</h2>
             <div class="detail-list">
                 <div class="detail-row">
-                    <span class="detail-label">Nmap</span>
-                    <span>XML output (<code style="font-size:12px;color:var(--accent-light)">-oX</code>)</span>
-                </div>
-                <div class="detail-row">
                     <span class="detail-label">Nuclei</span>
                     <span>JSON/JSONL output (<code style="font-size:12px;color:var(--accent-light)">-json</code>)</span>
                 </div>
@@ -62,10 +58,11 @@
         <div class="card">
             <h2 class="card-title" style="margin-bottom:12px">Tips</h2>
             <ul style="font-size:13px;color:var(--text-secondary);padding-left:18px">
-                <li style="margin-bottom:6px">Imported findings will be assigned a severity based on the tool's output</li>
+                <li style="margin-bottom:6px">Imported vulnerabilities are assigned severity based on the tool's output</li>
                 <li style="margin-bottom:6px">CVSS scores are calculated automatically where possible</li>
                 <li style="margin-bottom:6px">Duplicate findings are not automatically deduplicated — review after import</li>
-                <li>You can edit any imported finding after import</li>
+                <li style="margin-bottom:6px">You can edit any imported finding after import</li>
+                <li>Looking for Nmap import? It's in the <a href="{% url 'recon:dashboard' engagement.pk %}">Recon</a> section</li>
             </ul>
         </div>
     </div>
