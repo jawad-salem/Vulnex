@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'accounts:user_list' %}">Users</a>
+            {% if target_user %} &middot; {{ target_user.username }}{% endif %}
+        </p>
+    </div>
+    <a href="{% url 'accounts:user_list' %}" class="btn">Cancel</a>
+</div>
+
+<div class="card" style="max-width:600px">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="alert alert-error" style="margin-bottom:16px">
+            {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+            {% else %}
+                Please fix the errors below.
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.username.id_for_label }}">Username</label>
+                {{ form.username }}
+                {% if form.username.errors %}<span class="field-error">{{ form.username.errors.0 }}</span>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.role.id_for_label }}">Role</label>
+                {{ form.role }}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.first_name.id_for_label }}">First name</label>
+                {{ form.first_name }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.last_name.id_for_label }}">Last name</label>
+                {{ form.last_name }}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.email.id_for_label }}">Email</label>
+            {{ form.email }}
+            {% if form.email.errors %}<span class="field-error">{{ form.email.errors.0 }}</span>{% endif %}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.password1.id_for_label }}">Password</label>
+                {{ form.password1 }}
+                {% if form.password1.help_text %}<span class="form-help">{{ form.password1.help_text }}</span>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.password2.id_for_label }}">Confirm password</label>
+                {{ form.password2 }}
+            </div>
+        </div>
+
+        {% if target_user %}
+        <div class="form-group">
+            <label class="checkbox-label">
+                {{ form.is_active }} Active account
+            </label>
+            <span class="form-help">Inactive users cannot log in.</span>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if target_user %}Save changes{% else %}Create user{% endif %}</button>
+            <a href="{% url 'accounts:user_list' %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

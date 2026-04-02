@@ -17,7 +17,7 @@
         {% csrf_token %}
 
         {% if form.errors %}
-        <div class="alert alert-error" style="margin-bottom:16px">
+        <div class="alert alert-error mb-4">
             Please fix the errors below.
         </div>
         {% endif %}
@@ -38,10 +38,45 @@
             {{ form.status }}
         </div>
 
+        <!-- Location -->
+        <div class="section-box">
+            <h3 class="section-title">Location</h3>
+            <p class="section-desc">Where exactly was this vulnerability found? This helps devs reproduce and fix it.</p>
+
+            <div class="form-row" style="grid-template-columns:2fr 1fr">
+                <div class="form-group">
+                    <label for="{{ form.host.id_for_label }}">Host</label>
+                    {{ form.host }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.port.id_for_label }}">Port</label>
+                    {{ form.port }}
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="{{ form.url.id_for_label }}">URL</label>
+                {{ form.url }}
+            </div>
+            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                <div class="form-group">
+                    <label for="{{ form.endpoint.id_for_label }}">Endpoint / Path</label>
+                    {{ form.endpoint }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.http_method.id_for_label }}">HTTP Method</label>
+                    {{ form.http_method }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.parameter.id_for_label }}">Parameter</label>
+                    {{ form.parameter }}
+                </div>
+            </div>
+        </div>
+
         <!-- CVSS v3.1 vectors -->
-        <div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
-            <h3 style="font-size:14px;font-weight:600;margin-bottom:16px;color:var(--accent-light)">CVSS v3.1 Base Score</h3>
-            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Severity and CVSS score are automatically calculated from these vectors.</p>
+        <div class="section-box">
+            <h3 class="section-title">CVSS v3.1 Base Score</h3>
+            <p class="section-desc">Severity and CVSS score are automatically calculated from these vectors.</p>
 
             <div class="form-row">
                 <div class="form-group">
@@ -80,9 +115,9 @@
         </div>
 
         <div class="form-group">
-            <label for="{{ form.affected_hosts.id_for_label }}">Affected hosts</label>
+            <label for="{{ form.affected_hosts.id_for_label }}">Additional affected hosts</label>
             {{ form.affected_hosts }}
-            <span class="form-help">One host per line</span>
+            <span class="form-help">Other hosts affected by the same issue — one per line</span>
         </div>
 
         <div class="form-group">

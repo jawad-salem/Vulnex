@@ -10,8 +10,10 @@
         </p>
     </div>
     <div class="btn-group">
+        {% if can_edit %}
         <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
         <a href="{% url 'vulns:delete' finding.pk %}" class="btn btn-danger">Delete</a>
+        {% endif %}
         <a href="{% url 'vulns:list' finding.engagement.pk %}" class="btn">All findings</a>
     </div>
 </div>
@@ -19,7 +21,7 @@
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-label">Severity</div>
-        <span class="badge badge-{{ finding.severity }}" style="font-size:14px;padding:4px 12px">{{ finding.get_severity_display }}</span>
+        <span class="badge badge-{{ finding.severity }} badge-lg">{{ finding.get_severity_display }}</span>
     </div>
     <div class="stat-card">
         <div class="stat-label">CVSS Score</div>
@@ -27,11 +29,11 @@
     </div>
     <div class="stat-card">
         <div class="stat-label">Status</div>
-        <span class="badge badge-{{ finding.status }}" style="font-size:14px;padding:4px 12px">{{ finding.get_status_display }}</span>
+        <span class="badge badge-{{ finding.status }} badge-lg">{{ finding.get_status_display }}</span>
     </div>
     <div class="stat-card">
         <div class="stat-label">CVSS Vector</div>
-        <div style="font-family:var(--font-mono);font-size:11px;margin-top:6px;word-break:break-all">{{ finding.cvss_vector_string }}</div>
+        <div class="text-mono text-xs mt-2 text-break">{{ finding.cvss_vector_string }}</div>
     </div>
 </div>
 
@@ -39,15 +41,15 @@
     <div>
         <!-- Description -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Description</h2>
+            <h2 class="card-title mb-3">Description</h2>
             <div class="prose">{{ finding.description|linebreaksbr }}</div>
         </div>
 
         <!-- Affected hosts -->
         {% if finding.affected_hosts %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Affected hosts</h2>
-            <div style="font-family:var(--font-mono);font-size:12px;background:var(--bg-primary);padding:12px;border-radius:var(--radius)">
+            <h2 class="card-title mb-3">Affected hosts</h2>
+            <div class="mono-block">
                 {% for host in finding.affected_hosts.splitlines %}
                 {% if host.strip %}<div style="padding:2px 0">{{ host }}</div>{% endif %}
                 {% endfor %}
@@ -58,15 +60,15 @@
         <!-- Proof of Concept -->
         {% if finding.proof_of_concept %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Proof of concept</h2>
-            <div style="font-family:var(--font-mono);font-size:12px;background:var(--bg-primary);padding:12px;border-radius:var(--radius);white-space:pre-wrap">{{ finding.proof_of_concept }}</div>
+            <h2 class="card-title mb-3">Proof of concept</h2>
+            <div class="mono-block text-pre">{{ finding.proof_of_concept }}</div>
         </div>
         {% endif %}
 
         <!-- Remediation -->
         {% if finding.remediation %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Remediation</h2>
+            <h2 class="card-title mb-3">Remediation</h2>
             <div class="prose">{{ finding.remediation|linebreaksbr }}</div>
         </div>
         {% endif %}
@@ -77,26 +79,27 @@
                 <h2 class="card-title">Evidence</h2>
             </div>
             {% if evidence %}
-            <div class="evidence-grid">
+            <div>
                 {% for ev in evidence %}
-                <div style="border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px">
+                <div class="evidence-item">
                     {% if ev.is_image %}
-                    <img src="{{ ev.file.url }}" alt="{{ ev.caption }}" style="width:100%;display:block">
+                    <img src="{{ ev.file.url }}" alt="{{ ev.caption }}">
                     {% else %}
-                    <div style="padding:12px;background:var(--bg-primary);display:flex;align-items:center;gap:8px">
+                    <div class="evidence-file">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <a href="{{ ev.file.url }}">{{ ev.file.name|cut:"evidence/" }}</a>
                     </div>
                     {% endif %}
                     {% if ev.caption %}
-                    <div style="padding:8px 12px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border)">{{ ev.caption }}</div>
+                    <div class="evidence-caption">{{ ev.caption }}</div>
                     {% endif %}
                 </div>
                 {% endfor %}
             </div>
             {% endif %}
 
-            <form method="post" enctype="multipart/form-data" style="margin-top:12px">
+            {% if can_edit %}
+            <form method="post" enctype="multipart/form-data" class="mt-3">
                 {% csrf_token %}
                 <input type="hidden" name="upload_evidence" value="1">
                 <div class="form-group">
@@ -108,13 +111,59 @@
                 </div>
                 <button type="submit" class="btn btn-sm">Upload</button>
             </form>
+            {% endif %}
         </div>
     </div>
 
     <div>
+        <!-- Location -->
+        {% if finding.host or finding.url or finding.endpoint %}
+        <div class="card">
+            <h2 class="card-title mb-3">Location</h2>
+            <div class="detail-list">
+                {% if finding.host %}
+                <div class="detail-row">
+                    <span class="detail-label">Host</span>
+                    <span class="text-mono">{{ finding.host }}</span>
+                </div>
+                {% endif %}
+                {% if finding.port %}
+                <div class="detail-row">
+                    <span class="detail-label">Port</span>
+                    <span class="text-mono">{{ finding.port }}</span>
+                </div>
+                {% endif %}
+                {% if finding.url %}
+                <div class="detail-row flex-col items-start gap-1">
+                    <span class="detail-label">URL</span>
+                    <span class="text-mono text-sm text-break">{{ finding.url }}</span>
+                </div>
+                {% endif %}
+                {% if finding.endpoint %}
+                <div class="detail-row">
+                    <span class="detail-label">Endpoint</span>
+                    <span class="text-mono">{{ finding.endpoint }}</span>
+                </div>
+                {% endif %}
+                {% if finding.http_method %}
+                <div class="detail-row">
+                    <span class="detail-label">Method</span>
+                    <span class="badge badge-info text-mono">{{ finding.http_method }}</span>
+                </div>
+                {% endif %}
+                {% if finding.parameter %}
+                <div class="detail-row">
+                    <span class="detail-label">Parameter</span>
+                    <span class="text-mono" style="color:var(--warning)">{{ finding.parameter }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Metadata -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Details</h2>
+            <h2 class="card-title mb-3">Details</h2>
             <div class="detail-list">
                 <div class="detail-row">
                     <span class="detail-label">Found by</span>
@@ -123,13 +172,13 @@
                 {% if finding.tool_source %}
                 <div class="detail-row">
                     <span class="detail-label">Tool</span>
-                    <span style="font-family:var(--font-mono)">{{ finding.tool_source }}</span>
+                    <span class="text-mono">{{ finding.tool_source }}</span>
                 </div>
                 {% endif %}
                 {% if finding.cwe_id %}
                 <div class="detail-row">
                     <span class="detail-label">CWE</span>
-                    <span style="font-family:var(--font-mono)">{{ finding.cwe_id }}</span>
+                    <span class="text-mono">{{ finding.cwe_id }}</span>
                 </div>
                 {% endif %}
                 <div class="detail-row">
@@ -145,7 +194,7 @@
 
         <!-- CVSS Breakdown -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">CVSS v3.1 breakdown</h2>
+            <h2 class="card-title mb-3">CVSS v3.1 breakdown</h2>
             <div class="detail-list">
                 <div class="detail-row">
                     <span class="detail-label">Attack Vector</span>
@@ -181,11 +230,11 @@
         <!-- References -->
         {% if finding.references %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">References</h2>
-            <div style="font-size:13px">
+            <h2 class="card-title mb-3">References</h2>
+            <div class="text-sm">
                 {% for ref in finding.references.splitlines %}
                 {% if ref.strip %}
-                <div style="padding:4px 0;word-break:break-all">
+                <div style="padding:4px 0" class="text-break">
                     {% if "http" in ref %}<a href="{{ ref.strip }}">{{ ref.strip }}</a>{% else %}{{ ref.strip }}{% endif %}
                 </div>
                 {% endif %}

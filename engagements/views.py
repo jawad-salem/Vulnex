@@ -2,15 +2,23 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.core.mail import send_mail
+from django.conf import settings
 from django.db.models import Q
-from .models import Engagement, ActivityLog
+from .models import Engagement, EngagementMember, Invitation, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
-from accounts.decorators import role_required
+from accounts.decorators import role_required, engagement_access, engagement_edit_required
 
 
 @login_required
 def engagement_list(request):
-    engagements = Engagement.objects.all()
+    if request.user.role == 'admin':
+        engagements = Engagement.objects.all()
+    else:
+        engagements = Engagement.objects.filter(
+            members__user=request.user
+        ).distinct()
+
     status_filter = request.GET.get('status')
     type_filter = request.GET.get('type')
     search = request.GET.get('q')
@@ -27,7 +35,6 @@ def engagement_list(request):
     paginator = Paginator(engagements, 15)
     page = paginator.get_page(request.GET.get('page'))
 
-    # Build query string for pagination links (preserve filters)
     qs_parts = []
     if status_filter:
         qs_parts.append(f'status={status_filter}')
@@ -51,11 +58,13 @@ def engagement_list(request):
 
 
 @login_required
+@engagement_access(allow_client=True)
 def engagement_detail(request, pk):
-    engagement = get_object_or_404(Engagement, pk=pk)
+    engagement = request.engagement
+    is_client = request.eng_role == 'client'
     note_form = EngagementNoteForm()
 
-    if request.method == 'POST' and 'add_note' in request.POST:
+    if request.method == 'POST' and 'add_note' in request.POST and not is_client:
         note_form = EngagementNoteForm(request.POST)
         if note_form.is_valid():
             note = note_form.save(commit=False)
@@ -69,12 +78,21 @@ def engagement_detail(request, pk):
             messages.success(request, 'Note added.')
             return redirect('engagements:detail', pk=pk)
 
+    # Get team members for display
+    members = engagement.members.select_related('user').all()
+    pending_invitations = engagement.invitations.filter(status='pending')
+
     context = {
         'engagement': engagement,
         'note_form': note_form,
-        'notes': engagement.notes.select_related('author')[:20],
+        'notes': engagement.notes.select_related('author')[:20] if not is_client else [],
         'findings': engagement.findings.all()[:10],
-        'activity': engagement.activity_logs.select_related('user')[:15],
+        'activity': engagement.activity_logs.select_related('user')[:15] if not is_client else [],
+        'members': members,
+        'pending_invitations': pending_invitations,
+        'is_client': is_client,
+        'can_edit': request.eng_role in ('admin', 'lead', 'pentester'),
+        'can_manage': request.eng_role in ('admin', 'lead'),
     }
     return render(request, 'engagements/detail.html', context)
 
@@ -88,7 +106,12 @@ def engagement_create(request):
             engagement = form.save(commit=False)
             engagement.created_by = request.user
             engagement.save()
-            form.save_m2m()
+            # Auto-add creator as Lead
+            EngagementMember.objects.create(
+                engagement=engagement,
+                user=request.user,
+                role=EngagementMember.Role.LEAD,
+            )
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
                 action='Created engagement'
@@ -101,9 +124,9 @@ def engagement_create(request):
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def engagement_edit(request, pk):
-    engagement = get_object_or_404(Engagement, pk=pk)
+    engagement = request.engagement
     if request.method == 'POST':
         form = EngagementForm(request.POST, instance=engagement)
         if form.is_valid():
@@ -120,9 +143,12 @@ def engagement_edit(request, pk):
 
 
 @login_required
-@role_required('admin')
 def engagement_delete(request, pk):
     engagement = get_object_or_404(Engagement, pk=pk)
+    # Only lead or global admin can delete
+    if not engagement.user_is_lead(request.user):
+        messages.error(request, 'Only the engagement lead can delete this.')
+        return redirect('engagements:detail', pk=pk)
     if request.method == 'POST':
         name = engagement.name
         engagement.delete()
@@ -132,9 +158,9 @@ def engagement_delete(request, pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def engagement_update_status(request, pk):
-    engagement = get_object_or_404(Engagement, pk=pk)
+    engagement = request.engagement
     new_status = request.POST.get('status')
     if new_status and new_status in dict(Engagement.Status.choices):
         old_status = engagement.get_status_display()
@@ -147,3 +173,164 @@ def engagement_update_status(request, pk):
         messages.success(request, f'Status updated to {engagement.get_status_display()}.')
     return redirect('engagements:detail', pk=pk)
 
+
+# ── Team management ──
+
+@login_required
+def invite_member(request, pk):
+    engagement = get_object_or_404(Engagement, pk=pk)
+    if not engagement.user_is_lead(request.user):
+        messages.error(request, 'Only the lead can invite members.')
+        return redirect('engagements:detail', pk=pk)
+
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip()
+        role = request.POST.get('role', 'pentester')
+
+        if not email:
+            messages.error(request, 'Email is required.')
+            return redirect('engagements:detail', pk=pk)
+
+        if role not in dict(EngagementMember.Role.choices):
+            messages.error(request, 'Invalid role.')
+            return redirect('engagements:detail', pk=pk)
+
+        # Check if already a member
+        from accounts.models import User
+        existing_user = User.objects.filter(email=email).first()
+        if existing_user and engagement.members.filter(user=existing_user).exists():
+            messages.warning(request, f'{email} is already a member.')
+            return redirect('engagements:detail', pk=pk)
+
+        # Check for duplicate pending invitation
+        if engagement.invitations.filter(email=email, status='pending').exists():
+            messages.warning(request, f'An invitation to {email} is already pending.')
+            return redirect('engagements:detail', pk=pk)
+
+        invitation = Invitation.objects.create(
+            engagement=engagement,
+            email=email,
+            role=role,
+            invited_by=request.user,
+        )
+
+        # If user already exists, auto-accept
+        if existing_user:
+            EngagementMember.objects.create(
+                engagement=engagement,
+                user=existing_user,
+                role=role,
+            )
+            invitation.status = 'accepted'
+            invitation.save()
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Added {existing_user} as {invitation.get_role_display()}'
+            )
+            messages.success(request, f'{email} added as {invitation.get_role_display()}.')
+        else:
+            # Send invitation email
+            invite_url = f'{settings.SITE_URL}/engagements/join/{invitation.token}/'
+            try:
+                send_mail(
+                    subject=f'You\'ve been invited to "{engagement.name}" on PentestFlow',
+                    message=(
+                        f'Hi,\n\n'
+                        f'{request.user.get_full_name() or request.user.username} has invited you '
+                        f'to join the engagement "{engagement.name}" as {invitation.get_role_display()}.\n\n'
+                        f'Click the link below to accept:\n'
+                        f'{invite_url}\n\n'
+                        f'This invitation expires in 7 days.\n\n'
+                        f'— PentestFlow'
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            except Exception:
+                pass  # Don't block the flow if email fails
+
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Invited {email} as {invitation.get_role_display()}'
+            )
+            messages.success(request, f'Invitation sent to {email}.')
+
+    return redirect('engagements:detail', pk=pk)
+
+
+@login_required
+def remove_member(request, pk, member_pk):
+    engagement = get_object_or_404(Engagement, pk=pk)
+    if not engagement.user_is_lead(request.user):
+        messages.error(request, 'Only the lead can remove members.')
+        return redirect('engagements:detail', pk=pk)
+
+    member = get_object_or_404(EngagementMember, pk=member_pk, engagement=engagement)
+
+    # Can't remove yourself if you're the only lead
+    if member.user == request.user and member.role == 'lead':
+        other_leads = engagement.members.filter(role='lead').exclude(pk=member.pk).count()
+        if other_leads == 0:
+            messages.error(request, 'Cannot remove yourself — you are the only lead.')
+            return redirect('engagements:detail', pk=pk)
+
+    if request.method == 'POST':
+        username = str(member.user)
+        member.delete()
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Removed {username} from team'
+        )
+        messages.success(request, f'{username} removed from team.')
+
+    return redirect('engagements:detail', pk=pk)
+
+
+@login_required
+def cancel_invitation(request, pk, invitation_pk):
+    engagement = get_object_or_404(Engagement, pk=pk)
+    if not engagement.user_is_lead(request.user):
+        messages.error(request, 'Only the lead can cancel invitations.')
+        return redirect('engagements:detail', pk=pk)
+
+    invitation = get_object_or_404(Invitation, pk=invitation_pk, engagement=engagement, status='pending')
+    if request.method == 'POST':
+        invitation.status = 'expired'
+        invitation.save()
+        messages.success(request, f'Invitation to {invitation.email} cancelled.')
+
+    return redirect('engagements:detail', pk=pk)
+
+
+@login_required
+def accept_invitation(request, token):
+    """Accept an invitation via token link."""
+    invitation = get_object_or_404(Invitation, token=token, status='pending')
+
+    if invitation.is_expired:
+        invitation.status = 'expired'
+        invitation.save()
+        messages.error(request, 'This invitation has expired.')
+        return redirect('dashboard:home')
+
+    # Check email match
+    if request.user.email != invitation.email:
+        messages.error(request, f'This invitation was sent to {invitation.email}. Please log in with that account.')
+        return redirect('dashboard:home')
+
+    # Create membership
+    EngagementMember.objects.get_or_create(
+        engagement=invitation.engagement,
+        user=request.user,
+        defaults={'role': invitation.role},
+    )
+    invitation.status = 'accepted'
+    invitation.save()
+
+    ActivityLog.objects.create(
+        engagement=invitation.engagement, user=request.user,
+        action=f'Joined as {invitation.get_role_display()}'
+    )
+    messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
+    return redirect('engagements:detail', pk=invitation.engagement.pk)

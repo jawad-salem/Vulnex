@@ -1,21 +1,6 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import AuthenticationForm
 from .models import User
-
-
-class CustomUserCreationForm(UserCreationForm):
-    first_name = forms.CharField(max_length=30, required=True)
-    last_name = forms.CharField(max_length=30, required=True)
-    email = forms.EmailField(required=True)
-
-    class Meta:
-        model = User
-        fields = ('username', 'first_name', 'last_name', 'email', 'password1', 'password2')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-input'
 
 
 class CustomAuthenticationForm(AuthenticationForm):
@@ -35,3 +20,40 @@ class UserProfileForm(forms.ModelForm):
         for field in self.fields.values():
             field.widget.attrs['class'] = 'form-input'
 
+
+class AdminUserForm(forms.ModelForm):
+    """Form for admins to create/edit users."""
+    password1 = forms.CharField(
+        label='Password', widget=forms.PasswordInput(attrs={'class': 'form-input'}),
+        required=False, help_text='Leave blank to keep current password (edit only).',
+    )
+    password2 = forms.CharField(
+        label='Confirm password', widget=forms.PasswordInput(attrs={'class': 'form-input'}),
+        required=False,
+    )
+
+    class Meta:
+        model = User
+        fields = ('username', 'first_name', 'last_name', 'email', 'role', 'is_active')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name not in ('password1', 'password2'):
+                field.widget.attrs['class'] = 'form-input'
+        # Password required on create, optional on edit
+        if not self.instance.pk:
+            self.fields['password1'].required = True
+            self.fields['password2'].required = True
+            self.fields['password1'].help_text = ''
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('password1')
+        p2 = cleaned_data.get('password2')
+        if p1 or p2:
+            if p1 != p2:
+                raise forms.ValidationError('Passwords do not match.')
+            if len(p1) < 8:
+                raise forms.ValidationError('Password must be at least 8 characters.')
+        return cleaned_data

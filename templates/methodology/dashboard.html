@@ -13,12 +13,12 @@
 </div>
 
 {% for methodology in methodologies %}
-<div class="card" style="margin-bottom:20px">
+<div class="card mb-4">
     <div class="card-header">
         <div>
             <h2 class="card-title">{{ methodology.name }}</h2>
             {% if methodology.description %}
-            <p style="font-size:12px;color:var(--text-secondary);margin-top:2px">{{ methodology.description|truncatechars:120 }}</p>
+            <p class="text-sm text-secondary mt-1">{{ methodology.description|truncatechars:120 }}</p>
             {% endif %}
         </div>
         <form method="post" action="{% url 'methodology:apply' engagement.pk methodology.pk %}">
@@ -28,28 +28,28 @@
     </div>
 
     {% for category in methodology.categories.all %}
-    <div style="margin-bottom:16px">
-        <h3 style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;color:var(--text-muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border-light)">
+    <div class="mb-4">
+        <h3 class="detail-label" style="padding-bottom:6px;border-bottom:1px solid var(--border-light);margin-bottom:8px">
             {{ category.name }}
         </h3>
         {% for item in category.items.all %}
         {% with ec=checklist_progress|get_checklist:item.pk %}
-        <div class="checklist-item" style="display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--border-light)">
+        <div class="checklist-item flex items-start gap-3" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
             <div style="flex:1;min-width:0">
-                <div style="display:flex;align-items:center;gap:8px">
+                <div class="flex items-center gap-2">
                     {% if item.reference_id %}
-                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--accent-light);background:var(--accent-bg);padding:1px 6px;border-radius:4px;flex-shrink:0">{{ item.reference_id }}</span>
+                    <span class="text-mono text-xs" style="color:var(--accent-light);background:var(--accent-bg);padding:1px 6px;border-radius:4px;flex-shrink:0">{{ item.reference_id }}</span>
                     {% endif %}
-                    <span style="font-size:13px{% if ec and ec.status == 'completed' %};text-decoration:line-through;color:var(--text-muted){% endif %}">{{ item.title }}</span>
+                    <span class="text-sm{% if ec and ec.status == 'completed' %} text-muted{% endif %}" {% if ec and ec.status == 'completed' %}style="text-decoration:line-through"{% endif %}>{{ item.title }}</span>
                 </div>
                 {% if item.description %}
-                <p style="font-size:12px;color:var(--text-secondary);margin-top:2px">{{ item.description|truncatechars:100 }}</p>
+                <p class="text-sm text-secondary mt-1">{{ item.description|truncatechars:100 }}</p>
                 {% endif %}
                 {% if ec and ec.notes %}
-                <p style="font-size:11px;color:var(--text-muted);margin-top:2px;font-style:italic">{{ ec.notes }}</p>
+                <p class="text-xs text-muted mt-1" style="font-style:italic">{{ ec.notes }}</p>
                 {% endif %}
             </div>
-            <form method="post" action="{% url 'methodology:update_item' engagement.pk item.pk %}" style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+            <form method="post" action="{% url 'methodology:update_item' engagement.pk item.pk %}" class="flex gap-1 items-center" style="flex-shrink:0">
                 {% csrf_token %}
                 <select name="status" class="form-input" style="width:auto;padding:3px 28px 3px 8px;font-size:11px" onchange="this.form.submit()">
                     <option value="not_started" {% if not ec or ec.status == "not_started" %}selected{% endif %}>Not Started</option>
@@ -68,7 +68,7 @@
 <div class="card">
     <div class="empty-state">
         <p>No methodologies available.</p>
-        <p style="font-size:13px;color:var(--text-secondary)">Create methodologies in the admin panel to use testing checklists.</p>
+        <p class="text-sm text-secondary">Create methodologies in the admin panel to use testing checklists.</p>
     </div>
 </div>
 {% endfor %}

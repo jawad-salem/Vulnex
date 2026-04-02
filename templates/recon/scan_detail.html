@@ -18,7 +18,7 @@
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-label">Status</div>
-        <span class="badge badge-{{ scan.status }}" style="font-size:14px;padding:4px 12px">{{ scan.get_status_display }}</span>
+        <span class="badge badge-{{ scan.status }} badge-lg">{{ scan.get_status_display }}</span>
     </div>
     <div class="stat-card">
         <div class="stat-label">Results</div>
@@ -26,11 +26,11 @@
     </div>
     <div class="stat-card">
         <div class="stat-label">Duration</div>
-        <div style="font-family:var(--font-mono);font-size:18px;font-weight:600;margin-top:4px">{{ scan.duration|default:"—" }}</div>
+        <div class="text-mono font-semibold mt-2" style="font-size:18px">{{ scan.duration|default:"—" }}</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">Started</div>
-        <div style="font-size:13px;margin-top:4px">{{ scan.created_at|date:"M d, Y H:i" }}</div>
+        <div class="text-sm mt-2">{{ scan.created_at|date:"M d, Y H:i" }}</div>
     </div>
 </div>
 
@@ -38,31 +38,31 @@
     <div>
         <!-- Parsed results -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:16px">Results</h2>
+            <h2 class="card-title mb-4">Results</h2>
             {% if scan.parsed_results %}
                 {% for result in scan.parsed_results %}
-                <div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;background:var(--bg-primary)">
+                <div class="section-box" style="background:var(--bg-primary)">
                     {% firstof result.hostname result.host as display_host %}
                     {% if display_host %}
-                    <div style="font-family:var(--font-mono);font-size:14px;font-weight:600;margin-bottom:8px">
+                    <div class="text-mono font-semibold mb-2" style="font-size:14px">
                         {{ display_host }}
-                        {% if result.ip %}<span style="color:var(--text-secondary);font-size:12px;font-weight:400"> ({{ result.ip }})</span>{% endif %}
+                        {% if result.ip %}<span class="text-secondary text-sm" style="font-weight:400"> ({{ result.ip }})</span>{% endif %}
                     </div>
                     {% endif %}
 
-                    {# ── Port scan results ── #}
+                    {# Port scan results #}
                     {% if result.ports %}
-                    <div style="margin-top:8px">
-                        <div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600">Open Ports</div>
-                        <table style="font-size:12px">
+                    <div class="mt-2">
+                        <div class="detail-label mb-2">Open Ports</div>
+                        <table class="text-sm">
                             <thead><tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>State</th></tr></thead>
                             <tbody>
                             {% for port in result.ports %}
                             <tr>
-                                <td style="font-family:var(--font-mono);font-weight:600">{{ port.port }}</td>
+                                <td class="text-mono font-semibold">{{ port.port }}</td>
                                 <td>{{ port.protocol|default:"tcp" }}</td>
                                 <td>{{ port.service|default:"unknown" }}</td>
-                                <td style="font-size:11px;color:var(--text-secondary)">{{ port.product|default:"" }}</td>
+                                <td class="text-xs text-secondary">{{ port.product|default:"" }}</td>
                                 <td><span class="badge badge-completed" style="font-size:10px">{{ port.state|default:"open" }}</span></td>
                             </tr>
                             {% endfor %}
@@ -71,40 +71,40 @@
                     </div>
                     {% endif %}
 
-                    {# ── Technology detection results ── #}
+                    {# Technology detection #}
                     {% if result.technologies %}
-                    <div style="margin-top:8px">
-                        <div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600">Technologies</div>
-                        <div style="display:flex;gap:4px;flex-wrap:wrap">
+                    <div class="mt-2">
+                        <div class="detail-label mb-2">Technologies</div>
+                        <div class="flex gap-1 flex-wrap">
                             {% for tech in result.technologies %}
-                            <span style="font-size:11px;background:var(--accent-bg);color:var(--accent-light);padding:2px 8px;border-radius:4px">{{ tech }}</span>
+                            <span class="text-xs" style="background:var(--accent-bg);color:var(--accent-light);padding:2px 8px;border-radius:4px">{{ tech }}</span>
                             {% endfor %}
                         </div>
                     </div>
                     {% endif %}
 
-                    {# ── Security notes (from tech detect) ── #}
+                    {# Security notes #}
                     {% if result.security_notes %}
-                    <div style="margin-top:10px">
-                        <div style="font-size:11px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600">Security Notes</div>
+                    <div class="mt-3">
+                        <div class="detail-label mb-2">Security Notes</div>
                         {% for note in result.security_notes %}
-                        <div style="font-size:12px;color:var(--warning);padding:2px 0">&#9888; {{ note }}</div>
+                        <div class="text-sm" style="color:var(--warning);padding:2px 0">&#9888; {{ note }}</div>
                         {% endfor %}
                     </div>
                     {% endif %}
 
-                    {# ── DNS enumeration results ── #}
+                    {# DNS enumeration #}
                     {% if result.type %}
-                    <div style="display:flex;gap:12px;align-items:center;font-size:13px">
-                        <span class="badge badge-info" style="font-family:var(--font-mono);min-width:50px;justify-content:center">{{ result.type }}</span>
-                        <span style="font-family:var(--font-mono)">{{ result.value }}</span>
+                    <div class="flex gap-3 items-center text-sm">
+                        <span class="badge badge-info text-mono" style="min-width:50px;justify-content:center">{{ result.type }}</span>
+                        <span class="text-mono">{{ result.value }}</span>
                     </div>
                     {% endif %}
 
-                    {# ── WHOIS results ── #}
+                    {# WHOIS results #}
                     {% if result.registrar %}
-                    <div class="detail-list" style="margin-top:4px">
-                        {% if result.domain %}<div class="detail-row"><span class="detail-label">Domain</span><span style="font-family:var(--font-mono)">{{ result.domain }}</span></div>{% endif %}
+                    <div class="detail-list mt-1">
+                        {% if result.domain %}<div class="detail-row"><span class="detail-label">Domain</span><span class="text-mono">{{ result.domain }}</span></div>{% endif %}
                         <div class="detail-row"><span class="detail-label">Registrar</span><span>{{ result.registrar }}</span></div>
                         {% if result.organization %}<div class="detail-row"><span class="detail-label">Organization</span><span>{{ result.organization }}</span></div>{% endif %}
                         {% if result.country %}<div class="detail-row"><span class="detail-label">Country</span><span>{{ result.country }}</span></div>{% endif %}
@@ -112,30 +112,30 @@
                         {% if result.expires %}<div class="detail-row"><span class="detail-label">Expires</span><span>{{ result.expires }}</span></div>{% endif %}
                         {% if result.updated %}<div class="detail-row"><span class="detail-label">Updated</span><span>{{ result.updated }}</span></div>{% endif %}
                         {% if result.nameservers %}
-                        <div class="detail-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+                        <div class="detail-row flex-col items-start gap-1">
                             <span class="detail-label">Nameservers</span>
                             {% for ns in result.nameservers %}
-                            <span style="font-family:var(--font-mono);font-size:12px">{{ ns }}</span>
+                            <span class="text-mono text-sm">{{ ns }}</span>
                             {% endfor %}
                         </div>
                         {% endif %}
                     </div>
                     {% endif %}
 
-                    {# ── Directory bruteforce results ── #}
+                    {# Directory bruteforce #}
                     {% if result.directories %}
-                    <div style="margin-top:4px">
-                        <table style="font-size:12px">
+                    <div class="mt-1">
+                        <table class="text-sm">
                             <thead><tr><th>Path</th><th>Status</th><th>Size</th><th>Note</th></tr></thead>
                             <tbody>
                             {% for dir in result.directories %}
                             <tr>
-                                <td style="font-family:var(--font-mono)">{{ dir.path }}</td>
+                                <td class="text-mono">{{ dir.path }}</td>
                                 <td>
                                     <span class="badge {% if dir.status == 200 %}badge-completed{% elif dir.status == 403 %}badge-high{% elif dir.status == 301 or dir.status == 302 %}badge-low{% else %}badge-info{% endif %}" style="font-size:10px">{{ dir.status }}</span>
                                 </td>
-                                <td style="font-family:var(--font-mono);font-size:11px">{{ dir.size }}</td>
-                                <td style="font-size:11px;color:var(--text-secondary)">{{ dir.note|default:"" }}{% if dir.redirect %}&#8594; {{ dir.redirect }}{% endif %}</td>
+                                <td class="text-mono text-xs">{{ dir.size }}</td>
+                                <td class="text-xs text-secondary">{{ dir.note|default:"" }}{% if dir.redirect %} &#8594; {{ dir.redirect }}{% endif %}</td>
                             </tr>
                             {% endfor %}
                             </tbody>
@@ -143,22 +143,22 @@
                     </div>
                     {% endif %}
 
-                    {# ── Generic note ── #}
+                    {# Generic note #}
                     {% if result.note %}
-                    <div style="color:var(--text-secondary);font-size:13px;margin-top:4px">{{ result.note }}</div>
+                    <div class="text-secondary text-sm mt-1">{{ result.note }}</div>
                     {% endif %}
                 </div>
                 {% endfor %}
             {% else %}
-            <p style="color:var(--text-secondary);font-size:13px">No results.</p>
+            <p class="text-secondary text-sm">No results.</p>
             {% endif %}
         </div>
     </div>
 
     <div>
-        <!-- Scan details -->
+        <!-- Scan info -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Scan info</h2>
+            <h2 class="card-title mb-3">Scan info</h2>
             <div class="detail-list">
                 <div class="detail-row">
                     <span class="detail-label">Type</span>
@@ -166,7 +166,7 @@
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Target</span>
-                    <span style="font-family:var(--font-mono)">{{ scan.target }}</span>
+                    <span class="text-mono">{{ scan.target }}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Started by</span>
@@ -189,15 +189,15 @@
 
         {% if scan.error_message %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px;color:var(--critical)">Error</h2>
-            <div style="font-family:var(--font-mono);font-size:12px;background:var(--bg-primary);padding:12px;border-radius:var(--radius);color:var(--critical)">{{ scan.error_message }}</div>
+            <h2 class="card-title mb-3" style="color:var(--critical)">Error</h2>
+            <div class="mono-block" style="color:var(--critical)">{{ scan.error_message }}</div>
         </div>
         {% endif %}
 
         {% if scan.raw_output %}
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Raw output</h2>
-            <div style="font-family:var(--font-mono);font-size:11px;background:var(--bg-primary);padding:12px;border-radius:var(--radius);max-height:400px;overflow:auto;white-space:pre-wrap">{{ scan.raw_output }}</div>
+            <h2 class="card-title mb-3">Raw output</h2>
+            <div class="mono-block text-pre text-xs" style="max-height:400px;overflow:auto">{{ scan.raw_output }}</div>
         </div>
         {% endif %}
     </div>

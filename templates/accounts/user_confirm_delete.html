@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Delete user — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete user</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'accounts:user_list' %}">Users</a> &middot; {{ target_user.username }}
+        </p>
+    </div>
+</div>
+<div class="card" style="max-width:500px">
+    <p style="margin-bottom:16px">
+        Are you sure you want to delete <strong>{{ target_user.get_full_name|default:target_user.username }}</strong>
+        ({{ target_user.email }})?
+    </p>
+    <p class="text-secondary text-sm" style="margin-bottom:20px">
+        This will remove the user from all engagements and delete their data. This action cannot be undone.
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="btn-group">
+            <button type="submit" class="btn btn-danger">Delete user</button>
+            <a href="{% url 'accounts:user_list' %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

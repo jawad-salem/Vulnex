@@ -10,5 +10,10 @@ urlpatterns = [
     path('<uuid:pk>/edit/', views.engagement_edit, name='edit'),
     path('<uuid:pk>/delete/', views.engagement_delete, name='delete'),
     path('<uuid:pk>/status/', views.engagement_update_status, name='update_status'),
+    # Team management
+    path('<uuid:pk>/invite/', views.invite_member, name='invite'),
+    path('<uuid:pk>/remove/<uuid:member_pk>/', views.remove_member, name='remove_member'),
+    path('<uuid:pk>/cancel-invite/<uuid:invitation_pk>/', views.cancel_invitation, name='cancel_invitation'),
+    path('join/<uuid:token>/', views.accept_invitation, name='accept_invitation'),
 ]
 

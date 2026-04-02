@@ -1,0 +1,160 @@
+# PentestFlow
+
+A full-featured penetration testing workflow platform built with Django. Manage engagements, track vulnerabilities, run reconnaissance scans, follow testing methodologies, and generate professional PDF reports — all from a single dark-themed interface.
+
+## Features
+
+### Engagement Management
+- Create and track pentest engagements with scope, phases, and timelines
+- Per-engagement team roles (Lead, Pentester, Reviewer, Client)
+- Email-based invitation system with token acceptance
+- Activity logging and audit trail
+
+### Vulnerability Tracking
+- Full CRUD for findings with CVSS v3.1 auto-calculation
+- Structured location fields (host, port, URL, endpoint, HTTP method, parameter)
+- Import from **Nuclei** (JSON/JSONL) and **Nikto** (JSON) with automatic deduplication
+- Evidence upload (images and files) per finding
+- Export findings to **CSV** or **JSON**
+- Severity auto-assigned from CVSS vectors
+
+### Reconnaissance
+- Built-in Python scanners (no external tools required):
+  - **Port scanning** — threaded TCP connect scan with banner grabbing
+  - **Subdomain enumeration** — DNS-based discovery
+  - **Technology detection** — HTTP header/body analysis
+  - **DNS enumeration** — A, AAAA, PTR records
+  - **WHOIS lookup** — registrar, dates, nameservers
+  - **Directory bruteforce** — common path discovery
+- **Nmap XML import** for host/port discovery
+
+### Methodology Checklists
+- Apply testing methodologies (OWASP, PTES, custom)
+- Track checklist progress per engagement
+- Status tracking: Not Started, In Progress, Completed, N/A
+
+### Reporting
+- PDF report generation via ReportLab:
+  - **Full Report** — executive summary + scope + detailed findings + remediation
+  - **Executive Summary** — high-level risk overview for management
+  - **Technical Detail** — deep technical findings with PoC and CVSS vectors
+
+### Dashboard & Analytics
+- Real-time stats: active engagements, findings by severity, urgent items
+- Interactive charts (Chart.js): severity distribution, status breakdown, findings over time, top engagements
+- Activity feed and recent engagement overview
+
+### Access Control
+- **Global roles**: Admin, Pentester, Viewer
+- **Per-engagement roles**: Lead, Pentester, Reviewer, Client
+- Client role restrictions: no access to Recon, Methodology, or Notes
+- Admin user management (create, edit, deactivate, delete users)
+- No public registration — invitation-only access
+
+## Tech Stack
+
+- **Backend**: Django 5.x, Python 3.11+
+- **Database**: SQLite (dev), PostgreSQL (prod)
+- **PDF Generation**: ReportLab
+- **Charts**: Chart.js 4.x (CDN)
+- **Styling**: Custom CSS, dark cybersecurity theme
+- **Containerization**: Docker + Docker Compose
+
+## Quick Start
+
+### Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/jawad-salem/PentestFlow.git
+cd PentestFlow
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations
+python manage.py migrate
+
+# Create admin user
+python manage.py createsuperuser
+
+# Start the server
+python manage.py runserver
+```
+
+Then open http://localhost:8000 and log in with your superuser credentials.
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Then create an admin user:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+## Project Structure
+
+```
+pentestflow/
+├── accounts/          # User model, auth, admin user management
+├── dashboard/         # Dashboard views and analytics
+├── engagements/       # Engagement CRUD, team management, invitations
+├── vulns/             # Findings, evidence, import/export
+├── recon/             # Scanners, Nmap import, host discovery
+├── methodology/       # Testing checklists and progress tracking
+├── reports/           # PDF report generation
+├── pentestflow/       # Project settings, URLs, admin config
+├── templates/         # All HTML templates
+├── static/css/        # Dark theme CSS
+├── Dockerfile
+└── docker-compose.yml
+```
+
+## Usage
+
+### Initial Setup
+1. Create a superuser with `python manage.py createsuperuser`
+2. Log in and set your role to **Admin** via `/admin`
+3. Create other users via **Users** in the sidebar
+4. Create your first engagement
+
+### Typical Workflow
+1. **Create engagement** — define scope, targets, dates
+2. **Invite team** — add pentesters and reviewers via email
+3. **Run recon** — use built-in scanners or import Nmap XML
+4. **Track findings** — add manually or import from Nuclei/Nikto
+5. **Follow methodology** — apply and track testing checklists
+6. **Generate reports** — export PDF reports for clients
+7. **Export data** — download findings as CSV/JSON
+
+### Inviting Team Members
+- Navigate to an engagement's detail page
+- Use the invite form (visible to Leads only)
+- If the email matches an existing user, they're added immediately
+- Otherwise, an invitation email is sent with a join link
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | `dev-insecure-key...` | Django secret key |
+| `DJANGO_DEBUG` | `True` | Debug mode |
+| `DATABASE_URL` | SQLite | Database connection string |
+| `SITE_URL` | `http://localhost:8000` | Base URL for invitation links |
+| `EMAIL_BACKEND` | Console | Email backend class |
+| `EMAIL_HOST` | `smtp.gmail.com` | SMTP server |
+| `EMAIL_HOST_USER` | — | SMTP username |
+| `EMAIL_HOST_PASSWORD` | — | SMTP password |
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).

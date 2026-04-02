@@ -10,5 +10,7 @@ urlpatterns = [
     path('<uuid:pk>/', views.finding_detail, name='detail'),
     path('<uuid:pk>/edit/', views.finding_edit, name='edit'),
     path('<uuid:pk>/delete/', views.finding_delete, name='delete'),
+    path('engagement/<uuid:engagement_pk>/export/csv/', views.export_csv, name='export_csv'),
+    path('engagement/<uuid:engagement_pk>/export/json/', views.export_json, name='export_json'),
 ]
 

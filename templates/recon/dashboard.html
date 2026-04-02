@@ -15,7 +15,7 @@
     <div>
         <!-- Start new scan -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:16px">New scan</h2>
+            <h2 class="card-title mb-4">New scan</h2>
             <form method="post" action="{% url 'recon:start_scan' engagement.pk %}">
                 {% csrf_token %}
                 <div class="form-row">
@@ -34,7 +34,7 @@
 
         <!-- Import Nmap XML -->
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:16px">Import Nmap scan</h2>
+            <h2 class="card-title mb-4">Import Nmap scan</h2>
             <form method="post" action="{% url 'recon:import_nmap' engagement.pk %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="form-group">
@@ -61,10 +61,10 @@
                     {% for scan in scans %}
                     <tr>
                         <td><a href="{% url 'recon:scan_detail' scan.pk %}">{{ scan.get_scan_type_display }}</a></td>
-                        <td style="font-family:var(--font-mono);font-size:12px">{{ scan.target|truncatechars:30 }}</td>
+                        <td class="text-mono text-sm">{{ scan.target|truncatechars:30 }}</td>
                         <td><span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span></td>
-                        <td style="font-family:var(--font-mono)">{{ scan.result_count }}</td>
-                        <td style="font-size:12px;color:var(--text-secondary)">{{ scan.created_at|date:"M d, H:i" }}</td>
+                        <td class="text-mono">{{ scan.result_count }}</td>
+                        <td class="text-sm text-secondary">{{ scan.created_at|date:"M d, H:i" }}</td>
                     </tr>
                     {% endfor %}
                     </tbody>
@@ -87,35 +87,35 @@
             </div>
             {% if hosts %}
             {% for host in hosts %}
-            <div style="padding:10px 0;border-bottom:1px solid var(--border-light)">
-                <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="member-row flex-col items-start gap-2" style="padding:10px 0">
+                <div class="flex-between" style="width:100%">
                     <div>
-                        <div style="font-family:var(--font-mono);font-size:13px;font-weight:600">{{ host.hostname }}</div>
+                        <div class="text-mono font-semibold" style="font-size:13px">{{ host.hostname }}</div>
                         {% if host.ip_address %}
-                        <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)">{{ host.ip_address }}</div>
+                        <div class="text-mono text-xs text-secondary">{{ host.ip_address }}</div>
                         {% endif %}
                     </div>
                 </div>
                 {% if host.ports %}
-                <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+                <div class="flex gap-1 flex-wrap">
                     {% for port in host.ports %}
-                    <span class="badge badge-info" style="font-family:var(--font-mono)">
+                    <span class="badge badge-info text-mono">
                         {% if port.port %}{{ port.port }}/{{ port.protocol|default:"tcp" }}{% else %}{{ port }}{% endif %}
                     </span>
                     {% endfor %}
                 </div>
                 {% endif %}
                 {% if host.technologies %}
-                <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">
+                <div class="flex gap-1 flex-wrap">
                     {% for tech in host.technologies %}
-                    <span style="font-size:11px;background:var(--accent-bg);color:var(--accent-light);padding:2px 6px;border-radius:4px">{{ tech }}</span>
+                    <span class="text-xs" style="background:var(--accent-bg);color:var(--accent-light);padding:2px 6px;border-radius:4px">{{ tech }}</span>
                     {% endfor %}
                 </div>
                 {% endif %}
             </div>
             {% endfor %}
             {% else %}
-            <p style="color:var(--text-secondary);font-size:13px">No hosts discovered yet.</p>
+            <p class="text-secondary text-sm">No hosts discovered yet.</p>
             {% endif %}
         </div>
     </div>

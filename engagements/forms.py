@@ -8,7 +8,7 @@ class EngagementForm(forms.ModelForm):
         fields = [
             'name', 'client_name', 'engagement_type', 'status',
             'description', 'in_scope', 'out_of_scope',
-            'rules_of_engagement', 'start_date', 'end_date', 'lead',
+            'rules_of_engagement', 'start_date', 'end_date',
         ]
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
@@ -24,6 +24,15 @@ class EngagementForm(forms.ModelForm):
         for field in self.fields.values():
             if not isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect)):
                 field.widget.attrs.setdefault('class', 'form-input')
+
+    def clean_name(self):
+        name = self.cleaned_data['name']
+        qs = Engagement.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('An engagement with this name already exists.')
+        return name
 
 
 class EngagementNoteForm(forms.ModelForm):

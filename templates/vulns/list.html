@@ -7,13 +7,19 @@
         <p class="page-subtitle">{{ engagement.name }} &middot; {{ page_obj.paginator.count }} total</p>
     </div>
     <div class="btn-group">
+        {% if can_edit %}
         <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">+ Add finding</a>
         <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import</a>
+        {% endif %}
+        {% if findings %}
+        <a href="{% url 'vulns:export_csv' engagement.pk %}" class="btn">Export CSV</a>
+        <a href="{% url 'vulns:export_json' engagement.pk %}" class="btn">Export JSON</a>
+        {% endif %}
     </div>
 </div>
 
 <div class="filter-bar">
-    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;width:100%">
+    <form method="get" class="flex gap-2 flex-wrap" style="width:100%">
         <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search findings..." class="form-input search-input">
         <select name="severity" class="form-input" onchange="this.form.submit()">
             <option value="">All severities</option>
@@ -38,22 +44,22 @@
             <thead>
                 <tr>
                     <th>Title</th>
+                    <th>Host</th>
                     <th>Severity</th>
                     <th>CVSS</th>
                     <th>Status</th>
-                    <th>Found by</th>
                     <th>Date</th>
                 </tr>
             </thead>
             <tbody>
             {% for f in findings %}
             <tr>
-                <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:60 }}</strong></a></td>
+                <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:50 }}</strong></a></td>
+                <td class="text-mono text-sm">{{ f.host|default:"—" }}{% if f.port %}<span class="text-muted">:{{ f.port }}</span>{% endif %}</td>
                 <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td style="font-family:var(--font-mono);font-weight:600">{{ f.cvss_score|floatformat:1 }}</td>
+                <td class="text-mono font-semibold">{{ f.cvss_score|floatformat:1 }}</td>
                 <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
-                <td style="font-size:12px;color:var(--text-secondary)">{{ f.found_by|default:"—" }}</td>
-                <td style="font-size:12px;color:var(--text-secondary)">{{ f.created_at|date:"M d, Y" }}</td>
+                <td class="text-sm text-secondary">{{ f.created_at|date:"M d, Y" }}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -64,10 +70,12 @@
     <div class="empty-state">
         <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <p>No findings yet for this engagement.</p>
+        {% if can_edit %}
         <div class="btn-group" style="justify-content:center">
             <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">Add first finding</a>
             <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import from tool</a>
         </div>
+        {% endif %}
     </div>
     {% endif %}
 </div>

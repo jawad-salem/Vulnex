@@ -5,29 +5,30 @@ from django.http import HttpResponse
 from engagements.models import Engagement, ActivityLog
 from .models import Report
 from .generator import generate_report_pdf
-from accounts.decorators import role_required
+from accounts.decorators import engagement_access, engagement_edit_required
 
 
 @login_required
+@engagement_access(allow_client=True)
 def report_dashboard(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     reports = engagement.reports.all()
     context = {
         'engagement': engagement,
         'reports': reports,
+        'can_generate': request.eng_role in ('admin', 'lead', 'pentester'),
     }
     return render(request, 'reports/dashboard.html', context)
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def generate_report(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     report_type = request.POST.get('report_type', 'full')
 
     pdf_bytes = generate_report_pdf(engagement, report_type)
 
-    # Create report record
     report = Report.objects.create(
         engagement=engagement,
         title=f'{engagement.name} — {dict(Report.ReportType.choices).get(report_type, "Report")}',
@@ -35,7 +36,6 @@ def generate_report(request, engagement_pk):
         generated_by=request.user,
     )
 
-    # Save PDF
     from django.core.files.base import ContentFile
     import re
     safe_name = re.sub(r'[^\w\-]', '_', engagement.name)
@@ -52,19 +52,22 @@ def generate_report(request, engagement_pk):
 
 @login_required
 def download_report(request, pk):
-    report = get_object_or_404(Report, pk=pk)
+    report = get_object_or_404(Report.objects.select_related('engagement'), pk=pk)
+    if not report.engagement.user_can_access(request.user):
+        messages.error(request, 'You are not a member of this engagement.')
+        return redirect('engagements:list')
     response = HttpResponse(report.file.read(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{report.file.name.split("/")[-1]}"'
     return response
 
 
 @login_required
+@engagement_access(allow_client=True)
 def preview_report(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     report_type = request.GET.get('type', 'full')
     pdf_bytes = generate_report_pdf(engagement, report_type)
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="preview.pdf"'
     return response
-

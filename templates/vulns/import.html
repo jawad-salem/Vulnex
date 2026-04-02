@@ -14,14 +14,12 @@
 
 <div class="grid-2">
     <div class="card">
-        <h2 class="card-title" style="margin-bottom:16px">Upload tool output</h2>
+        <h2 class="card-title mb-4">Upload tool output</h2>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
             {% if form.errors %}
-            <div class="alert alert-error" style="margin-bottom:16px">
-                Please fix the errors below.
-            </div>
+            <div class="alert alert-error mb-4">Please fix the errors below.</div>
             {% endif %}
 
             <div class="form-group">
@@ -42,26 +40,26 @@
 
     <div>
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Supported formats</h2>
+            <h2 class="card-title mb-3">Supported formats</h2>
             <div class="detail-list">
                 <div class="detail-row">
                     <span class="detail-label">Nuclei</span>
-                    <span>JSON/JSONL output (<code style="font-size:12px;color:var(--accent-light)">-json</code>)</span>
+                    <span>JSON/JSONL output (<code>-json</code>)</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Nikto</span>
-                    <span>JSON output (<code style="font-size:12px;color:var(--accent-light)">-Format json</code>)</span>
+                    <span>JSON output (<code>-Format json</code>)</span>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <h2 class="card-title" style="margin-bottom:12px">Tips</h2>
-            <ul style="font-size:13px;color:var(--text-secondary);padding-left:18px">
-                <li style="margin-bottom:6px">Imported vulnerabilities are assigned severity based on the tool's output</li>
-                <li style="margin-bottom:6px">CVSS scores are calculated automatically where possible</li>
-                <li style="margin-bottom:6px">Duplicate findings are not automatically deduplicated — review after import</li>
-                <li style="margin-bottom:6px">You can edit any imported finding after import</li>
+            <h2 class="card-title mb-3">Tips</h2>
+            <ul class="text-sm text-secondary" style="padding-left:18px">
+                <li class="mb-2">Imported vulnerabilities are assigned severity based on the tool's output</li>
+                <li class="mb-2">CVSS scores are calculated automatically where possible</li>
+                <li class="mb-2">Duplicate findings are not automatically deduplicated — review after import</li>
+                <li class="mb-2">You can edit any imported finding after import</li>
                 <li>Looking for Nmap import? It's in the <a href="{% url 'recon:dashboard' engagement.pk %}">Recon</a> section</li>
             </ul>
         </div>

@@ -61,9 +61,26 @@ class Finding(models.Model):
     integrity_impact = models.CharField(max_length=1, choices=Impact.choices, default='N')
     availability_impact = models.CharField(max_length=1, choices=Impact.choices, default='N')
 
+    # Location — where exactly the vulnerability exists
+    class HttpMethod(models.TextChoices):
+        GET = 'GET', 'GET'
+        POST = 'POST', 'POST'
+        PUT = 'PUT', 'PUT'
+        PATCH = 'PATCH', 'PATCH'
+        DELETE = 'DELETE', 'DELETE'
+        OPTIONS = 'OPTIONS', 'OPTIONS'
+        HEAD = 'HEAD', 'HEAD'
+
+    host = models.CharField(max_length=300, blank=True, help_text='e.g. api.example.com')
+    port = models.PositiveIntegerField(null=True, blank=True, help_text='e.g. 443, 8080')
+    url = models.URLField(max_length=2000, blank=True, help_text='Full URL where the issue was found')
+    parameter = models.CharField(max_length=300, blank=True, help_text='Vulnerable parameter, e.g. username, id')
+    http_method = models.CharField(max_length=10, choices=HttpMethod.choices, blank=True, help_text='HTTP method used')
+    endpoint = models.CharField(max_length=500, blank=True, help_text='API endpoint or path, e.g. /api/v1/login')
+
     # Details
     description = models.TextField()
-    affected_hosts = models.TextField(blank=True, help_text='One host per line')
+    affected_hosts = models.TextField(blank=True, help_text='Additional affected hosts — one per line')
     proof_of_concept = models.TextField(blank=True, help_text='Steps to reproduce')
     remediation = models.TextField(blank=True)
     references = models.TextField(blank=True, help_text='CVE IDs, URLs — one per line')

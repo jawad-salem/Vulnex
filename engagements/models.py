@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 import uuid
 
 
@@ -43,14 +44,7 @@ class Engagement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Team
-    lead = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, related_name='led_engagements'
-    )
-    team_members = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name='engagements'
-    )
+    # Creator
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, related_name='created_engagements'
@@ -82,6 +76,36 @@ class Engagement(models.Model):
     def high_count(self):
         return self.findings.filter(severity='high').count()
 
+    def get_user_role(self, user):
+        """Return the user's EngagementMember role, or None if not a member."""
+        try:
+            return self.members.get(user=user).role
+        except self.members.model.DoesNotExist:
+            return None
+
+    def user_can_access(self, user):
+        """Check if user can access this engagement."""
+        if user.role == 'admin':
+            return True
+        return self.members.filter(user=user).exists()
+
+    def user_can_edit(self, user):
+        """Check if user can edit (lead or pentester on this engagement)."""
+        if user.role == 'admin':
+            return True
+        role = self.get_user_role(user)
+        return role in ('lead', 'pentester')
+
+    def user_is_lead(self, user):
+        """Check if user is lead on this engagement."""
+        if user.role == 'admin':
+            return True
+        return self.get_user_role(user) == 'lead'
+
+    def user_is_client(self, user):
+        """Check if user has client role on this engagement."""
+        return self.get_user_role(user) == 'client'
+
     @property
     def progress_percent(self):
         phases = list(self.Status.values)
@@ -105,6 +129,67 @@ class EngagementNote(models.Model):
 
     def __str__(self):
         return f"Note on {self.engagement.name} by {self.author}"
+
+
+class EngagementMember(models.Model):
+    """Per-engagement role assignment."""
+    class Role(models.TextChoices):
+        LEAD = 'lead', 'Lead'
+        PENTESTER = 'pentester', 'Pentester'
+        REVIEWER = 'reviewer', 'Reviewer'
+        CLIENT = 'client', 'Client'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='memberships')
+    role = models.CharField(max_length=20, choices=Role.choices)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('engagement', 'user')
+        ordering = ['role', 'joined_at']
+
+    def __str__(self):
+        return f"{self.user} — {self.get_role_display()} on {self.engagement.name}"
+
+    @property
+    def can_edit(self):
+        return self.role in (self.Role.LEAD, self.Role.PENTESTER)
+
+    @property
+    def can_manage(self):
+        return self.role == self.Role.LEAD
+
+    @property
+    def is_client(self):
+        return self.role == self.Role.CLIENT
+
+
+class Invitation(models.Model):
+    """Email-based invitation to join an engagement."""
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        ACCEPTED = 'accepted', 'Accepted'
+        EXPIRED = 'expired', 'Expired'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='invitations')
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=EngagementMember.Role.choices)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    token = models.UUIDField(default=uuid.uuid4, unique=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Invite {self.email} → {self.engagement.name} as {self.get_role_display()}"
+
+    @property
+    def is_expired(self):
+        return (timezone.now() - self.created_at).days > 7
 
 
 class ActivityLog(models.Model):

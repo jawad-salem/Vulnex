@@ -1,18 +1,22 @@
+import csv
+import json
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.http import HttpResponse
 from django.db.models import Q
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence
 from .forms import FindingForm, EvidenceForm, ToolImportForm
 from .parsers import parse_nuclei_json, parse_nikto_json
-from accounts.decorators import role_required
+from accounts.decorators import engagement_access, engagement_edit_required
 
 
 @login_required
+@engagement_access(allow_client=True)
 def finding_list(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     findings = engagement.findings.all()
 
     severity_filter = request.GET.get('severity')
@@ -45,6 +49,7 @@ def finding_list(request, engagement_pk):
         'query_string': query_string,
         'severity_choices': Finding.Severity.choices,
         'status_choices': Finding.Status.choices,
+        'can_edit': request.eng_role in ('admin', 'lead', 'pentester'),
     }
     return render(request, 'vulns/list.html', context)
 
@@ -52,9 +57,13 @@ def finding_list(request, engagement_pk):
 @login_required
 def finding_detail(request, pk):
     finding = get_object_or_404(Finding.objects.select_related('engagement', 'found_by'), pk=pk)
+    if not finding.engagement.user_can_access(request.user):
+        messages.error(request, 'You are not a member of this engagement.')
+        return redirect('engagements:list')
     evidence_form = EvidenceForm()
+    is_client = finding.engagement.user_is_client(request.user)
 
-    if request.method == 'POST' and 'upload_evidence' in request.POST:
+    if request.method == 'POST' and 'upload_evidence' in request.POST and not is_client:
         evidence_form = EvidenceForm(request.POST, request.FILES)
         if evidence_form.is_valid():
             ev = evidence_form.save(commit=False)
@@ -68,14 +77,16 @@ def finding_detail(request, pk):
         'finding': finding,
         'evidence': finding.evidence.all(),
         'evidence_form': evidence_form,
+        'is_client': is_client,
+        'can_edit': finding.engagement.user_can_edit(request.user),
     }
     return render(request, 'vulns/detail.html', context)
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def finding_create(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     if request.method == 'POST':
         form = FindingForm(request.POST)
         if form.is_valid():
@@ -97,9 +108,11 @@ def finding_create(request, engagement_pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
 def finding_edit(request, pk):
     finding = get_object_or_404(Finding, pk=pk)
+    if not finding.engagement.user_can_edit(request.user):
+        messages.error(request, 'You do not have edit permissions.')
+        return redirect('vulns:detail', pk=pk)
     if request.method == 'POST':
         form = FindingForm(request.POST, instance=finding)
         if form.is_valid():
@@ -115,9 +128,11 @@ def finding_edit(request, pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
 def finding_delete(request, pk):
     finding = get_object_or_404(Finding, pk=pk)
+    if not finding.engagement.user_can_edit(request.user):
+        messages.error(request, 'You do not have permission to delete findings.')
+        return redirect('vulns:detail', pk=pk)
     engagement = finding.engagement
     if request.method == 'POST':
         title = finding.title
@@ -135,9 +150,9 @@ def finding_delete(request, pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def tool_import(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     if request.method == 'POST':
         form = ToolImportForm(request.POST, request.FILES)
         if form.is_valid():
@@ -151,20 +166,33 @@ def tool_import(request, engagement_pk):
             }
             try:
                 findings_data = parsers[tool](content)
-                count = 0
+                created = 0
+                skipped = 0
+                # Build set of (title, host, endpoint) from existing findings
+                existing_keys = set(
+                    engagement.findings.values_list('title', 'host', 'endpoint')
+                )
                 for fd in findings_data:
+                    dedup_key = (fd.get('title', ''), fd.get('host', ''), fd.get('endpoint', ''))
+                    if dedup_key in existing_keys:
+                        skipped += 1
+                        continue
+                    existing_keys.add(dedup_key)
                     Finding.objects.create(
                         engagement=engagement,
                         found_by=request.user,
                         tool_source=tool.capitalize(),
                         **fd
                     )
-                    count += 1
+                    created += 1
                 ActivityLog.objects.create(
                     engagement=engagement, user=request.user,
-                    action=f'Imported {count} findings from {tool.capitalize()}'
+                    action=f'Imported {created} findings from {tool.capitalize()}'
                 )
-                messages.success(request, f'Imported {count} findings from {tool.capitalize()}.')
+                msg = f'Imported {created} findings from {tool.capitalize()}.'
+                if skipped:
+                    msg += f' {skipped} duplicate(s) skipped.'
+                messages.success(request, msg)
             except Exception as e:
                 messages.error(request, f'Import failed: {str(e)}')
             return redirect('vulns:list', engagement_pk=engagement_pk)
@@ -173,4 +201,56 @@ def tool_import(request, engagement_pk):
     return render(request, 'vulns/import.html', {
         'form': form, 'engagement': engagement,
     })
+
+
+EXPORT_FIELDS = [
+    'title', 'severity', 'cvss_score', 'status', 'host', 'port', 'url',
+    'endpoint', 'http_method', 'parameter', 'description',
+    'proof_of_concept', 'remediation', 'cwe_id', 'tool_source',
+    'affected_hosts', 'references', 'cvss_vector_string', 'created_at',
+]
+
+
+@login_required
+@engagement_access(allow_client=True)
+def export_csv(request, engagement_pk):
+    engagement = request.engagement
+    findings = engagement.findings.all()
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(EXPORT_FIELDS)
+    for f in findings:
+        writer.writerow([
+            getattr(f, field) if field != 'cvss_vector_string'
+            else f.cvss_vector_string
+            for field in EXPORT_FIELDS
+        ])
+    return response
+
+
+@login_required
+@engagement_access(allow_client=True)
+def export_json(request, engagement_pk):
+    engagement = request.engagement
+    findings = engagement.findings.all()
+
+    data = []
+    for f in findings:
+        row = {}
+        for field in EXPORT_FIELDS:
+            val = getattr(f, field) if field != 'cvss_vector_string' else f.cvss_vector_string
+            if hasattr(val, 'isoformat'):
+                val = val.isoformat()
+            row[field] = val
+        data.append(row)
+
+    response = HttpResponse(
+        json.dumps(data, indent=2),
+        content_type='application/json',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.json"'
+    return response
 

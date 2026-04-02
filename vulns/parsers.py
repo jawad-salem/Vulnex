@@ -92,13 +92,27 @@ def parse_nuclei_json(content: bytes) -> list[dict]:
         'info': {'c': 'N', 'i': 'N', 'a': 'N'},
     }
 
-    for line in text.strip().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
+    # Support both JSON array and JSONL (one object per line)
+    items = []
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            items = parsed
+        elif isinstance(parsed, dict):
+            items = [parsed]
+    except json.JSONDecodeError:
+        # Fall back to JSONL (one JSON object per line)
+        for line in text.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                items.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    for item in items:
+        if not isinstance(item, dict):
             continue
 
         info = item.get('info', {})
@@ -114,10 +128,37 @@ def parse_nuclei_json(content: bytes) -> list[dict]:
         cwe_ids = info.get('classification', {}).get('cwe-id', [])
         cwe = cwe_ids[0] if cwe_ids else ''
 
-        findings.append({
+        # Extract host/url from matched-at
+        matched_at = item.get('matched-at', '')
+        host_val = item.get('host', '')
+        url_val = ''
+        endpoint_val = ''
+        port_val = None
+
+        if matched_at.startswith(('http://', 'https://')):
+            url_val = matched_at
+            try:
+                from urllib.parse import urlparse
+                parsed = urlparse(matched_at)
+                host_val = host_val or parsed.hostname or ''
+                endpoint_val = parsed.path or ''
+                if parsed.port:
+                    port_val = parsed.port
+                elif parsed.scheme == 'https':
+                    port_val = 443
+                elif parsed.scheme == 'http':
+                    port_val = 80
+            except Exception:
+                pass
+        elif not host_val:
+            host_val = matched_at
+
+        finding_data = {
             'title': info.get('name', item.get('template-id', 'Unknown')),
-            'description': info.get('description', '') or f"Matched: {item.get('matched-at', '')}",
-            'affected_hosts': item.get('host', item.get('matched-at', '')),
+            'description': info.get('description', '') or f"Matched: {matched_at}",
+            'host': host_val,
+            'url': url_val,
+            'endpoint': endpoint_val,
             'references': refs,
             'cwe_id': str(cwe),
             'severity': sev,
@@ -128,7 +169,11 @@ def parse_nuclei_json(content: bytes) -> list[dict]:
             'confidentiality_impact': impacts['c'],
             'integrity_impact': impacts['i'],
             'availability_impact': impacts['a'],
-        })
+        }
+        if port_val:
+            finding_data['port'] = port_val
+
+        findings.append(finding_data)
 
     return findings
 
@@ -164,7 +209,10 @@ def parse_nikto_json(content: bytes) -> list[dict]:
             findings.append({
                 'title': f'Nikto: {msg[:120]}',
                 'description': f'{method} {url}\n\n{msg}',
-                'affected_hosts': host_label,
+                'host': ip,
+                'port': int(port) if port else None,
+                'endpoint': url,
+                'http_method': method if method in ('GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD') else '',
                 'references': refs,
                 'severity': 'low',
                 'attack_vector': 'N',

@@ -7,12 +7,13 @@ from .models import ReconScan, DiscoveredHost
 from .forms import ReconScanForm, NmapImportForm
 from .parsers import parse_nmap_xml_to_hosts
 from .scanners import run_scan
-from accounts.decorators import role_required
+from accounts.decorators import engagement_access, engagement_edit_required
 
 
 @login_required
+@engagement_access(allow_client=False)
 def recon_dashboard(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     scans = engagement.scans.all()
     hosts = engagement.discovered_hosts.all()
     scan_form = ReconScanForm()
@@ -29,9 +30,9 @@ def recon_dashboard(request, engagement_pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def start_scan(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     if request.method == 'POST':
         form = ReconScanForm(request.POST)
         if form.is_valid():
@@ -88,16 +89,21 @@ def start_scan(request, engagement_pk):
 @login_required
 def scan_detail(request, pk):
     scan = get_object_or_404(ReconScan.objects.select_related('engagement'), pk=pk)
+    if not scan.engagement.user_can_access(request.user) or scan.engagement.user_is_client(request.user):
+        messages.error(request, 'You do not have access to this section.')
+        return redirect('engagements:list')
     return render(request, 'recon/scan_detail.html', {'scan': scan})
 
 
 @login_required
-@role_required('admin', 'pentester')
 def scan_delete(request, pk):
     scan = get_object_or_404(ReconScan.objects.select_related('engagement'), pk=pk)
     engagement = scan.engagement
+    if not engagement.user_can_edit(request.user):
+        messages.error(request, 'You do not have permission to delete scans.')
+        return redirect('recon:scan_detail', pk=pk)
     if request.method == 'POST':
-        scan_type = scan.get_scan_type_display()
+        scan_type = scan.get_scan_type_display() # type: ignore
         target = scan.target
         scan.delete()
         ActivityLog.objects.create(
@@ -111,9 +117,9 @@ def scan_delete(request, pk):
 
 
 @login_required
-@role_required('admin', 'pentester')
+@engagement_edit_required
 def import_nmap(request, engagement_pk):
-    engagement = get_object_or_404(Engagement, pk=engagement_pk)
+    engagement = request.engagement
     if request.method == 'POST':
         form = NmapImportForm(request.POST, request.FILES)
         if form.is_valid():

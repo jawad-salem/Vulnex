@@ -243,10 +243,22 @@ def generate_report_pdf(engagement, report_type='full'):
                 ['CVSS Vector', f.cvss_vector_string],
                 ['Status', f.get_status_display()],
             ]
+            if f.host:
+                location = _esc(f.host)
+                if f.port:
+                    location += f':{f.port}'
+                info_data.append(['Host', location])
+            if f.url:
+                info_data.append(['URL', _esc(f.url[:100])])
+            if f.endpoint:
+                method_str = f'{f.http_method} ' if f.http_method else ''
+                info_data.append(['Endpoint', f'{method_str}{_esc(f.endpoint)}'])
+            if f.parameter:
+                info_data.append(['Parameter', _esc(f.parameter)])
             if f.cwe_id:
                 info_data.append(['CWE', f.cwe_id])
             if f.affected_hosts:
-                info_data.append(['Affected Hosts', f.affected_hosts])
+                info_data.append(['Other Hosts', _esc(f.affected_hosts[:200])])
             if f.tool_source:
                 info_data.append(['Discovered By', f.tool_source])
 
