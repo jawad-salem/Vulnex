@@ -29,6 +29,63 @@ def recon_dashboard(request, engagement_pk):
     return render(request, 'recon/dashboard.html', context)
 
 
+def _merge_host(engagement, scan, result):
+    """Merge scan result into DiscoveredHost without overwriting other scan data."""
+    hostname = result.get('hostname', result.get('host', ''))
+    if not hostname:
+        return
+
+    host, created = DiscoveredHost.objects.get_or_create(
+        engagement=engagement,
+        hostname=hostname,
+        defaults={
+            'scan': scan,
+            'ip_address': result.get('ip') or None,
+            'ports': result.get('ports', []),
+            'technologies': result.get('technologies', []),
+        }
+    )
+
+    if not created:
+        # Merge rather than replace
+        changed = False
+
+        # Update IP if we got one and existing is empty
+        new_ip = result.get('ip')
+        if new_ip and not host.ip_address:
+            host.ip_address = new_ip
+            changed = True
+
+        # Merge ports (deduplicate by port number)
+        new_ports = result.get('ports', [])
+        if new_ports:
+            existing_port_nums = set()
+            for p in host.ports:
+                if isinstance(p, dict):
+                    existing_port_nums.add(p.get('port'))
+                else:
+                    existing_port_nums.add(p)
+            for p in new_ports:
+                port_num = p.get('port') if isinstance(p, dict) else p
+                if port_num not in existing_port_nums:
+                    host.ports.append(p)
+                    existing_port_nums.add(port_num)
+                    changed = True
+
+        # Merge technologies (deduplicate)
+        new_techs = result.get('technologies', [])
+        if new_techs:
+            existing_techs = set(host.technologies)
+            for t in new_techs:
+                if t not in existing_techs:
+                    host.technologies.append(t)
+                    existing_techs.add(t)
+                    changed = True
+
+        if changed:
+            host.save()
+
+
 @login_required
 @engagement_edit_required
 def start_scan(request, engagement_pk):
@@ -36,6 +93,21 @@ def start_scan(request, engagement_pk):
     if request.method == 'POST':
         form = ReconScanForm(request.POST)
         if form.is_valid():
+            scan_type = form.cleaned_data['scan_type']
+            target = form.cleaned_data['target']
+
+            # Prevent duplicate: same type + target already completed
+            existing = engagement.scans.filter(
+                scan_type=scan_type, target__iexact=target, status='completed'
+            ).first()
+            if existing:
+                messages.warning(
+                    request,
+                    f'A {existing.get_scan_type_display()} on "{target}" already exists. '
+                    f'Delete the old scan first if you want to re-run it.'
+                )
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
             scan = form.save(commit=False)
             scan.engagement = engagement
             scan.started_by = request.user
@@ -58,21 +130,9 @@ def start_scan(request, engagement_pk):
                 scan.completed_at = timezone.now()
                 scan.save()
 
-                # Create discovered hosts from results
+                # Merge results into discovered hosts
                 for result in results:
-                    hostname = result.get('hostname', result.get('host', ''))
-                    if not hostname:
-                        continue
-                    DiscoveredHost.objects.update_or_create(
-                        engagement=engagement,
-                        hostname=hostname,
-                        defaults={
-                            'scan': scan,
-                            'ip_address': result.get('ip') or None,
-                            'ports': result.get('ports', []),
-                            'technologies': result.get('technologies', []),
-                        }
-                    )
+                    _merge_host(engagement, scan, result)
 
                 messages.success(request, f'Scan completed: {scan.result_count} results found.')
             except Exception as e:
@@ -103,7 +163,7 @@ def scan_delete(request, pk):
         messages.error(request, 'You do not have permission to delete scans.')
         return redirect('recon:scan_detail', pk=pk)
     if request.method == 'POST':
-        scan_type = scan.get_scan_type_display() # type: ignore
+        scan_type = scan.get_scan_type_display()  # type: ignore
         target = scan.target
         scan.delete()
         ActivityLog.objects.create(
@@ -111,7 +171,7 @@ def scan_delete(request, pk):
             user=request.user,
             action=f'Deleted {scan_type} scan on {target}'
         )
-        messages.success(request, f'Scan deleted.')
+        messages.success(request, 'Scan deleted.')
         return redirect('recon:dashboard', engagement_pk=engagement.pk)
     return render(request, 'recon/confirm_delete.html', {'scan': scan, 'engagement': engagement})
 
@@ -128,14 +188,7 @@ def import_nmap(request, engagement_pk):
                 hosts_data = parse_nmap_xml_to_hosts(content)
                 count = 0
                 for hd in hosts_data:
-                    DiscoveredHost.objects.update_or_create(
-                        engagement=engagement,
-                        hostname=hd['hostname'],
-                        defaults={
-                            'ip_address': hd.get('ip') or None,
-                            'ports': hd.get('ports', []),
-                        }
-                    )
+                    _merge_host(engagement, None, hd)
                     count += 1
                 ActivityLog.objects.create(
                     engagement=engagement, user=request.user,
@@ -146,6 +199,3 @@ def import_nmap(request, engagement_pk):
                 messages.error(request, f'Nmap import failed: {str(e)}')
         return redirect('recon:dashboard', engagement_pk=engagement_pk)
     return redirect('recon:dashboard', engagement_pk=engagement_pk)
-
-
-
