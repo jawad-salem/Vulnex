@@ -852,6 +852,31 @@ code {
     height: 200px;
 }
 
+/* ── Breadcrumbs ── */
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.breadcrumbs a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+.breadcrumbs a:hover {
+    color: var(--accent-light);
+}
+.breadcrumbs .bc-sep {
+    color: var(--text-muted);
+    font-size: 10px;
+}
+.breadcrumbs .bc-current {
+    color: var(--text-primary);
+}
+
 /* ── Host cards (recon) ── */
 .host-card {
     display: block;

@@ -1,5 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ host.hostname }} — Recon — PentestFlow{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'recon:dashboard' engagement.pk %}">Recon</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ host.hostname|truncatechars:30 }}</span>
+</nav>
+{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>

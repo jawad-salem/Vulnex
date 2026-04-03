@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% load humanize %}
 {% block title %}{{ engagement.name }} — PentestFlow{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ engagement.name|truncatechars:30 }}</span>
+</nav>
+{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>

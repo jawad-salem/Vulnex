@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% load methodology_tags %}
 {% block title %}Methodology — {{ engagement.name }} — PentestFlow{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Methodology</span>
+</nav>
+{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>

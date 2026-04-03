@@ -7,10 +7,11 @@ from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.db.models import Q
 from engagements.models import Engagement, ActivityLog
-from .models import Finding, Evidence
+from .models import Finding, Evidence, FindingTemplate
 from .forms import FindingForm, EvidenceForm, ToolImportForm
 from .parsers import parse_nuclei_json, parse_nikto_json
 from accounts.decorators import engagement_access, engagement_edit_required
+from recon.models import DiscoveredHost
 
 
 @login_required
@@ -88,11 +89,19 @@ def finding_detail(request, pk):
 def finding_create(request, engagement_pk):
     engagement = request.engagement
     if request.method == 'POST':
-        form = FindingForm(request.POST)
+        form = FindingForm(request.POST, engagement=engagement)
         if form.is_valid():
             finding = form.save(commit=False)
             finding.engagement = engagement
             finding.found_by = request.user
+            # Auto-fill host/IP from linked recon host if not manually set
+            if finding.discovered_host:
+                if not finding.host:
+                    finding.host = finding.discovered_host.hostname
+                if not finding.port and finding.discovered_host.ports:
+                    first_port = finding.discovered_host.ports[0]
+                    if isinstance(first_port, dict):
+                        finding.port = first_port.get('port')
             finding.save()
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
@@ -101,29 +110,34 @@ def finding_create(request, engagement_pk):
             messages.success(request, 'Finding created.')
             return redirect('vulns:detail', pk=finding.pk)
     else:
-        form = FindingForm()
+        form = FindingForm(engagement=engagement)
+    templates = FindingTemplate.objects.all()
     return render(request, 'vulns/form.html', {
-        'form': form, 'engagement': engagement, 'title': 'New finding'
+        'form': form, 'engagement': engagement, 'title': 'New finding',
+        'finding_templates': templates,
     })
 
 
 @login_required
 def finding_edit(request, pk):
     finding = get_object_or_404(Finding, pk=pk)
-    if not finding.engagement.user_can_edit(request.user):
+    engagement = finding.engagement
+    if not engagement.user_can_edit(request.user):
         messages.error(request, 'You do not have edit permissions.')
         return redirect('vulns:detail', pk=pk)
     if request.method == 'POST':
-        form = FindingForm(request.POST, instance=finding)
+        form = FindingForm(request.POST, instance=finding, engagement=engagement)
         if form.is_valid():
             form.save()
             messages.success(request, 'Finding updated.')
             return redirect('vulns:detail', pk=pk)
     else:
-        form = FindingForm(instance=finding)
+        form = FindingForm(instance=finding, engagement=engagement)
+    templates = FindingTemplate.objects.all()
     return render(request, 'vulns/form.html', {
-        'form': form, 'engagement': finding.engagement,
+        'form': form, 'engagement': engagement,
         'title': 'Edit finding', 'finding': finding,
+        'finding_templates': templates,
     })
 
 
@@ -253,4 +267,47 @@ def export_json(request, engagement_pk):
     )
     response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.json"'
     return response
+
+
+@login_required
+def api_template_detail(request, pk):
+    """Return finding template data as JSON for form auto-fill."""
+    tpl = get_object_or_404(FindingTemplate, pk=pk)
+    data = {
+        'title': tpl.title,
+        'description': tpl.description,
+        'remediation': tpl.remediation,
+        'references': tpl.references,
+        'cwe_id': tpl.cwe_id,
+        'attack_vector': tpl.attack_vector,
+        'attack_complexity': tpl.attack_complexity,
+        'privileges_required': tpl.privileges_required,
+        'user_interaction': tpl.user_interaction,
+        'confidentiality_impact': tpl.confidentiality_impact,
+        'integrity_impact': tpl.integrity_impact,
+        'availability_impact': tpl.availability_impact,
+    }
+    return HttpResponse(json.dumps(data), content_type='application/json')
+
+
+@login_required
+def api_host_detail(request, pk):
+    """Return discovered host data as JSON for form auto-fill."""
+    host = get_object_or_404(DiscoveredHost, pk=pk)
+    # Verify user has access to the engagement
+    if not host.engagement.user_can_access(request.user):
+        return HttpResponse('{}', content_type='application/json', status=403)
+    ports = []
+    for p in host.ports:
+        if isinstance(p, dict):
+            ports.append(p)
+        else:
+            ports.append({'port': p, 'protocol': 'tcp'})
+    data = {
+        'hostname': host.hostname,
+        'ip_address': host.ip_address or '',
+        'ports': ports,
+        'technologies': host.technologies,
+    }
+    return HttpResponse(json.dumps(data), content_type='application/json')
 

@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.urls import reverse
 from engagements.models import Engagement
+from recon.models import DiscoveredHost
 import uuid
 
 
@@ -71,6 +72,10 @@ class Finding(models.Model):
         OPTIONS = 'OPTIONS', 'OPTIONS'
         HEAD = 'HEAD', 'HEAD'
 
+    discovered_host = models.ForeignKey(
+        DiscoveredHost, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='findings', help_text='Link to a discovered host from recon'
+    )
     host = models.CharField(max_length=300, blank=True, help_text='e.g. api.example.com')
     port = models.PositiveIntegerField(null=True, blank=True, help_text='e.g. 443, 8080')
     url = models.URLField(max_length=2000, blank=True, help_text='Full URL where the issue was found')
@@ -167,6 +172,31 @@ class Finding(models.Model):
         else:
             self.severity = 'info'
         super().save(*args, **kwargs)
+
+
+class FindingTemplate(models.Model):
+    """Pre-built vulnerability templates for common finding types."""
+    name = models.CharField(max_length=200, unique=True)
+    title = models.CharField(max_length=300)
+    severity = models.CharField(max_length=20, choices=Finding.Severity.choices)
+    description = models.TextField()
+    remediation = models.TextField(blank=True)
+    references = models.TextField(blank=True)
+    cwe_id = models.CharField(max_length=20, blank=True)
+    # CVSS defaults
+    attack_vector = models.CharField(max_length=1, default='N')
+    attack_complexity = models.CharField(max_length=1, default='L')
+    privileges_required = models.CharField(max_length=1, default='N')
+    user_interaction = models.CharField(max_length=1, default='N')
+    confidentiality_impact = models.CharField(max_length=1, default='N')
+    integrity_impact = models.CharField(max_length=1, default='N')
+    availability_impact = models.CharField(max_length=1, default='N')
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
 
 
 class Evidence(models.Model):

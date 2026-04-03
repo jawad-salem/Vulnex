@@ -1,5 +1,6 @@
 from django import forms
 from .models import Finding, Evidence
+from recon.models import DiscoveredHost
 
 
 class FindingForm(forms.ModelForm):
@@ -7,6 +8,8 @@ class FindingForm(forms.ModelForm):
         model = Finding
         fields = [
             'title', 'description',
+            # Host link
+            'discovered_host',
             # Location
             'host', 'port', 'url', 'endpoint', 'http_method', 'parameter',
             # Additional
@@ -30,11 +33,22 @@ class FindingForm(forms.ModelForm):
             'parameter': forms.TextInput(attrs={'placeholder': 'username, id'}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, engagement=None, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             if not isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect)):
                 field.widget.attrs.setdefault('class', 'form-input')
+
+        # Scope host dropdown to this engagement's discovered hosts
+        if engagement:
+            self.fields['discovered_host'].queryset = DiscoveredHost.objects.filter(
+                engagement=engagement
+            )
+        else:
+            self.fields['discovered_host'].queryset = DiscoveredHost.objects.none()
+
+        self.fields['discovered_host'].required = False
+        self.fields['discovered_host'].empty_label = '— Select from recon (optional) —'
 
 
 class EvidenceForm(forms.ModelForm):
