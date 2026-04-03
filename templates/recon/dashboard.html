@@ -6,9 +6,10 @@
         <h1 class="page-title">Reconnaissance</h1>
         <p class="page-subtitle">
             <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
-            &middot; {{ scans|length }} scans &middot; {{ hosts|length }} hosts
+            &middot; {{ scans|length }} scan{{ scans|length|pluralize }} &middot; {{ hosts|length }} host{{ hosts|length|pluralize }}
         </p>
     </div>
+    <a href="{% url 'recon:host_add' engagement.pk %}" class="btn btn-primary">+ Add host</a>
 </div>
 
 <div class="grid-3">
@@ -84,38 +85,53 @@
         <div class="card">
             <div class="card-header">
                 <h2 class="card-title">Discovered hosts</h2>
+                <span class="text-xs text-muted">{{ hosts|length }} total</span>
             </div>
             {% if hosts %}
             {% for host in hosts %}
-            <div class="member-row flex-col items-start gap-2" style="padding:10px 0">
-                <div class="flex-between" style="width:100%">
+            <a href="{% url 'recon:host_detail' engagement.pk host.pk %}" class="host-card">
+                <div class="flex-between">
                     <div>
                         <div class="text-mono font-semibold" style="font-size:13px">{{ host.hostname }}</div>
                         {% if host.ip_address %}
                         <div class="text-mono text-xs text-secondary">{{ host.ip_address }}</div>
                         {% endif %}
                     </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><polyline points="9 18 15 12 9 6"/></svg>
                 </div>
                 {% if host.ports %}
-                <div class="flex gap-1 flex-wrap">
-                    {% for port in host.ports %}
+                <div class="flex gap-1 flex-wrap mt-2">
+                    {% for port in host.ports|slice:":8" %}
                     <span class="badge badge-info text-mono">
                         {% if port.port %}{{ port.port }}/{{ port.protocol|default:"tcp" }}{% else %}{{ port }}{% endif %}
                     </span>
                     {% endfor %}
+                    {% if host.ports|length > 8 %}
+                    <span class="text-xs text-muted">+{{ host.ports|length|add:"-8" }} more</span>
+                    {% endif %}
                 </div>
                 {% endif %}
                 {% if host.technologies %}
-                <div class="flex gap-1 flex-wrap">
-                    {% for tech in host.technologies %}
-                    <span class="text-xs" style="background:var(--accent-bg);color:var(--accent-light);padding:2px 6px;border-radius:4px">{{ tech }}</span>
+                <div class="flex gap-1 flex-wrap mt-1">
+                    {% for tech in host.technologies|slice:":5" %}
+                    <span class="tech-tag">{{ tech }}</span>
                     {% endfor %}
+                    {% if host.technologies|length > 5 %}
+                    <span class="text-xs text-muted">+{{ host.technologies|length|add:"-5" }} more</span>
+                    {% endif %}
                 </div>
                 {% endif %}
-            </div>
+                {% if host.notes %}
+                <div class="text-xs text-muted mt-1" style="font-style:italic">{{ host.notes|truncatechars:60 }}</div>
+                {% endif %}
+            </a>
             {% endfor %}
             {% else %}
-            <p class="text-secondary text-sm">No hosts discovered yet.</p>
+            <div class="empty-state" style="padding:24px">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                <p>No hosts discovered yet.</p>
+                <p class="text-xs">Run a scan or add a host manually.</p>
+            </div>
             {% endif %}
         </div>
     </div>

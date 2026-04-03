@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.98 scan initiated Fri Apr  3 00:27:32 2026 as: /usr/lib/nmap/nmap -p 80 -oX mariam.xml mariamhotel.com -->
+<nmaprun scanner="nmap" args="/usr/lib/nmap/nmap -p 80 -oX mariam.xml mariamhotel.com" start="1775190452" startstr="Fri Apr  3 00:27:32 2026" version="7.98" xmloutputversion="1.05">
+<scaninfo type="syn" protocol="tcp" numservices="1" services="80"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="209.216.88.183" addrtype="ipv4"/>
+<hostnames>
+<hostname name="mariamhotel.com" type="user"/>
+</hostnames>
+</hosthint>
+<host starttime="1775190453" endtime="1775190453"><status state="up" reason="reset" reason_ttl="128"/>
+<address addr="209.216.88.183" addrtype="ipv4"/>
+<hostnames>
+<hostname name="mariamhotel.com" type="user"/>
+</hostnames>
+<ports><port protocol="tcp" portid="80"><state state="filtered" reason="no-response" reason_ttl="0"/><service name="http" method="table" conf="3"/></port>
+</ports>
+<times srtt="1585" rttvar="5000" to="100000"/>
+</host>
+<runstats><finished time="1775190453" timestr="Fri Apr  3 00:27:33 2026" summary="Nmap done at Fri Apr  3 00:27:33 2026; 1 IP address (1 host up) scanned in 1.49 seconds" elapsed="1.49" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

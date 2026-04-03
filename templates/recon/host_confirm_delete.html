@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Delete host — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete host</h1>
+        <p class="page-subtitle"><a href="{% url 'recon:dashboard' engagement.pk %}">{{ engagement.name }} — Recon</a></p>
+    </div>
+</div>
+
+<div class="card" style="max-width:500px">
+    <p class="text-secondary text-sm mb-3">This will permanently delete this host and all its associated data:</p>
+    <div class="section-box" style="background:var(--bg-primary)">
+        <div class="text-mono font-semibold">{{ host.hostname }}</div>
+        <div class="text-sm text-secondary mt-1">
+            {% if host.ip_address %}IP: <span class="text-mono">{{ host.ip_address }}</span> &middot; {% endif %}
+            {{ host.ports|length }} port{{ host.ports|length|pluralize }}
+            &middot; {{ host.technologies|length }} technolog{{ host.technologies|length|pluralize:"y,ies" }}
+        </div>
+    </div>
+    <form method="post">
+        {% csrf_token %}
+        <div class="btn-group">
+            <button type="submit" class="btn btn-danger">Delete host</button>
+            <a href="{% url 'recon:host_detail' engagement.pk host.pk %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

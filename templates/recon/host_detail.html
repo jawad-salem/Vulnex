@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}{{ host.hostname }} — Recon — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title text-mono">{{ host.hostname }}</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'recon:dashboard' engagement.pk %}">{{ engagement.name }} — Recon</a>
+            {% if host.ip_address %}&middot; <span class="text-mono">{{ host.ip_address }}</span>{% endif %}
+        </p>
+    </div>
+    {% if can_edit %}
+    <div class="btn-group">
+        <a href="{% url 'recon:host_edit' engagement.pk host.pk %}" class="btn btn-primary">Edit host</a>
+        <a href="{% url 'recon:host_delete' engagement.pk host.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="grid-3">
+    <div>
+        <!-- Open ports -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Open ports</h2>
+                <span class="text-xs text-muted">{{ host.ports|length }} port{{ host.ports|length|pluralize }}</span>
+            </div>
+            {% if host.ports %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>State</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for port in host.ports %}
+                    <tr>
+                        {% if port.port %}
+                        <td class="text-mono font-semibold">{{ port.port }}</td>
+                        <td>{{ port.protocol|default:"tcp" }}</td>
+                        <td>{{ port.service|default:"unknown" }}</td>
+                        <td class="text-xs text-secondary">{{ port.product|default:"" }}</td>
+                        <td><span class="badge badge-completed" style="font-size:10px">{{ port.state|default:"open" }}</span></td>
+                        {% else %}
+                        <td class="text-mono font-semibold" colspan="5">{{ port }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state" style="padding:24px">
+                <p class="text-sm">No open ports recorded.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Related scans -->
+        {% if related_scans %}
+        <div class="card">
+            <h2 class="card-title mb-3">Related scans</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Target</th><th>Status</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for scan in related_scans %}
+                    <tr>
+                        <td><a href="{% url 'recon:scan_detail' scan.pk %}">{{ scan.get_scan_type_display }}</a></td>
+                        <td class="text-mono text-sm">{{ scan.target }}</td>
+                        <td><span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span></td>
+                        <td class="text-sm text-secondary">{{ scan.created_at|date:"M d, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <!-- Host info -->
+        <div class="card">
+            <h2 class="card-title mb-3">Host info</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <span class="detail-label">Hostname</span>
+                    <span class="text-mono">{{ host.hostname }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">IP address</span>
+                    <span class="text-mono">{{ host.ip_address|default:"—" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Open ports</span>
+                    <span class="text-mono">{{ host.ports|length }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Technologies</span>
+                    <span class="text-mono">{{ host.technologies|length }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Added</span>
+                    <span class="text-sm">{{ host.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Technologies -->
+        <div class="card">
+            <h2 class="card-title mb-3">Technologies</h2>
+            {% if host.technologies %}
+            <div class="flex gap-1 flex-wrap">
+                {% for tech in host.technologies %}
+                <span class="tech-tag">{{ tech }}</span>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-secondary text-sm">No technologies detected.</p>
+            {% endif %}
+        </div>
+
+        <!-- Notes -->
+        <div class="card">
+            <h2 class="card-title mb-3">Notes</h2>
+            {% if host.notes %}
+            <div class="prose">{{ host.notes|linebreaksbr }}</div>
+            {% else %}
+            <p class="text-secondary text-sm">No notes.{% if can_edit %} <a href="{% url 'recon:host_edit' engagement.pk host.pk %}">Add some</a>.{% endif %}</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

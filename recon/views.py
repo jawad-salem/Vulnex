@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from .models import ReconScan, DiscoveredHost
-from .forms import ReconScanForm, NmapImportForm
+from .forms import ReconScanForm, NmapImportForm, DiscoveredHostForm
 from .parsers import parse_nmap_xml_to_hosts
 from .scanners import run_scan
 from accounts.decorators import engagement_access, engagement_edit_required
@@ -199,3 +199,86 @@ def import_nmap(request, engagement_pk):
                 messages.error(request, f'Nmap import failed: {str(e)}')
         return redirect('recon:dashboard', engagement_pk=engagement_pk)
     return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+# ── Host management ──
+
+@login_required
+@engagement_access(allow_client=False)
+def host_detail(request, engagement_pk, host_pk):
+    engagement = request.engagement
+    host = get_object_or_404(DiscoveredHost, pk=host_pk, engagement=engagement)
+    related_scans = engagement.scans.filter(
+        target__iexact=host.hostname
+    ) | engagement.scans.filter(target__iexact=host.ip_address or '')
+    context = {
+        'engagement': engagement,
+        'host': host,
+        'related_scans': related_scans.distinct(),
+        'can_edit': engagement.user_can_edit(request.user),
+    }
+    return render(request, 'recon/host_detail.html', context)
+
+
+@login_required
+@engagement_edit_required
+def host_add(request, engagement_pk):
+    engagement = request.engagement
+    if request.method == 'POST':
+        form = DiscoveredHostForm(request.POST)
+        if form.is_valid():
+            host = form.save(commit=False)
+            host.engagement = engagement
+            try:
+                host.save()
+                ActivityLog.objects.create(
+                    engagement=engagement, user=request.user,
+                    action=f'Added host: {host.hostname}'
+                )
+                messages.success(request, f'Host "{host.hostname}" added.')
+                return redirect('recon:host_detail', engagement_pk=engagement_pk, host_pk=host.pk)
+            except Exception:
+                messages.error(request, f'Host "{host.hostname}" already exists in this engagement.')
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
+    else:
+        form = DiscoveredHostForm()
+    return render(request, 'recon/host_form.html', {
+        'form': form, 'engagement': engagement, 'title': 'Add host',
+    })
+
+
+@login_required
+@engagement_edit_required
+def host_edit(request, engagement_pk, host_pk):
+    engagement = request.engagement
+    host = get_object_or_404(DiscoveredHost, pk=host_pk, engagement=engagement)
+    if request.method == 'POST':
+        form = DiscoveredHostForm(request.POST, instance=host)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f'Host "{host.hostname}" updated.')
+            return redirect('recon:host_detail', engagement_pk=engagement_pk, host_pk=host.pk)
+    else:
+        form = DiscoveredHostForm(instance=host)
+    return render(request, 'recon/host_form.html', {
+        'form': form, 'engagement': engagement, 'title': f'Edit {host.hostname}', 'host': host,
+    })
+
+
+@login_required
+@engagement_edit_required
+def host_delete(request, engagement_pk, host_pk):
+    engagement = request.engagement
+    host = get_object_or_404(DiscoveredHost, pk=host_pk, engagement=engagement)
+    if request.method == 'POST':
+        hostname = host.hostname
+        host.delete()
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Deleted host: {hostname}'
+        )
+        messages.success(request, f'Host "{hostname}" deleted.')
+        return redirect('recon:dashboard', engagement_pk=engagement_pk)
+    return render(request, 'recon/host_confirm_delete.html', {
+        'host': host, 'engagement': engagement,
+    })

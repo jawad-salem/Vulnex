@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Recon — PentestFlow{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle"><a href="{% url 'recon:dashboard' engagement.pk %}">{{ engagement.name }} — Recon</a></p>
+    </div>
+</div>
+
+<div class="card" style="max-width:600px">
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="{{ form.hostname.id_for_label }}">Hostname</label>
+            {{ form.hostname }}
+            {% if form.hostname.errors %}<span class="field-error">{{ form.hostname.errors.0 }}</span>{% endif %}
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.ip_address.id_for_label }}">IP address</label>
+                {{ form.ip_address }}
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="{{ form.ports_text.id_for_label }}">Open ports</label>
+            {{ form.ports_text }}
+            <span class="form-help">{{ form.ports_text.help_text }}</span>
+        </div>
+        <div class="form-group">
+            <label for="{{ form.techs_text.id_for_label }}">Technologies</label>
+            {{ form.techs_text }}
+            <span class="form-help">{{ form.techs_text.help_text }}</span>
+        </div>
+        <div class="form-group">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if host %}Save changes{% else %}Add host{% endif %}</button>
+            {% if host %}
+            <a href="{% url 'recon:host_detail' engagement.pk host.pk %}" class="btn">Cancel</a>
+            {% else %}
+            <a href="{% url 'recon:dashboard' engagement.pk %}" class="btn">Cancel</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}
