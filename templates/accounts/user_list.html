@@ -36,7 +36,7 @@
                     </div>
                 </td>
                 <td class="text-mono text-sm">{{ u.email|default:"—" }}</td>
-                <td><span class="badge badge-{% if u.role == 'admin' %}completed{% elif u.role == 'pentester' %}low{% else %}info{% endif %}">{{ u.get_role_display }}</span></td>
+                <td><span class="badge badge-{% if u.role == 'admin' %}completed{% elif u.role == 'pentester' %}low{% elif u.role == 'reviewer' %}medium{% else %}info{% endif %}">{{ u.get_role_display }}</span></td>
                 <td>
                     {% if u.is_active %}
                     <span class="badge badge-completed">Active</span>

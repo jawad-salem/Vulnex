@@ -6,7 +6,8 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'admin', 'Admin'
         PENTESTER = 'pentester', 'Pentester'
-        VIEWER = 'viewer', 'Viewer'
+        REVIEWER = 'reviewer', 'Reviewer'
+        CLIENT = 'client', 'Client'
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PENTESTER)
     bio = models.TextField(blank=True)
@@ -27,8 +28,12 @@ class User(AbstractUser):
         return self.role in (self.Role.ADMIN, self.Role.PENTESTER)
 
     @property
-    def is_viewer(self):
-        return True  # Everyone can view
+    def is_reviewer(self):
+        return self.role == self.Role.REVIEWER
+
+    @property
+    def is_client(self):
+        return self.role == self.Role.CLIENT
 
     def __str__(self):
         return self.get_full_name() or self.username
