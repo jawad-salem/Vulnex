@@ -28,6 +28,21 @@
     {% endif %}
 </div>
 
+<div class="stats-grid" style="grid-template-columns:repeat(3, 1fr)">
+    <div class="stat-card">
+        <div class="stat-label">Open Ports</div>
+        <div class="stat-value">{{ host.ports|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Technologies</div>
+        <div class="stat-value">{{ host.technologies|length }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Findings</div>
+        <div class="stat-value">{{ host.findings.count|default:"0" }}</div>
+    </div>
+</div>
+
 <div class="grid-3">
     <div>
         <!-- Open ports -->
@@ -60,9 +75,7 @@
                 </table>
             </div>
             {% else %}
-            <div class="empty-state" style="padding:24px">
-                <p class="text-sm">No open ports recorded.</p>
-            </div>
+            <p class="text-secondary text-sm text-center" style="padding:16px 0">No open ports recorded.</p>
             {% endif %}
         </div>
 

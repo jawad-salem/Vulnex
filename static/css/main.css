@@ -569,11 +569,13 @@ select.form-input {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+    align-items: start;
 }
 .grid-3 {
     display: grid;
     grid-template-columns: 2fr 1fr;
     gap: 20px;
+    align-items: start;
 }
 
 /* ── Auth pages ── */
@@ -902,6 +904,25 @@ code {
     white-space: nowrap;
 }
 
+/* ── Form 2-column section ── */
+.form-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 20px;
+}
+
+/* ── Select dropdown native styling ── */
+select.form-input option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 8px;
+}
+
+/* ── Card that should not stretch vertically ── */
+.card-fit {
+    align-self: start;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
     .mobile-toggle { display: block; }
@@ -917,4 +938,5 @@ code {
     .form-row { grid-template-columns: 1fr; }
     .stats-grid { grid-template-columns: repeat(2, 1fr); }
     .page-header { flex-direction: column; align-items: flex-start; }
+    .form-2col { grid-template-columns: 1fr; }
 }

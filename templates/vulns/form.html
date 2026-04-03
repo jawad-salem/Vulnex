@@ -152,40 +152,53 @@
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="{{ form.affected_hosts.id_for_label }}">Additional affected hosts</label>
-            {{ form.affected_hosts }}
-            <span class="form-help">Other hosts affected by the same issue — one per line</span>
-        </div>
+        <!-- Impact & reproduction -->
+        <div class="section-box">
+            <h3 class="section-title">Impact & Reproduction</h3>
+            <p class="section-desc">Describe affected hosts, proof of concept, and remediation.</p>
 
-        <div class="form-group">
-            <label for="{{ form.proof_of_concept.id_for_label }}">Proof of concept</label>
-            {{ form.proof_of_concept }}
-            <span class="form-help">Steps to reproduce the vulnerability</span>
-        </div>
-
-        <div class="form-group">
-            <label for="{{ form.remediation.id_for_label }}">Remediation</label>
-            {{ form.remediation }}
-        </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label for="{{ form.cwe_id.id_for_label }}">CWE ID</label>
-                {{ form.cwe_id }}
-                <span class="form-help">e.g. CWE-79</span>
+            <div class="form-2col">
+                <div class="form-group">
+                    <label for="{{ form.proof_of_concept.id_for_label }}">Proof of concept</label>
+                    {{ form.proof_of_concept }}
+                    <span class="form-help">Steps to reproduce the vulnerability</span>
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.affected_hosts.id_for_label }}">Additional affected hosts</label>
+                    {{ form.affected_hosts }}
+                    <span class="form-help">Other hosts affected by the same issue — one per line</span>
+                </div>
             </div>
+
             <div class="form-group">
-                <label for="{{ form.tool_source.id_for_label }}">Tool source</label>
-                {{ form.tool_source }}
-                <span class="form-help">e.g. Burp Suite, Manual</span>
+                <label for="{{ form.remediation.id_for_label }}">Remediation</label>
+                {{ form.remediation }}
             </div>
         </div>
 
-        <div class="form-group">
-            <label for="{{ form.references.id_for_label }}">References</label>
-            {{ form.references }}
-            <span class="form-help">CVE IDs, URLs — one per line</span>
+        <!-- Metadata -->
+        <div class="section-box">
+            <h3 class="section-title">Metadata & References</h3>
+            <p class="section-desc">Classification, tooling, and external references.</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.cwe_id.id_for_label }}">CWE ID</label>
+                    {{ form.cwe_id }}
+                    <span class="form-help">e.g. CWE-79</span>
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.tool_source.id_for_label }}">Tool source</label>
+                    {{ form.tool_source }}
+                    <span class="form-help">e.g. Burp Suite, Manual</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.references.id_for_label }}">References</label>
+                {{ form.references }}
+                <span class="form-help">CVE IDs, URLs — one per line</span>
+            </div>
         </div>
 
         <div class="form-actions">
