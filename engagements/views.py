@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q
 from .models import Engagement, EngagementMember, Invitation, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
@@ -303,34 +304,102 @@ def cancel_invitation(request, pk, invitation_pk):
     return redirect('engagements:detail', pk=pk)
 
 
-@login_required
 def accept_invitation(request, token):
-    """Accept an invitation via token link."""
+    """Accept an invitation via token link. Handles three cases:
+    1. Logged-in user whose email matches -> accept immediately
+    2. Logged-in user whose email doesn't match -> error
+    3. Anonymous user with existing account -> redirect to login
+    4. Anonymous user, no account -> show registration form
+    """
     invitation = get_object_or_404(Invitation, token=token, status='pending')
 
     if invitation.is_expired:
         invitation.status = 'expired'
         invitation.save()
         messages.error(request, 'This invitation has expired.')
-        return redirect('dashboard:home')
+        if request.user.is_authenticated:
+            return redirect('dashboard:home')
+        return redirect('accounts:login')
 
-    # Check email match
-    if request.user.email != invitation.email:
-        messages.error(request, f'This invitation was sent to {invitation.email}. Please log in with that account.')
-        return redirect('dashboard:home')
+    # ── Case 1 & 2: User is logged in ──
+    if request.user.is_authenticated:
+        if request.user.email != invitation.email:
+            messages.error(request, f'This invitation was sent to {invitation.email}. Please log in with that account.')
+            return redirect('dashboard:home')
 
-    # Create membership
-    EngagementMember.objects.get_or_create(
-        engagement=invitation.engagement,
-        user=request.user,
-        defaults={'role': invitation.role},
-    )
-    invitation.status = 'accepted'
-    invitation.save()
+        # Accept: create membership (atomic to prevent race conditions)
+        with transaction.atomic():
+            EngagementMember.objects.get_or_create(
+                engagement=invitation.engagement,
+                user=request.user,
+                defaults={'role': invitation.role},
+            )
+            invitation.status = 'accepted'
+            invitation.save()
 
-    ActivityLog.objects.create(
-        engagement=invitation.engagement, user=request.user,
-        action=f'Joined as {invitation.get_role_display()}'
-    )
-    messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
-    return redirect('engagements:detail', pk=invitation.engagement.pk)
+        ActivityLog.objects.create(
+            engagement=invitation.engagement, user=request.user,
+            action=f'Joined as {invitation.get_role_display()}'
+        )
+        messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
+        return redirect('engagements:detail', pk=invitation.engagement.pk)
+
+    # ── Case 3: Anonymous, but account already exists ──
+    from accounts.models import User
+    existing_user = User.objects.filter(email=invitation.email).first()
+    if existing_user:
+        messages.info(request, f'Please log in as "{existing_user.username}" to accept this invitation.')
+        from django.urls import reverse
+        login_url = reverse('accounts:login') + f'?next=/engagements/join/{token}/'
+        return redirect(login_url)
+
+    # ── Case 4: Anonymous, no account — show registration form ──
+    from .forms import InviteRegistrationForm
+
+    # Map engagement role to global platform role
+    ROLE_MAP = {
+        'client': 'client',
+        'reviewer': 'reviewer',
+        'pentester': 'pentester',
+        'lead': 'pentester',
+    }
+
+    if request.method == 'POST':
+        form = InviteRegistrationForm(request.POST)
+        if form.is_valid():
+            # Atomic: create user + membership + accept invitation together
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=form.cleaned_data['username'],
+                    email=invitation.email,
+                    password=form.cleaned_data['password1'],
+                    first_name=form.cleaned_data.get('first_name', ''),
+                    last_name=form.cleaned_data.get('last_name', ''),
+                    role=ROLE_MAP.get(invitation.role, 'client'),
+                )
+
+                EngagementMember.objects.create(
+                    engagement=invitation.engagement,
+                    user=user,
+                    role=invitation.role,
+                )
+                invitation.status = 'accepted'
+                invitation.save()
+
+            ActivityLog.objects.create(
+                engagement=invitation.engagement, user=user,
+                action=f'Joined as {invitation.get_role_display()}'
+            )
+
+            # Log them in
+            from django.contrib.auth import login
+            login(request, user)
+            messages.success(request, f'Account created! You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
+            return redirect('engagements:detail', pk=invitation.engagement.pk)
+    else:
+        form = InviteRegistrationForm()
+
+    return render(request, 'engagements/accept_invitation.html', {
+        'form': form,
+        'invitation': invitation,
+    })

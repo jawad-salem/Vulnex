@@ -45,11 +45,46 @@ A full-featured penetration testing workflow platform built with Django. Manage 
 - Activity feed and recent engagement overview
 
 ### Access Control
-- **Global roles**: Admin, Pentester, Viewer
+- **Global roles**: Admin, Pentester, Reviewer, Client
 - **Per-engagement roles**: Lead, Pentester, Reviewer, Client
 - Client role restrictions: no access to Recon, Methodology, or Notes
+- Reviewer role: read-only access to all sections including Recon
 - Admin user management (create, edit, deactivate, delete users)
-- No public registration — invitation-only access
+- Self-registration via invitation links — no public signup
+
+## Screenshots
+
+<details>
+<summary>Dashboard</summary>
+
+![Dashboard](docs/screenshots/dashboard.png)
+</details>
+
+<details>
+<summary>Engagement Detail</summary>
+
+![Engagement Detail](docs/screenshots/engagement-detail.png)
+</details>
+
+<details>
+<summary>Finding Form with CVSS Preview</summary>
+
+![Finding Form](docs/screenshots/finding-form.png)
+</details>
+
+<details>
+<summary>Reconnaissance</summary>
+
+![Recon Dashboard](docs/screenshots/recon.png)
+</details>
+
+<details>
+<summary>Methodology Checklist</summary>
+
+![Methodology](docs/screenshots/methodology.png)
+</details>
+
+> **To add screenshots**: Save your screenshots to `docs/screenshots/` and they'll render above.
 
 ## Tech Stack
 
@@ -82,6 +117,9 @@ python manage.py migrate
 
 # Create admin user
 python manage.py createsuperuser
+
+# Seed finding templates (optional)
+python manage.py seed_templates
 
 # Start the server
 python manage.py runserver
@@ -124,8 +162,9 @@ pentestflow/
 ### Initial Setup
 1. Create a superuser with `python manage.py createsuperuser`
 2. Log in and set your role to **Admin** via `/admin`
-3. Create other users via **Users** in the sidebar
-4. Create your first engagement
+3. Seed finding templates: `python manage.py seed_templates`
+4. Create other users via **Users** in the sidebar (or invite them to engagements)
+5. Create your first engagement
 
 ### Typical Workflow
 1. **Create engagement** — define scope, targets, dates
@@ -140,7 +179,14 @@ pentestflow/
 - Navigate to an engagement's detail page
 - Use the invite form (visible to Leads only)
 - If the email matches an existing user, they're added immediately
-- Otherwise, an invitation email is sent with a join link
+- Otherwise, an invitation email is sent with a secure token link
+- New users can create their account directly from the invitation link — no admin intervention needed
+- Account role is automatically set based on the engagement role (e.g., invited as Client → Client platform role)
+
+### Recon ↔ Findings
+- Link findings to discovered hosts from recon
+- Use finding templates (seed with `python manage.py seed_templates`) to auto-fill common vulnerabilities
+- Live CVSS severity preview when creating/editing findings
 
 ## Environment Variables
 

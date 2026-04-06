@@ -1,5 +1,46 @@
 from django import forms
+from accounts.models import User
 from .models import Engagement, EngagementNote
+
+
+class InviteRegistrationForm(forms.Form):
+    """Form for new users to create an account via an invitation link."""
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={'class': 'form-input', 'placeholder': 'Choose a username'}),
+    )
+    first_name = forms.CharField(
+        max_length=150, required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+    )
+    last_name = forms.CharField(
+        max_length=150, required=False,
+        widget=forms.TextInput(attrs={'class': 'form-input'}),
+    )
+    password1 = forms.CharField(
+        label='Password',
+        widget=forms.PasswordInput(attrs={'class': 'form-input'}),
+    )
+    password2 = forms.CharField(
+        label='Confirm password',
+        widget=forms.PasswordInput(attrs={'class': 'form-input'}),
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data['username']
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError('This username is already taken.')
+        return username
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('password1')
+        p2 = cleaned_data.get('password2')
+        if p1 and p2 and p1 != p2:
+            raise forms.ValidationError('Passwords do not match.')
+        if p1 and len(p1) < 8:
+            raise forms.ValidationError('Password must be at least 8 characters.')
+        return cleaned_data
 
 
 class EngagementForm(forms.ModelForm):

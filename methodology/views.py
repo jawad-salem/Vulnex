@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import transaction
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from .models import Methodology, EngagementChecklist, ChecklistItem
@@ -33,13 +34,14 @@ def apply_methodology(request, engagement_pk, methodology_pk):
 
     items = ChecklistItem.objects.filter(category__methodology=methodology)
     created = 0
-    for item in items:
-        _, was_created = EngagementChecklist.objects.get_or_create(
-            engagement=engagement,
-            checklist_item=item,
-        )
-        if was_created:
-            created += 1
+    with transaction.atomic():
+        for item in items:
+            _, was_created = EngagementChecklist.objects.get_or_create(
+                engagement=engagement,
+                checklist_item=item,
+            )
+            if was_created:
+                created += 1
 
     ActivityLog.objects.create(
         engagement=engagement, user=request.user,

@@ -54,6 +54,49 @@ COMMON_DIRS = [
 ]
 
 
+import ipaddress
+
+
+def _is_internal_ip(ip_str: str) -> bool:
+    """Check if an IP address is internal/private/reserved."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        return (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip_str.startswith('169.254.')  # AWS metadata, link-local
+        )
+    except ValueError:
+        return False
+
+
+def _validate_target(target: str) -> str:
+    """Extract hostname from target, validate it's not internal. Returns hostname or raises ValueError."""
+    target = target.strip().rstrip('/')
+    if target.startswith(('http://', 'https://')):
+        target = target.split('://')[1].split('/')[0]
+    if ':' in target and not target.startswith('['):
+        target = target.split(':')[0]
+
+    # Block obvious internal targets
+    if target in ('localhost', '127.0.0.1', '0.0.0.0', '::1'):
+        raise ValueError(f'Scanning internal targets is not allowed: {target}')
+
+    # Resolve and check IP
+    try:
+        resolved_ip = socket.gethostbyname(target)
+    except socket.gaierror:
+        raise ValueError(f'Could not resolve hostname: {target}')
+
+    if _is_internal_ip(resolved_ip):
+        raise ValueError(f'Scanning internal/private IPs is not allowed: {target} ({resolved_ip})')
+
+    return target
+
+
 def _resolve_target(target: str) -> str:
     """Resolve hostname to IP address."""
     target = target.strip().rstrip('/')
@@ -137,6 +180,8 @@ def scan_ports(target: str) -> list[dict]:
     if ':' in clean_target and not clean_target.startswith('['):
         clean_target = clean_target.split(':')[0]
 
+    _validate_target(clean_target)  # SSRF protection
+
     ip = _resolve_target(clean_target)
     if not ip:
         return []
@@ -214,8 +259,9 @@ def detect_technologies(target: str) -> list[dict]:
     if not target.startswith(('http://', 'https://')):
         target = f'http://{target}'
 
-    technologies = []
     hostname = target.split('://')[1].split('/')[0]
+    _validate_target(hostname)  # SSRF protection
+    technologies = []
 
     for url in [target, target.replace('http://', 'https://')]:
         try:
@@ -481,6 +527,8 @@ def bruteforce_dirs(target: str) -> list[dict]:
     if not target.startswith(('http://', 'https://')):
         target = f'http://{target}'
 
+    hostname = target.split('://')[1].split('/')[0]
+    _validate_target(hostname)  # SSRF protection
     found = []
 
     ctx = ssl.create_default_context()
