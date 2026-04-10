@@ -234,7 +234,7 @@ def invite_member(request, pk):
             invite_url = f'{settings.SITE_URL}/engagements/join/{invitation.token}/'
             try:
                 send_mail(
-                    subject=f'You\'ve been invited to "{engagement.name}" on PentestFlow',
+                    subject=f'You\'ve been invited to "{engagement.name}" on Vulnex',
                     message=(
                         f'Hi,\n\n'
                         f'{request.user.get_full_name() or request.user.username} has invited you '
@@ -242,7 +242,7 @@ def invite_member(request, pk):
                         f'Click the link below to accept:\n'
                         f'{invite_url}\n\n'
                         f'This invitation expires in 7 days.\n\n'
-                        f'— PentestFlow'
+                        f'— Vulnex'
                     ),
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     recipient_list=[email],

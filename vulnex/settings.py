@@ -36,7 +36,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'pentestflow.urls'
+ROOT_URLCONF = 'vulnex.urls'
 
 TEMPLATES = [
     {
@@ -55,7 +55,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'pentestflow.wsgi.application'
+WSGI_APPLICATION = 'vulnex.wsgi.application'
 
 # Database — SQLite for dev, PostgreSQL for prod
 if os.environ.get('DATABASE_URL'):
@@ -107,7 +107,7 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'PentestFlow <noreply@pentestflow.local>')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Vulnex <noreply@vulnex.local>')
 
 # Base URL for invitation links
 SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
@@ -142,4 +142,3 @@ SEVERITY_THRESHOLDS = {
     'low': 0.1,
     'info': 0.0,
 }
-

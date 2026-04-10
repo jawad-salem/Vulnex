@@ -1,4 +1,4 @@
-# PentestFlow
+# Vulnex
 
 A full-featured penetration testing workflow platform built with Django. Manage engagements, track vulnerabilities, run reconnaissance scans, follow testing methodologies, and generate professional PDF reports — all from a single dark-themed interface.
 
@@ -9,6 +9,8 @@ A full-featured penetration testing workflow platform built with Django. Manage 
 - Per-engagement team roles (Lead, Pentester, Reviewer, Client)
 - Email-based invitation system with token acceptance
 - Activity logging and audit trail
+- Engagement types: Web App, Network, Mobile, API, Cloud, Social Engineering, Red Team, Physical, IoT, Wireless
+  > **Note:** Some engagement types (e.g., Red Team, IoT, Wireless) are included as labels for categorization. The platform's core workflow — findings, recon, methodology checklists, and reporting — applies to all types, but specialized tooling for certain engagement types (like Active Directory attack paths for Red Team) is not yet built in.
 
 ### Vulnerability Tracking
 - Full CRUD for findings with CVSS v3.1 auto-calculation
@@ -101,8 +103,8 @@ A full-featured penetration testing workflow platform built with Django. Manage 
 
 ```bash
 # Clone the repository
-git clone https://github.com/jawad-salem/PentestFlow.git
-cd PentestFlow
+git clone https://github.com/jawad-salem/Vulnex.git
+cd Vulnex
 
 # Create virtual environment
 python -m venv .venv
@@ -142,7 +144,7 @@ docker compose exec web python manage.py createsuperuser
 ## Project Structure
 
 ```
-pentestflow/
+Vulnex/
 ├── accounts/          # User model, auth, admin user management
 ├── dashboard/         # Dashboard views and analytics
 ├── engagements/       # Engagement CRUD, team management, invitations
@@ -150,7 +152,7 @@ pentestflow/
 ├── recon/             # Scanners, Nmap import, host discovery
 ├── methodology/       # Testing checklists and progress tracking
 ├── reports/           # PDF report generation
-├── pentestflow/       # Project settings, URLs, admin config
+├── vulnex/            # Project settings, URLs, admin config
 ├── templates/         # All HTML templates
 ├── static/css/        # Dark theme CSS
 ├── Dockerfile

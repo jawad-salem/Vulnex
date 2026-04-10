@@ -1,6 +1,5 @@
 import os
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pentestflow.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'vulnex.settings')
 application = get_wsgi_application()
-

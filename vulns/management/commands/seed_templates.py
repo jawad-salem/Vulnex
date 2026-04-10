@@ -279,6 +279,282 @@ TEMPLATES = [
         'privileges_required': 'N', 'user_interaction': 'N',
         'confidentiality_impact': 'N', 'integrity_impact': 'N', 'availability_impact': 'N',
     },
+    {
+        'name': 'XML External Entity (XXE) Injection',
+        'title': 'XML External Entity (XXE) Injection',
+        'severity': 'high',
+        'description': (
+            'An XML External Entity (XXE) injection vulnerability was identified. The application '
+            'parses XML input from an untrusted source with external entity processing enabled, '
+            'allowing an attacker to define malicious external entities.\n\n'
+            'Exploitation can lead to disclosure of internal files, server-side request forgery (SSRF), '
+            'denial of service via recursive entity expansion (billion laughs attack), or in some cases '
+            'remote code execution.'
+        ),
+        'remediation': (
+            '1. Disable external entity processing and DTD processing in the XML parser.\n'
+            '2. Use less complex data formats such as JSON where possible.\n'
+            '3. Patch or upgrade all XML processors and libraries.\n'
+            '4. Implement server-side input validation and sanitization.\n'
+            '5. Use SAST tools to detect XXE in source code.'
+        ),
+        'references': (
+            'https://owasp.org/www-community/vulnerabilities/XML_External_Entity_(XXE)_Processing\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-611',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'N', 'availability_impact': 'L',
+    },
+    {
+        'name': 'Unrestricted File Upload',
+        'title': 'Unrestricted File Upload',
+        'severity': 'high',
+        'description': (
+            'An unrestricted file upload vulnerability was identified. The application allows users '
+            'to upload files without adequate validation of file type, content, or size. An attacker '
+            'can upload malicious files such as web shells, scripts, or executables.\n\n'
+            'Successful exploitation may allow remote code execution on the server, defacement, '
+            'storage of malicious content, or client-side attacks against other users.'
+        ),
+        'remediation': (
+            '1. Validate file type using allowlists (check MIME type and file extension).\n'
+            '2. Validate file content (magic bytes) rather than relying solely on extensions.\n'
+            '3. Store uploaded files outside the web root or on a separate storage service.\n'
+            '4. Rename uploaded files to random names to prevent direct access.\n'
+            '5. Set file size limits and scan uploads for malware.\n'
+            '6. Serve uploaded files with Content-Disposition: attachment header.'
+        ),
+        'references': (
+            'https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-434',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'L', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'H', 'availability_impact': 'H',
+    },
+    {
+        'name': 'Path Traversal',
+        'title': 'Path Traversal / Directory Traversal',
+        'severity': 'high',
+        'description': (
+            'A path traversal vulnerability was identified. The application uses user-supplied input '
+            'to construct file paths without adequate sanitization, allowing an attacker to access '
+            'files and directories outside the intended directory.\n\n'
+            'Using sequences like "../" an attacker can read sensitive system files (e.g. /etc/passwd, '
+            'configuration files, application source code) or in some cases write to arbitrary locations.'
+        ),
+        'remediation': (
+            '1. Validate user input against an allowlist of permitted file names.\n'
+            '2. Use a chroot jail or sandboxed file system for file operations.\n'
+            '3. Canonicalize paths and verify they remain within the intended base directory.\n'
+            '4. Avoid passing user-supplied input directly to file system APIs.\n'
+            '5. Apply the principle of least privilege to the application\'s file system access.'
+        ),
+        'references': (
+            'https://owasp.org/www-community/attacks/Path_Traversal\n'
+            'https://cwe.mitre.org/data/definitions/22.html'
+        ),
+        'cwe_id': 'CWE-22',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'N', 'availability_impact': 'N',
+    },
+    {
+        'name': 'Command Injection',
+        'title': 'OS Command Injection',
+        'severity': 'critical',
+        'description': (
+            'An OS command injection vulnerability was identified. The application passes user-supplied '
+            'input to a system shell or command execution function without proper sanitization, allowing '
+            'an attacker to execute arbitrary operating system commands.\n\n'
+            'Successful exploitation grants the attacker full control over the application server with '
+            'the privileges of the web application process.'
+        ),
+        'remediation': (
+            '1. Avoid calling OS commands directly — use language-native libraries instead.\n'
+            '2. If OS commands are necessary, use parameterized APIs (e.g. subprocess with shell=False).\n'
+            '3. Validate input against a strict allowlist of expected values.\n'
+            '4. Escape all special shell characters if shell execution cannot be avoided.\n'
+            '5. Run the application with minimal OS-level privileges.'
+        ),
+        'references': (
+            'https://owasp.org/www-community/attacks/Command_Injection\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/OS_Command_Injection_Defense_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-78',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'H', 'availability_impact': 'H',
+    },
+    {
+        'name': 'Broken Access Control — Privilege Escalation',
+        'title': 'Broken Access Control — Vertical Privilege Escalation',
+        'severity': 'critical',
+        'description': (
+            'A vertical privilege escalation vulnerability was identified. The application does not '
+            'properly enforce role-based access controls, allowing a lower-privileged user to access '
+            'functionality or data restricted to higher-privileged roles (e.g. admin).\n\n'
+            'An attacker can escalate their privileges by directly accessing administrative endpoints, '
+            'modifying role parameters, or manipulating authorization tokens.'
+        ),
+        'remediation': (
+            '1. Implement server-side access control checks on every request.\n'
+            '2. Deny access by default — only grant permissions explicitly.\n'
+            '3. Use role-based access control (RBAC) with clearly defined permission levels.\n'
+            '4. Do not rely on client-side controls or hidden UI elements for access control.\n'
+            '5. Log and alert on access control failures.'
+        ),
+        'references': (
+            'https://owasp.org/www-project-top-ten/2021/A01_2021-Broken_Access_Control\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-269',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'L', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'H', 'availability_impact': 'H',
+    },
+    {
+        'name': 'JWT / Token Vulnerability',
+        'title': 'Insecure JSON Web Token (JWT) Implementation',
+        'severity': 'high',
+        'description': (
+            'An insecure JWT implementation was identified. The application uses JSON Web Tokens '
+            'for authentication or authorization with weaknesses in token generation, validation, '
+            'or handling.\n\n'
+            'Common issues include: accepting the "none" algorithm, using weak signing secrets, '
+            'not validating token expiration, allowing algorithm confusion attacks, or storing '
+            'sensitive data in the token payload without encryption.'
+        ),
+        'remediation': (
+            '1. Use strong, asymmetric signing algorithms (RS256) or strong HMAC secrets.\n'
+            '2. Explicitly reject the "none" algorithm and enforce expected algorithm.\n'
+            '3. Validate all claims: expiration (exp), issuer (iss), audience (aud).\n'
+            '4. Keep token lifetimes short and implement token refresh mechanisms.\n'
+            '5. Do not store sensitive data in JWT payloads — they are base64-encoded, not encrypted.\n'
+            '6. Implement token revocation for logout and password changes.'
+        ),
+        'references': (
+            'https://portswigger.net/web-security/jwt\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-347',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'N',
+        'confidentiality_impact': 'H', 'integrity_impact': 'H', 'availability_impact': 'N',
+    },
+    {
+        'name': 'Open Redirect',
+        'title': 'Open Redirect',
+        'severity': 'medium',
+        'description': (
+            'An open redirect vulnerability was identified. The application accepts user-controlled '
+            'input in a URL redirection parameter without validating the destination, allowing an '
+            'attacker to redirect users to malicious external sites.\n\n'
+            'This is commonly exploited in phishing attacks where the attacker sends a link that '
+            'appears to point to the legitimate application but redirects the victim to a '
+            'credential-harvesting page.'
+        ),
+        'remediation': (
+            '1. Avoid using user-supplied input for redirect destinations.\n'
+            '2. If redirects are necessary, use an allowlist of permitted redirect URLs.\n'
+            '3. Use indirect references (e.g. mapping IDs to URLs) instead of direct URL parameters.\n'
+            '4. Validate that redirect targets are relative URLs or belong to trusted domains.\n'
+            '5. Display a warning page before redirecting to external sites.'
+        ),
+        'references': (
+            'https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html\n'
+            'https://cwe.mitre.org/data/definitions/601.html'
+        ),
+        'cwe_id': 'CWE-601',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'R',
+        'confidentiality_impact': 'L', 'integrity_impact': 'L', 'availability_impact': 'N',
+    },
+    {
+        'name': 'CORS Misconfiguration',
+        'title': 'Cross-Origin Resource Sharing (CORS) Misconfiguration',
+        'severity': 'medium',
+        'description': (
+            'A CORS misconfiguration was identified. The application returns overly permissive '
+            'Access-Control-Allow-Origin headers, allowing untrusted origins to read responses '
+            'from the application.\n\n'
+            'Common misconfigurations include reflecting the Origin header without validation, '
+            'using a wildcard (*) with credentials, or allowing null origins. This can enable '
+            'an attacker to steal sensitive data via a malicious website.'
+        ),
+        'remediation': (
+            '1. Implement a strict allowlist of permitted origins.\n'
+            '2. Never reflect the Origin header without validation.\n'
+            '3. Do not use wildcard (*) with Access-Control-Allow-Credentials: true.\n'
+            '4. Avoid allowing the "null" origin.\n'
+            '5. Restrict exposed headers and allowed methods to the minimum required.'
+        ),
+        'references': (
+            'https://portswigger.net/web-security/cors\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html#cors'
+        ),
+        'cwe_id': 'CWE-942',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'R',
+        'confidentiality_impact': 'H', 'integrity_impact': 'N', 'availability_impact': 'N',
+    },
+    {
+        'name': 'Clickjacking',
+        'title': 'Clickjacking (UI Redress Attack)',
+        'severity': 'medium',
+        'description': (
+            'The application is vulnerable to clickjacking. It can be embedded in an iframe on a '
+            'malicious site, allowing an attacker to overlay transparent UI elements and trick users '
+            'into clicking on hidden actions within the framed application.\n\n'
+            'This can be used to trick authenticated users into performing unintended actions such as '
+            'changing account settings, making purchases, or granting permissions.'
+        ),
+        'remediation': (
+            '1. Set the X-Frame-Options header to DENY or SAMEORIGIN.\n'
+            '2. Implement a Content Security Policy (CSP) with frame-ancestors directive.\n'
+            '3. Use JavaScript frame-busting as defense-in-depth (not a sole defense).\n'
+            '4. Consider using SameSite cookie attributes to prevent cross-origin framing attacks.'
+        ),
+        'references': (
+            'https://owasp.org/www-community/attacks/Clickjacking\n'
+            'https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html'
+        ),
+        'cwe_id': 'CWE-1021',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'R',
+        'confidentiality_impact': 'N', 'integrity_impact': 'L', 'availability_impact': 'N',
+    },
+    {
+        'name': 'Weak Password Policy',
+        'title': 'Weak Password Policy',
+        'severity': 'medium',
+        'description': (
+            'The application enforces a weak password policy that allows users to set passwords '
+            'that do not meet industry-standard complexity requirements. This increases the risk '
+            'of successful brute-force or credential stuffing attacks.\n\n'
+            'Weaknesses may include: no minimum length requirement, no complexity requirements, '
+            'allowing common passwords, no account lockout mechanism, or no password expiration policy.'
+        ),
+        'remediation': (
+            '1. Enforce minimum password length of at least 12 characters.\n'
+            '2. Check passwords against known breached password databases (e.g. HIBP).\n'
+            '3. Implement account lockout or progressive delays after failed login attempts.\n'
+            '4. Encourage use of password managers and passphrases.\n'
+            '5. Implement multi-factor authentication (MFA) as an additional control.\n'
+            '6. Do not use password complexity rules (uppercase + symbol) — length is more effective.'
+        ),
+        'references': (
+            'https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html\n'
+            'https://pages.nist.gov/800-63-3/sp800-63b.html'
+        ),
+        'cwe_id': 'CWE-521',
+        'attack_vector': 'N', 'attack_complexity': 'L',
+        'privileges_required': 'N', 'user_interaction': 'N',
+        'confidentiality_impact': 'L', 'integrity_impact': 'N', 'availability_impact': 'N',
+    },
 ]
 
 

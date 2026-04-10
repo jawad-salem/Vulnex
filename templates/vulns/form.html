@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} — PentestFlow{% endblock %}
+{% block title %}{{ title }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
     <a href="{% url 'engagements:list' %}">Engagements</a>
@@ -34,7 +34,7 @@
         {% endif %}
 
         <!-- Template picker -->
-        {% if finding_templates and not finding %}
+        {% if finding_templates %}
         <div class="section-box mb-4">
             <h3 class="section-title">Use a template</h3>
             <p class="section-desc">Auto-fill from a common vulnerability template, then customize.</p>

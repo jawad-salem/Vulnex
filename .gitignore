@@ -11,3 +11,8 @@ staticfiles/
 .DS_Store
 .claude/
 resutls.json
+.vscode/
+.idea/
+*.swp
+staticfiles/
+

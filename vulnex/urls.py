@@ -3,10 +3,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
-from .admin import PentestFlowAdminSite
+from .admin import VulnexAdminSite
 
 # Replace default admin site with role-restricted version
-admin.site.__class__ = PentestFlowAdminSite
+admin.site.__class__ = VulnexAdminSite
 
 urlpatterns = [
     path('admin/', admin.site.urls),

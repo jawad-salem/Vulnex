@@ -266,7 +266,7 @@ def detect_technologies(target: str) -> list[dict]:
     for url in [target, target.replace('http://', 'https://')]:
         try:
             req = urllib.request.Request(url, method='GET', headers={
-                'User-Agent': 'Mozilla/5.0 (compatible; PentestFlow/1.0)',
+                'User-Agent': 'Mozilla/5.0 (compatible; Vulnex/1.0)',
             })
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
@@ -539,7 +539,7 @@ def bruteforce_dirs(target: str) -> list[dict]:
         url = f'{target}{path}'
         try:
             req = urllib.request.Request(url, method='GET', headers={
-                'User-Agent': 'Mozilla/5.0 (compatible; PentestFlow/1.0)',
+                'User-Agent': 'Mozilla/5.0 (compatible; Vulnex/1.0)',
             })
             with urllib.request.urlopen(req, timeout=6, context=ctx) as resp:
                 status = resp.status
