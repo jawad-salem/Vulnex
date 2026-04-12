@@ -150,6 +150,12 @@
 
 {% block extra_js %}
 {% if total_findings > 0 %}
+{{ severity_counts|json_script:"chart-severity-data" }}
+{{ status_counts|json_script:"chart-status-data" }}
+{{ timeline_labels|json_script:"chart-timeline-labels" }}
+{{ timeline_data|json_script:"chart-timeline-data" }}
+{{ top_eng_labels|json_script:"chart-eng-labels" }}
+{{ top_eng_data|json_script:"chart-eng-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script>
 (function() {
@@ -163,7 +169,7 @@
     Chart.defaults.plugins.legend.labels.padding = 16;
 
     // Severity donut
-    var sevData = {{ severity_counts_json|safe }};
+    var sevData = JSON.parse(document.getElementById('chart-severity-data').textContent);
     new Chart(document.getElementById('severityChart'), {
         type: 'doughnut',
         data: {
@@ -192,7 +198,7 @@
     });
 
     // Status donut
-    var statusData = {{ status_counts_json|safe }};
+    var statusData = JSON.parse(document.getElementById('chart-status-data').textContent);
     new Chart(document.getElementById('statusChart'), {
         type: 'doughnut',
         data: {
@@ -221,8 +227,8 @@
     });
 
     // Timeline line chart
-    var timeLabels = {{ timeline_labels_json|safe }};
-    var timeData = {{ timeline_data_json|safe }};
+    var timeLabels = JSON.parse(document.getElementById('chart-timeline-labels').textContent);
+    var timeData = JSON.parse(document.getElementById('chart-timeline-data').textContent);
     if (timeLabels.length > 0) {
         new Chart(document.getElementById('timelineChart'), {
             type: 'line',
@@ -253,8 +259,8 @@
     }
 
     // Top engagements bar chart
-    var engLabels = {{ top_eng_labels_json|safe }};
-    var engData = {{ top_eng_data_json|safe }};
+    var engLabels = JSON.parse(document.getElementById('chart-eng-labels').textContent);
+    var engData = JSON.parse(document.getElementById('chart-eng-data').textContent);
     if (engLabels.length > 0) {
         new Chart(document.getElementById('engChart'), {
             type: 'bar',

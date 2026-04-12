@@ -6,8 +6,7 @@ import socket
 import struct
 import ssl
 import json
-import urllib.request
-import urllib.error
+import http.client
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -73,8 +72,15 @@ def _is_internal_ip(ip_str: str) -> bool:
         return False
 
 
-def _validate_target(target: str) -> str:
-    """Extract hostname from target, validate it's not internal. Returns hostname or raises ValueError."""
+def _validate_target(target: str) -> tuple[str, str]:
+    """Extract hostname from target, validate it's not internal.
+
+    Returns (hostname, ip) tuple. Callers MUST use the returned IP for
+    subsequent connections — re-resolving the hostname would re-introduce
+    a DNS rebinding TOCTOU window where an attacker-controlled DNS server
+    could return a public IP during validation and an internal IP at
+    connection time.
+    """
     target = target.strip().rstrip('/')
     if target.startswith(('http://', 'https://')):
         target = target.split('://')[1].split('/')[0]
@@ -94,21 +100,40 @@ def _validate_target(target: str) -> str:
     if _is_internal_ip(resolved_ip):
         raise ValueError(f'Scanning internal/private IPs is not allowed: {target} ({resolved_ip})')
 
-    return target
+    return target, resolved_ip
 
 
-def _resolve_target(target: str) -> str:
-    """Resolve hostname to IP address."""
-    target = target.strip().rstrip('/')
-    if target.startswith(('http://', 'https://')):
-        target = target.split('://')[1].split('/')[0]
-    # Remove port if present
-    if ':' in target and not target.startswith('['):
-        target = target.split(':')[0]
+def _pinned_http_get(hostname: str, ip: str, path: str, use_https: bool, timeout: int = 8):
+    """HTTP GET that connects directly to a pre-validated IP.
+
+    This prevents DNS rebinding: the IP was validated by `_validate_target`
+    and is passed in here, so no additional name resolution happens between
+    the safety check and the actual connection.
+
+    The original `hostname` is sent in the Host header so virtual-hosted
+    sites still route correctly.
+
+    Returns (status, headers dict, body bytes). Body is capped at 50 KB.
+    """
+    port = 443 if use_https else 80
+    if use_https:
+        ctx = ssl._create_unverified_context()
+        conn = http.client.HTTPSConnection(ip, port, timeout=timeout, context=ctx)
+    else:
+        conn = http.client.HTTPConnection(ip, port, timeout=timeout)
     try:
-        return socket.gethostbyname(target)
-    except socket.gaierror:
-        return ''
+        conn.request('GET', path or '/', headers={
+            'Host': hostname,
+            'User-Agent': 'Mozilla/5.0 (compatible; Vulnex/1.0)',
+            'Accept': '*/*',
+            'Connection': 'close',
+        })
+        resp = conn.getresponse()
+        headers = {k: v for k, v in resp.getheaders()}
+        body = resp.read(50000)
+        return resp.status, headers, body
+    finally:
+        conn.close()
 
 
 def _grab_banner(ip: str, port: int, timeout: float = 2.0) -> str:
@@ -174,17 +199,10 @@ def _check_port(ip: str, port: int, timeout: float = 1.5) -> dict | None:
 
 def scan_ports(target: str) -> list[dict]:
     """TCP connect scan on common ports using thread pool."""
-    clean_target = target.strip().rstrip('/')
-    if clean_target.startswith(('http://', 'https://')):
-        clean_target = clean_target.split('://')[1].split('/')[0]
-    if ':' in clean_target and not clean_target.startswith('['):
-        clean_target = clean_target.split(':')[0]
-
-    _validate_target(clean_target)  # SSRF protection
-
-    ip = _resolve_target(clean_target)
-    if not ip:
-        return []
+    # Validate and resolve in one step. We use the returned IP directly for
+    # the scan — never re-resolve, or DNS rebinding could redirect the scan
+    # to an internal target.
+    clean_target, ip = _validate_target(target)
 
     hostname = clean_target if clean_target != ip else ''
     open_ports = []
@@ -260,102 +278,97 @@ def detect_technologies(target: str) -> list[dict]:
         target = f'http://{target}'
 
     hostname = target.split('://')[1].split('/')[0]
-    _validate_target(hostname)  # SSRF protection
+    # SSRF + DNS-rebinding protection: validate and pin to the resolved IP
+    host_only, validated_ip = _validate_target(hostname)
     technologies = []
+    security_notes = []
 
-    for url in [target, target.replace('http://', 'https://')]:
+    for use_https in (False, True):
         try:
-            req = urllib.request.Request(url, method='GET', headers={
-                'User-Agent': 'Mozilla/5.0 (compatible; Vulnex/1.0)',
-            })
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
+            status, headers, body_bytes = _pinned_http_get(
+                host_only, validated_ip, '/', use_https=use_https, timeout=8,
+            )
+            body = body_bytes.decode('utf-8', errors='replace')
 
-            with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
-                headers = dict(resp.headers)
-                body = resp.read(50000).decode('utf-8', errors='replace')
+            # Server header
+            server = headers.get('Server', '')
+            if server:
+                technologies.append(server)
 
-                # Server header
-                server = headers.get('Server', '')
-                if server:
-                    technologies.append(server)
+            # X-Powered-By
+            powered = headers.get('X-Powered-By', '')
+            if powered:
+                technologies.append(powered)
 
-                # X-Powered-By
-                powered = headers.get('X-Powered-By', '')
-                if powered:
-                    technologies.append(powered)
+            # X-AspNet-Version
+            aspnet = headers.get('X-AspNet-Version', '')
+            if aspnet:
+                technologies.append(f'ASP.NET {aspnet}')
 
-                # X-AspNet-Version
-                aspnet = headers.get('X-AspNet-Version', '')
-                if aspnet:
-                    technologies.append(f'ASP.NET {aspnet}')
+            # X-Generator
+            generator = headers.get('X-Generator', '')
+            if generator:
+                technologies.append(generator)
 
-                # X-Generator
-                generator = headers.get('X-Generator', '')
-                if generator:
-                    technologies.append(generator)
+            # Cookie-based detection
+            set_cookie = headers.get('Set-Cookie', '')
+            if 'PHPSESSID' in set_cookie:
+                technologies.append('PHP')
+            if 'JSESSIONID' in set_cookie:
+                technologies.append('Java')
+            if 'ASP.NET' in set_cookie:
+                technologies.append('ASP.NET')
+            if 'laravel_session' in set_cookie:
+                technologies.append('Laravel')
+            if 'csrftoken' in set_cookie.lower() and 'django' not in [t.lower() for t in technologies]:
+                technologies.append('Django (likely)')
+            if 'express.sid' in set_cookie or 'connect.sid' in set_cookie:
+                technologies.append('Node.js/Express')
 
-                # Cookie-based detection
-                set_cookie = headers.get('Set-Cookie', '')
-                if 'PHPSESSID' in set_cookie:
-                    technologies.append('PHP')
-                if 'JSESSIONID' in set_cookie:
-                    technologies.append('Java')
-                if 'ASP.NET' in set_cookie:
-                    technologies.append('ASP.NET')
-                if 'laravel_session' in set_cookie:
-                    technologies.append('Laravel')
-                if 'csrftoken' in set_cookie.lower() and 'django' not in [t.lower() for t in technologies]:
-                    technologies.append('Django (likely)')
-                if 'express.sid' in set_cookie or 'connect.sid' in set_cookie:
-                    technologies.append('Node.js/Express')
+            # Body-based detection
+            body_lower = body.lower()
+            if 'wp-content' in body_lower or 'wp-includes' in body_lower:
+                technologies.append('WordPress')
+            if 'joomla' in body_lower:
+                technologies.append('Joomla')
+            if 'drupal' in body_lower:
+                technologies.append('Drupal')
+            if 'shopify' in body_lower:
+                technologies.append('Shopify')
 
-                # Body-based detection
-                body_lower = body.lower()
-                if 'wp-content' in body_lower or 'wp-includes' in body_lower:
-                    technologies.append('WordPress')
-                if 'joomla' in body_lower:
-                    technologies.append('Joomla')
-                if 'drupal' in body_lower:
-                    technologies.append('Drupal')
-                if 'shopify' in body_lower:
-                    technologies.append('Shopify')
+            # Meta generator tag
+            import re
+            gen_match = re.search(r'<meta[^>]+name=["\']generator["\'][^>]+content=["\'](.*?)["\']', body, re.I)
+            if gen_match:
+                gen_val = gen_match.group(1)
+                if gen_val not in technologies:
+                    technologies.append(gen_val)
 
-                # Meta generator tag
-                import re
-                gen_match = re.search(r'<meta[^>]+name=["\']generator["\'][^>]+content=["\'](.*?)["\']', body, re.I)
-                if gen_match:
-                    gen_val = gen_match.group(1)
-                    if gen_val not in technologies:
-                        technologies.append(gen_val)
+            # JavaScript frameworks
+            if 'react' in body_lower and ('reactdom' in body_lower or 'react-dom' in body_lower or '_react' in body_lower):
+                technologies.append('React')
+            if 'vue' in body_lower and ('vue.js' in body_lower or 'vue.min' in body_lower or '__vue__' in body_lower):
+                technologies.append('Vue.js')
+            if 'angular' in body_lower and ('ng-version' in body_lower or 'angular.js' in body_lower):
+                technologies.append('Angular')
+            if 'jquery' in body_lower:
+                # Try to get version
+                jq_match = re.search(r'jquery[/-](\d+\.\d+[\.\d]*)', body_lower)
+                technologies.append(f'jQuery {jq_match.group(1)}' if jq_match else 'jQuery')
+            if 'bootstrap' in body_lower:
+                technologies.append('Bootstrap')
 
-                # JavaScript frameworks
-                if 'react' in body_lower and ('reactdom' in body_lower or 'react-dom' in body_lower or '_react' in body_lower):
-                    technologies.append('React')
-                if 'vue' in body_lower and ('vue.js' in body_lower or 'vue.min' in body_lower or '__vue__' in body_lower):
-                    technologies.append('Vue.js')
-                if 'angular' in body_lower and ('ng-version' in body_lower or 'angular.js' in body_lower):
-                    technologies.append('Angular')
-                if 'jquery' in body_lower:
-                    # Try to get version
-                    jq_match = re.search(r'jquery[/-](\d+\.\d+[\.\d]*)', body_lower)
-                    technologies.append(f'jQuery {jq_match.group(1)}' if jq_match else 'jQuery')
-                if 'bootstrap' in body_lower:
-                    technologies.append('Bootstrap')
+            # Security headers check
+            if not headers.get('X-Frame-Options'):
+                security_notes.append('Missing X-Frame-Options')
+            if not headers.get('X-Content-Type-Options'):
+                security_notes.append('Missing X-Content-Type-Options')
+            if use_https and not headers.get('Strict-Transport-Security'):
+                security_notes.append('Missing HSTS')
+            if not headers.get('Content-Security-Policy'):
+                security_notes.append('Missing CSP')
 
-                # Security headers check
-                security_notes = []
-                if not headers.get('X-Frame-Options'):
-                    security_notes.append('Missing X-Frame-Options')
-                if not headers.get('X-Content-Type-Options'):
-                    security_notes.append('Missing X-Content-Type-Options')
-                if not headers.get('Strict-Transport-Security') and url.startswith('https'):
-                    security_notes.append('Missing HSTS')
-                if not headers.get('Content-Security-Policy'):
-                    security_notes.append('Missing CSP')
-
-                break  # Got a response, no need to try the other protocol
+            break  # Got a response, no need to try the other protocol
 
         except Exception:
             continue
@@ -528,32 +541,23 @@ def bruteforce_dirs(target: str) -> list[dict]:
         target = f'http://{target}'
 
     hostname = target.split('://')[1].split('/')[0]
-    _validate_target(hostname)  # SSRF protection
+    use_https = target.startswith('https://')
+    # SSRF + DNS-rebinding protection: validate and pin to the resolved IP
+    host_only, validated_ip = _validate_target(hostname)
     found = []
 
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-
     def _check_path(path):
-        url = f'{target}{path}'
         try:
-            req = urllib.request.Request(url, method='GET', headers={
-                'User-Agent': 'Mozilla/5.0 (compatible; Vulnex/1.0)',
-            })
-            with urllib.request.urlopen(req, timeout=6, context=ctx) as resp:
-                status = resp.status
-                length = len(resp.read(1000))
-                if status in (200, 301, 302, 403):
-                    return {
-                        'path': path,
-                        'status': status,
-                        'size': length,
-                        'redirect': resp.url if status in (301, 302) else None,
-                    }
-        except urllib.error.HTTPError as e:
-            if e.code == 403:
-                return {'path': path, 'status': 403, 'size': 0, 'note': 'Forbidden'}
+            status, headers, body = _pinned_http_get(
+                host_only, validated_ip, path, use_https=use_https, timeout=6,
+            )
+            if status in (200, 301, 302, 403):
+                return {
+                    'path': path,
+                    'status': status,
+                    'size': len(body),
+                    'redirect': headers.get('Location') if status in (301, 302) else None,
+                }
         except Exception:
             pass
         return None
@@ -569,7 +573,6 @@ def bruteforce_dirs(target: str) -> list[dict]:
                 found.append(result)
 
     found.sort(key=lambda x: x['path'])
-    hostname = target.split('://')[1].split('/')[0]
     return [{'hostname': hostname, 'url': target, 'directories': found}]
 
 

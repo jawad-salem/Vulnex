@@ -4,7 +4,8 @@ Each parser takes raw file content (bytes) and returns a list of dicts
 suitable for creating Finding objects.
 """
 import json
-import xml.etree.ElementTree as ET
+# Use defusedxml to protect against XXE, billion laughs, and quadratic blowup attacks
+import defusedxml.ElementTree as ET
 
 
 def parse_nmap_xml(content: bytes) -> list[dict]:

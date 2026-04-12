@@ -1,4 +1,3 @@
-import json
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
@@ -74,12 +73,11 @@ def home(request):
         'active_engagements': active_engagements,
         'total_findings': total_findings,
         'severity_counts': severity_counts,
-        'status_counts_json': json.dumps(status_counts),
-        'severity_counts_json': json.dumps(severity_counts),
-        'timeline_labels_json': json.dumps(timeline_labels),
-        'timeline_data_json': json.dumps(timeline_data),
-        'top_eng_labels_json': json.dumps(top_eng_labels),
-        'top_eng_data_json': json.dumps(top_eng_data),
+        'status_counts': status_counts,
+        'timeline_labels': timeline_labels,
+        'timeline_data': timeline_data,
+        'top_eng_labels': top_eng_labels,
+        'top_eng_data': top_eng_data,
         'recent_engagements': recent_engagements,
         'urgent_findings': urgent_findings,
         'recent_activity': recent_activity,

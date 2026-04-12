@@ -52,6 +52,16 @@ class FindingForm(forms.ModelForm):
 
 
 class EvidenceForm(forms.ModelForm):
+    # Whitelist of allowed evidence file extensions. Anything that the browser
+    # could execute as script (html, svg, js, xml, etc.) is intentionally excluded
+    # to prevent stored XSS via the media folder.
+    ALLOWED_EXTENSIONS = {
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
+        'pdf', 'txt', 'log', 'json', 'csv', 'md',
+        'zip', 'tar', 'gz',
+    }
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
     class Meta:
         model = Evidence
         fields = ['file', 'caption']
@@ -60,6 +70,30 @@ class EvidenceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
+
+    def clean_file(self):
+        f = self.cleaned_data.get('file')
+        if not f:
+            return f
+
+        if f.size > self.MAX_FILE_SIZE:
+            raise forms.ValidationError(
+                f'File too large ({f.size // 1024} KB). Maximum size is '
+                f'{self.MAX_FILE_SIZE // (1024 * 1024)} MB.'
+            )
+
+        name = f.name or ''
+        if '.' not in name:
+            raise forms.ValidationError('File must have an extension.')
+
+        ext = name.rsplit('.', 1)[-1].lower()
+        if ext not in self.ALLOWED_EXTENSIONS:
+            allowed = ', '.join(sorted(self.ALLOWED_EXTENSIONS))
+            raise forms.ValidationError(
+                f'File type ".{ext}" is not allowed. Allowed types: {allowed}.'
+            )
+
+        return f
 
 
 class ToolImportForm(forms.Form):

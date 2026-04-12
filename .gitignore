@@ -15,4 +15,6 @@ resutls.json
 .idea/
 *.swp
 staticfiles/
+.git
+.gitignore
 

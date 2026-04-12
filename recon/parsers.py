@@ -3,7 +3,8 @@ Parsers for recon tool outputs.
 Each parser returns a list of dicts suitable for creating DiscoveredHost records.
 """
 import gzip
-import xml.etree.ElementTree as ET
+# Use defusedxml to protect against XXE, billion laughs, and quadratic blowup attacks
+import defusedxml.ElementTree as ET
 
 
 def parse_nmap_xml_to_hosts(content: bytes) -> list[dict]:
