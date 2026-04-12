@@ -12,6 +12,11 @@
 
 <div class="stats-grid">
     <div class="stat-card">
+        <div class="stat-label">Risk Score</div>
+        <div class="stat-value" style="color:{{ risk_color }}">{{ overall_risk_score }}</div>
+        <div class="stat-sublabel" style="color:{{ risk_color }}">{{ risk_label }}</div>
+    </div>
+    <div class="stat-card">
         <div class="stat-label">Active engagements</div>
         <div class="stat-value">{{ active_engagements }}</div>
     </div>
@@ -20,12 +25,9 @@
         <div class="stat-value">{{ total_findings }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Critical</div>
+        <div class="stat-label">Critical / High</div>
         <div class="stat-value critical">{{ severity_counts.critical }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">High</div>
-        <div class="stat-value high">{{ severity_counts.high }}</div>
+        <div class="stat-sublabel high">{{ severity_counts.high }} high</div>
     </div>
 </div>
 
@@ -144,6 +146,24 @@
             </div>
             {% endfor %}
         </div>
+
+        {% if engagement_risks %}
+        <div class="card">
+            <h2 class="card-title mb-3">Engagement risk scores</h2>
+            {% for er in engagement_risks %}
+            <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
+                <div>
+                    <a href="{{ er.engagement.get_absolute_url }}" class="text-sm font-semibold">{{ er.engagement.name|truncatechars:25 }}</a>
+                    <div class="text-xs text-secondary">{{ er.finding_count }} finding{{ er.finding_count|pluralize }}</div>
+                </div>
+                <div style="text-align:right">
+                    <span class="text-mono font-semibold" style="color:{{ er.color }};font-size:16px">{{ er.score }}</span>
+                    <div class="text-xs" style="color:{{ er.color }}">{{ er.label }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

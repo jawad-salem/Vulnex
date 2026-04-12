@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from .models import Engagement, EngagementMember, Invitation, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
+from reports.generator import calculate_engagement_risk_score, _risk_label
 from accounts.decorators import role_required, engagement_access, engagement_edit_required
 
 
@@ -83,17 +84,25 @@ def engagement_detail(request, pk):
     members = engagement.members.select_related('user').all()
     pending_invitations = engagement.invitations.filter(status='pending')
 
+    # Risk score
+    all_findings = engagement.findings.all()
+    risk_score = calculate_engagement_risk_score(all_findings)
+    risk_label_text, risk_color = _risk_label(risk_score)
+
     context = {
         'engagement': engagement,
         'note_form': note_form,
         'notes': engagement.notes.select_related('author')[:20] if not is_client else [],
-        'findings': engagement.findings.all()[:10],
+        'findings': all_findings[:10],
         'activity': engagement.activity_logs.select_related('user')[:15] if not is_client else [],
         'members': members,
         'pending_invitations': pending_invitations,
         'is_client': is_client,
         'can_edit': request.eng_role in ('admin', 'lead', 'pentester'),
         'can_manage': request.eng_role in ('admin', 'lead'),
+        'risk_score': risk_score,
+        'risk_label': risk_label_text,
+        'risk_color': risk_color,
     }
     return render(request, 'engagements/detail.html', context)
 

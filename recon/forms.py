@@ -1,5 +1,5 @@
 from django import forms
-from .models import ReconScan, DiscoveredHost
+from .models import ReconScan, DiscoveredHost, ScheduledScan, ScanPipeline
 
 
 class ReconScanForm(forms.ModelForm):
@@ -114,3 +114,35 @@ class DiscoveredHostForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class ScheduledScanForm(forms.ModelForm):
+    class Meta:
+        model = ScheduledScan
+        fields = ['scan_type', 'target', 'frequency']
+        widgets = {
+            'target': forms.TextInput(attrs={'placeholder': 'e.g. example.com'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')
+
+
+class ScanPipelineForm(forms.Form):
+    PRESET_CHOICES = [
+        (key, preset['name'])
+        for key, preset in ScanPipeline.PIPELINE_PRESETS.items()
+    ]
+
+    preset = forms.ChoiceField(choices=PRESET_CHOICES, label='Pipeline type')
+    target = forms.CharField(
+        max_length=500,
+        widget=forms.TextInput(attrs={'placeholder': 'e.g. example.com'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')

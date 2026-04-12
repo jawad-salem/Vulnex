@@ -27,6 +27,11 @@
 
 <div class="stats-grid">
     <div class="stat-card">
+        <div class="stat-label">Risk Score</div>
+        <div class="stat-value" style="color:{{ risk_color }}">{{ risk_score }}</div>
+        <div class="stat-sublabel" style="color:{{ risk_color }}">{{ risk_label }}</div>
+    </div>
+    <div class="stat-card">
         <div class="stat-label">Status</div>
         <span class="badge badge-{{ engagement.status }} badge-lg">{{ engagement.get_status_display }}</span>
     </div>
@@ -35,12 +40,9 @@
         <div class="stat-value">{{ engagement.finding_count }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Critical</div>
+        <div class="stat-label">Critical / High</div>
         <div class="stat-value critical">{{ engagement.critical_count }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">High</div>
-        <div class="stat-value high">{{ engagement.high_count }}</div>
+        <div class="stat-sublabel high">{{ engagement.high_count }} high</div>
     </div>
 </div>
 

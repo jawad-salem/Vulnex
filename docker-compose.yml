@@ -8,14 +8,55 @@ services:
       - DJANGO_DEBUG=True
       - DATABASE_URL=sqlite:///db.sqlite3
       - SITE_URL=http://localhost:8000
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
       - sqlite_data:/app/db.sqlite3
       - media_data:/app/media
+    depends_on:
+      - redis
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput 2>/dev/null;
              gunicorn vulnex.wsgi:application --bind 0.0.0.0:8000 --reload"
+
+  celery-worker:
+    build: .
+    environment:
+      - DJANGO_SECRET_KEY=change-me-in-production
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=sqlite:///db.sqlite3
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - sqlite_data:/app/db.sqlite3
+      - media_data:/app/media
+    depends_on:
+      - redis
+    command: celery -A vulnex worker -l info
+
+  celery-beat:
+    build: .
+    environment:
+      - DJANGO_SECRET_KEY=change-me-in-production
+      - DJANGO_DEBUG=True
+      - DATABASE_URL=sqlite:///db.sqlite3
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - .:/app
+      - sqlite_data:/app/db.sqlite3
+      - media_data:/app/media
+    depends_on:
+      - redis
+    command: celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
 
 volumes:
   sqlite_data:

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Pipeline: {{ pipeline.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'recon:dashboard' engagement.pk %}">Recon</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ pipeline.name }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ pipeline.name }}</h1>
+        <p class="page-subtitle">
+            Target: <span class="text-mono">{{ pipeline.target }}</span>
+            &middot; <span class="badge badge-{{ pipeline.status }}">{{ pipeline.get_status_display }}</span>
+        </p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div>
+        <!-- Pipeline Progress -->
+        <div class="card">
+            <h2 class="card-title mb-4">Pipeline progress</h2>
+            <div class="progress-bar" style="margin-bottom:16px">
+                <div class="progress-fill" style="width:{{ pipeline.progress_percent }}%"></div>
+            </div>
+            <div class="detail-list">
+                {% for step in pipeline.steps %}
+                <div class="detail-row">
+                    <span class="detail-label">
+                        {% if forloop.counter0 < pipeline.current_step %}
+                            <span style="color:var(--green)">&#10003;</span>
+                        {% elif forloop.counter0 == pipeline.current_step and pipeline.status == 'running' %}
+                            <span style="color:var(--warning)">&#9654;</span>
+                        {% else %}
+                            <span style="color:var(--text-muted)">&#9675;</span>
+                        {% endif %}
+                        Step {{ forloop.counter }}: {{ step }}
+                    </span>
+                    <span class="text-mono text-sm">
+                        {% with step_data=pipeline.results_summary %}
+                            {% if step_data and step in step_data %}
+                                {{ step_data|default_if_none:"" }}
+                            {% endif %}
+                        {% endwith %}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Results Summary -->
+        {% if pipeline.results_summary %}
+        <div class="card">
+            <h2 class="card-title mb-4">Results summary</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Step</th><th>Targets scanned</th><th>Results</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for step_name, step_data in pipeline.results_summary.items %}
+                    <tr>
+                        <td>{{ step_name }}</td>
+                        <td class="text-mono">{{ step_data.targets_scanned }}</td>
+                        <td class="text-mono">{{ step_data.count }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="flex-between mt-3" style="padding:0 4px">
+                <span class="text-sm text-secondary">Total results</span>
+                <span class="text-mono font-semibold">{{ pipeline.total_results }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if pipeline.error_message %}
+        <div class="card" style="border-left:3px solid var(--danger)">
+            <h2 class="card-title mb-2">Error</h2>
+            <pre class="text-sm" style="white-space:pre-wrap;color:var(--danger)">{{ pipeline.error_message }}</pre>
+        </div>
+        {% endif %}
+    </div>
+
+    <div>
+        <!-- Related Scans -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Individual scans</h2>
+                <span class="text-xs text-muted">{{ related_scans|length }} scans</span>
+            </div>
+            {% if related_scans %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Target</th><th>Status</th><th>Results</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for scan in related_scans %}
+                    <tr>
+                        <td><a href="{% url 'recon:scan_detail' scan.pk %}">{{ scan.get_scan_type_display }}</a></td>
+                        <td class="text-mono text-sm">{{ scan.target|truncatechars:25 }}</td>
+                        <td><span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span></td>
+                        <td class="text-mono">{{ scan.result_count }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-secondary text-sm" style="padding:16px">No scans created yet.</p>
+            {% endif %}
+        </div>
+
+        <!-- Meta info -->
+        <div class="card">
+            <h2 class="card-title mb-3">Details</h2>
+            <div class="detail-list">
+                <div class="detail-row">
+                    <span class="detail-label">Started by</span>
+                    <span>{{ pipeline.started_by|default:"System" }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Created</span>
+                    <span>{{ pipeline.created_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% if pipeline.started_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Started</span>
+                    <span>{{ pipeline.started_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+                {% if pipeline.completed_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Completed</span>
+                    <span>{{ pipeline.completed_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

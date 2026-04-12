@@ -1,10 +1,12 @@
+import json
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
-from .models import ReconScan, DiscoveredHost
-from .forms import ReconScanForm, NmapImportForm, DiscoveredHostForm
+from .models import ReconScan, DiscoveredHost, ScheduledScan, ScanPipeline
+from .forms import ReconScanForm, NmapImportForm, DiscoveredHostForm, ScheduledScanForm, ScanPipelineForm
 from .parsers import parse_nmap_xml_to_hosts
 from .scanners import run_scan
 from accounts.decorators import engagement_access, engagement_edit_required
@@ -18,6 +20,10 @@ def recon_dashboard(request, engagement_pk):
     hosts = engagement.discovered_hosts.all()
     scan_form = ReconScanForm()
     import_form = NmapImportForm()
+    scheduled_form = ScheduledScanForm()
+    pipeline_form = ScanPipelineForm()
+    scheduled_scans = engagement.scheduled_scans.all()
+    pipelines = engagement.scan_pipelines.all()[:10]
 
     context = {
         'engagement': engagement,
@@ -25,6 +31,11 @@ def recon_dashboard(request, engagement_pk):
         'hosts': hosts,
         'scan_form': scan_form,
         'import_form': import_form,
+        'scheduled_form': scheduled_form,
+        'pipeline_form': pipeline_form,
+        'scheduled_scans': scheduled_scans,
+        'pipelines': pipelines,
+        'pipeline_presets': ScanPipeline.PIPELINE_PRESETS,
     }
     return render(request, 'recon/dashboard.html', context)
 
@@ -199,6 +210,241 @@ def import_nmap(request, engagement_pk):
                 messages.error(request, f'Nmap import failed: {str(e)}')
         return redirect('recon:dashboard', engagement_pk=engagement_pk)
     return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+# ── Scheduled scans ──
+
+@login_required
+@engagement_edit_required
+def create_scheduled_scan(request, engagement_pk):
+    engagement = request.engagement
+    if request.method == 'POST':
+        form = ScheduledScanForm(request.POST)
+        if form.is_valid():
+            ss = form.save(commit=False)
+            ss.engagement = engagement
+            ss.created_by = request.user
+            ss.save()
+
+            # Create the django-celery-beat PeriodicTask
+            _sync_periodic_task(ss)
+
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Scheduled {ss.get_scan_type_display()} on {ss.target} ({ss.get_frequency_display()})',
+            )
+            messages.success(request, f'Scheduled scan created: {ss.get_frequency_display()}.')
+            return redirect('recon:dashboard', engagement_pk=engagement_pk)
+    return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+@login_required
+@engagement_edit_required
+def toggle_scheduled_scan(request, engagement_pk, pk):
+    engagement = request.engagement
+    ss = get_object_or_404(ScheduledScan, pk=pk, engagement=engagement)
+    if request.method == 'POST':
+        ss.is_active = not ss.is_active
+        ss.save(update_fields=['is_active'])
+        _sync_periodic_task(ss)
+        state = 'enabled' if ss.is_active else 'paused'
+        messages.success(request, f'Scheduled scan {state}.')
+    return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+@login_required
+@engagement_edit_required
+def delete_scheduled_scan(request, engagement_pk, pk):
+    engagement = request.engagement
+    ss = get_object_or_404(ScheduledScan, pk=pk, engagement=engagement)
+    if request.method == 'POST':
+        _delete_periodic_task(ss)
+        ss.delete()
+        messages.success(request, 'Scheduled scan deleted.')
+    return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+def _sync_periodic_task(scheduled_scan):
+    """Create or update the django-celery-beat PeriodicTask for a ScheduledScan."""
+    from django_celery_beat.models import PeriodicTask, IntervalSchedule
+
+    intervals = {
+        'hourly': (1, IntervalSchedule.HOURS),
+        'daily': (1, IntervalSchedule.DAYS),
+        'weekly': (7, IntervalSchedule.DAYS),
+        'monthly': (30, IntervalSchedule.DAYS),
+    }
+    every, period = intervals[scheduled_scan.frequency]
+
+    schedule, _ = IntervalSchedule.objects.get_or_create(every=every, period=period)
+
+    task_name = f'scheduled-scan-{scheduled_scan.pk}'
+
+    if scheduled_scan.periodic_task_name:
+        PeriodicTask.objects.filter(name=scheduled_scan.periodic_task_name).delete()
+
+    if scheduled_scan.is_active:
+        pt = PeriodicTask.objects.create(
+            name=task_name,
+            task='recon.tasks.run_scheduled_scan',
+            interval=schedule,
+            args=json.dumps([str(scheduled_scan.pk)]),
+            enabled=True,
+        )
+        scheduled_scan.periodic_task_name = task_name
+        scheduled_scan.save(update_fields=['periodic_task_name'])
+    else:
+        scheduled_scan.periodic_task_name = ''
+        scheduled_scan.save(update_fields=['periodic_task_name'])
+
+
+def _delete_periodic_task(scheduled_scan):
+    """Remove the django-celery-beat PeriodicTask."""
+    if scheduled_scan.periodic_task_name:
+        from django_celery_beat.models import PeriodicTask
+        PeriodicTask.objects.filter(name=scheduled_scan.periodic_task_name).delete()
+
+
+# ── Scan pipelines ──
+
+@login_required
+@engagement_edit_required
+def start_pipeline(request, engagement_pk):
+    engagement = request.engagement
+    if request.method == 'POST':
+        form = ScanPipelineForm(request.POST)
+        if form.is_valid():
+            preset_key = form.cleaned_data['preset']
+            target = form.cleaned_data['target']
+            preset = ScanPipeline.PIPELINE_PRESETS[preset_key]
+
+            pipeline = ScanPipeline.objects.create(
+                engagement=engagement,
+                name=preset['name'],
+                target=target,
+                steps=preset['steps'],
+                started_by=request.user,
+            )
+
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Started pipeline "{preset["name"]}" on {target}',
+            )
+
+            # Try to run via Celery, fall back to synchronous
+            try:
+                from .tasks import run_pipeline as run_pipeline_task
+                run_pipeline_task.delay(str(pipeline.pk))
+                messages.success(
+                    request,
+                    f'Pipeline "{preset["name"]}" started in background. '
+                    f'Steps: {" → ".join(preset["steps"])}',
+                )
+            except Exception:
+                # Celery not available — run synchronously
+                _run_pipeline_sync(pipeline)
+                messages.success(
+                    request,
+                    f'Pipeline "{preset["name"]}" completed: {pipeline.total_results} results.',
+                )
+
+            return redirect('recon:dashboard', engagement_pk=engagement_pk)
+    return redirect('recon:dashboard', engagement_pk=engagement_pk)
+
+
+@login_required
+@engagement_access(allow_client=False)
+def pipeline_detail(request, engagement_pk, pk):
+    engagement = request.engagement
+    pipeline = get_object_or_404(ScanPipeline, pk=pk, engagement=engagement)
+    # Get scans that were created by this pipeline (matched by time window)
+    related_scans = engagement.scans.filter(
+        started_by=pipeline.started_by,
+        created_at__gte=pipeline.created_at,
+    )
+    if pipeline.completed_at:
+        related_scans = related_scans.filter(created_at__lte=pipeline.completed_at)
+
+    context = {
+        'engagement': engagement,
+        'pipeline': pipeline,
+        'related_scans': related_scans,
+    }
+    return render(request, 'recon/pipeline_detail.html', context)
+
+
+def _run_pipeline_sync(pipeline):
+    """Run a pipeline synchronously (fallback when Celery is unavailable)."""
+    from .scanners import run_scan as scanner_run
+
+    pipeline.status = 'running'
+    pipeline.started_at = timezone.now()
+    pipeline.save(update_fields=['status', 'started_at'])
+
+    targets = [pipeline.target]
+    results_summary = {}
+
+    try:
+        for i, step in enumerate(pipeline.steps):
+            pipeline.current_step = i
+            pipeline.save(update_fields=['current_step'])
+
+            step_results = []
+            step_targets = list(targets)
+
+            for target in step_targets:
+                scan = ReconScan.objects.create(
+                    engagement=pipeline.engagement,
+                    scan_type=step,
+                    target=target,
+                    started_by=pipeline.started_by,
+                    status='running',
+                    started_at=timezone.now(),
+                )
+                try:
+                    results = scanner_run(step, target)
+                    scan.parsed_results = results
+                    scan.status = 'completed'
+                    scan.completed_at = timezone.now()
+                    scan.save(update_fields=['parsed_results', 'status', 'completed_at'])
+                    for result in results:
+                        _merge_host(pipeline.engagement, scan, result)
+                    step_results.extend(results)
+                except Exception as e:
+                    scan.status = 'failed'
+                    scan.error_message = str(e)
+                    scan.completed_at = timezone.now()
+                    scan.save(update_fields=['status', 'error_message', 'completed_at'])
+
+            if step == 'subdomain':
+                for result in step_results:
+                    hostname = result.get('hostname', '')
+                    if hostname and hostname not in targets:
+                        targets.append(hostname)
+
+            if step == 'port_scan':
+                for result in step_results:
+                    host = result.get('host') or result.get('hostname', '')
+                    if host and host not in targets:
+                        targets.append(host)
+
+            results_summary[step] = {
+                'count': len(step_results),
+                'targets_scanned': len(step_targets),
+            }
+
+        pipeline.current_step = len(pipeline.steps)
+        pipeline.status = 'completed'
+        pipeline.completed_at = timezone.now()
+        pipeline.results_summary = results_summary
+        pipeline.save()
+
+    except Exception as e:
+        pipeline.status = 'failed'
+        pipeline.error_message = str(e)
+        pipeline.completed_at = timezone.now()
+        pipeline.results_summary = results_summary
+        pipeline.save()
 
 
 # ── Host management ──

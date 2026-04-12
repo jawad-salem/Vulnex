@@ -42,6 +42,49 @@
             </form>
         </div>
 
+        <!-- Scan Pipeline -->
+        <div class="card">
+            <h2 class="card-title mb-4">Scan pipeline</h2>
+            <form method="post" action="{% url 'recon:start_pipeline' engagement.pk %}">
+                {% csrf_token %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ pipeline_form.preset.id_for_label }}">Pipeline type</label>
+                        {{ pipeline_form.preset }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ pipeline_form.target.id_for_label }}">Target</label>
+                        {{ pipeline_form.target }}
+                    </div>
+                </div>
+                <div id="pipeline-desc" class="text-xs text-secondary mb-3" style="min-height:18px"></div>
+                <button type="submit" class="btn btn-primary">Start pipeline</button>
+            </form>
+        </div>
+
+        <!-- Schedule Recurring Scan -->
+        <div class="card">
+            <h2 class="card-title mb-4">Schedule recurring scan</h2>
+            <form method="post" action="{% url 'recon:create_scheduled' engagement.pk %}">
+                {% csrf_token %}
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="{{ scheduled_form.scan_type.id_for_label }}">Scan type</label>
+                        {{ scheduled_form.scan_type }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ scheduled_form.target.id_for_label }}">Target</label>
+                        {{ scheduled_form.target }}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="{{ scheduled_form.frequency.id_for_label }}">Frequency</label>
+                    {{ scheduled_form.frequency }}
+                </div>
+                <button type="submit" class="btn btn-primary">Create schedule</button>
+            </form>
+        </div>
+
         <!-- Import Nmap XML -->
         <div class="card">
             <h2 class="card-title mb-4">Import Nmap scan</h2>
@@ -55,6 +98,83 @@
                 <button type="submit" class="btn btn-primary">Import hosts</button>
             </form>
         </div>
+
+        <!-- Pipelines -->
+        {% if pipelines %}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Pipelines</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Name</th><th>Target</th><th>Status</th><th>Progress</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for p in pipelines %}
+                    <tr>
+                        <td><a href="{% url 'recon:pipeline_detail' engagement.pk p.pk %}">{{ p.name }}</a></td>
+                        <td class="text-mono text-sm">{{ p.target|truncatechars:25 }}</td>
+                        <td><span class="badge badge-{{ p.status }}">{{ p.get_status_display }}</span></td>
+                        <td>
+                            <div class="progress-bar-mini">
+                                <div class="progress-fill" style="width:{{ p.progress_percent }}%"></div>
+                            </div>
+                            <span class="text-xs text-secondary">{{ p.progress_percent }}%</span>
+                        </td>
+                        <td class="text-sm text-secondary">{{ p.created_at|date:"M d, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Scheduled Scans -->
+        {% if scheduled_scans %}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Scheduled scans</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Target</th><th>Frequency</th><th>Status</th><th>Runs</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for ss in scheduled_scans %}
+                    <tr>
+                        <td>{{ ss.get_scan_type_display }}</td>
+                        <td class="text-mono text-sm">{{ ss.target|truncatechars:25 }}</td>
+                        <td>{{ ss.get_frequency_display }}</td>
+                        <td>
+                            {% if ss.is_active %}
+                            <span class="badge badge-completed">Active</span>
+                            {% else %}
+                            <span class="badge badge-pending">Paused</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-mono">{{ ss.run_count }}</td>
+                        <td class="text-right">
+                            <form method="post" action="{% url 'recon:toggle_scheduled' engagement.pk ss.pk %}" style="display:inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm" title="{% if ss.is_active %}Pause{% else %}Resume{% endif %}">
+                                    {% if ss.is_active %}Pause{% else %}Resume{% endif %}
+                                </button>
+                            </form>
+                            <form method="post" action="{% url 'recon:delete_scheduled' engagement.pk ss.pk %}" style="display:inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Scan history -->
         <div class="card">
@@ -146,3 +266,22 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+{{ pipeline_presets|json_script:"pipeline-presets" }}
+<script>
+(function() {
+    var presets = JSON.parse(document.getElementById('pipeline-presets').textContent);
+    var select = document.querySelector('[name="preset"]');
+    var desc = document.getElementById('pipeline-desc');
+    if (select && desc) {
+        function update() {
+            var p = presets[select.value];
+            desc.textContent = p ? p.description : '';
+        }
+        select.addEventListener('change', update);
+        update();
+    }
+})();
+</script>
+{% endblock extra_js %}

@@ -1,3 +1,45 @@
+Metadata-Version: 2.4
+Name: vulnex
+Version: 1.0.0
+Summary: A penetration testing workflow platform built with Django
+Home-page: https://github.com/jawad-salem/Vulnex
+Author: Jawad Salem
+License: MIT
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Web Environment
+Classifier: Framework :: Django
+Classifier: Framework :: Django :: 4.2
+Classifier: Framework :: Django :: 5.0
+Classifier: Intended Audience :: Information Technology
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Security
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: Django<6.0,>=4.2
+Requires-Dist: reportlab>=4.0
+Requires-Dist: dj-database-url>=2.1
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: gunicorn>=21.2
+Requires-Dist: psycopg2-binary>=2.9
+Requires-Dist: defusedxml>=0.7.1
+Requires-Dist: celery>=5.3
+Requires-Dist: django-celery-beat>=2.5
+Requires-Dist: redis>=5.0
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
 # Vulnex
 
 A full-featured penetration testing workflow platform built with Django. Manage engagements, track vulnerabilities, run reconnaissance scans, follow testing methodologies, and generate professional PDF reports — all from a single dark-themed interface.

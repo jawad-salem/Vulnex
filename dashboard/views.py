@@ -4,6 +4,7 @@ from django.db.models import Count
 from django.db.models.functions import TruncDate
 from engagements.models import Engagement, ActivityLog
 from vulns.models import Finding
+from reports.generator import calculate_engagement_risk_score, _risk_label
 
 
 @login_required
@@ -69,6 +70,26 @@ def home(request):
         severity__in=['critical', 'high'], status__in=['open', 'confirmed']
     ).select_related('engagement')[:10]
 
+    # Overall risk score
+    overall_risk_score = calculate_engagement_risk_score(findings)
+    risk_label, risk_color = _risk_label(overall_risk_score)
+
+    # Per-engagement risk scores (for active engagements)
+    active_engs = engagements.exclude(status__in=['completed', 'cancelled'])[:10]
+    engagement_risks = []
+    for eng in active_engs:
+        eng_findings = findings.filter(engagement=eng)
+        eng_score = calculate_engagement_risk_score(eng_findings)
+        eng_label, eng_color = _risk_label(eng_score)
+        engagement_risks.append({
+            'engagement': eng,
+            'score': eng_score,
+            'label': eng_label,
+            'color': eng_color,
+            'finding_count': eng_findings.count(),
+        })
+    engagement_risks.sort(key=lambda x: x['score'], reverse=True)
+
     context = {
         'active_engagements': active_engagements,
         'total_findings': total_findings,
@@ -81,5 +102,9 @@ def home(request):
         'recent_engagements': recent_engagements,
         'urgent_findings': urgent_findings,
         'recent_activity': recent_activity,
+        'overall_risk_score': overall_risk_score,
+        'risk_label': risk_label,
+        'risk_color': risk_color,
+        'engagement_risks': engagement_risks,
     }
     return render(request, 'dashboard/home.html', context)

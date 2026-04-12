@@ -2,12 +2,14 @@
 PDF report generator for pentest engagements using ReportLab.
 Generates professional penetration testing reports with:
 - Cover page
-- Executive summary
-- Findings summary table
+- Executive summary with risk score
+- Findings summary table (grouped by host)
 - Detailed findings with CVSS vectors
 - Remediation recommendations
 """
 import io
+import math
+from collections import defaultdict
 from datetime import datetime
 from xml.sax.saxutils import escape as xml_escape
 
@@ -186,10 +188,55 @@ def generate_report_pdf(engagement, report_type='full'):
         elements.append(Paragraph(_esc(engagement.rules_of_engagement), styles['BodyText2']))
     elements.append(PageBreak())
 
-    # ── 3. Findings summary ──
+    # ── Risk score ──
+    risk_score = calculate_engagement_risk_score(findings)
+
+    elements.append(Spacer(1, 12))
+    risk_label, risk_color = _risk_label(risk_score)
+    elements.append(Paragraph(
+        f'Overall risk score: <font color="{risk_color}"><b>{risk_score:.1f}/10 ({risk_label})</b></font>',
+        styles['BodyText2'],
+    ))
+    elements.append(PageBreak())
+
+    # ── 3. Findings summary (grouped by host) ──
     elements.append(Paragraph('3. Findings summary', styles['SectionHeading']))
 
     if total > 0:
+        # Group findings by host
+        host_groups = _group_findings_by_host(findings)
+
+        # Per-host risk summary table
+        elements.append(Paragraph('<b>Risk by asset</b>', styles['BodyText2']))
+        host_summary_data = [['Asset', 'Findings', 'Highest', 'Risk Score']]
+        for host_label, host_findings in host_groups:
+            host_risk = calculate_engagement_risk_score(host_findings)
+            worst = host_findings[0]  # already sorted by severity
+            host_summary_data.append([
+                Paragraph(_esc(host_label[:50]), styles['BodyText2']),
+                str(len(host_findings)),
+                worst.get_severity_display(),
+                f'{host_risk:.1f}',
+            ])
+
+        host_summary_table = Table(host_summary_data, colWidths=[200, 55, 65, 65])
+        host_summary_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#534AB7')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f8f8')]),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        elements.append(host_summary_table)
+        elements.append(Spacer(1, 16))
+
+        # Full findings table
+        elements.append(Paragraph('<b>All findings</b>', styles['BodyText2']))
         findings_table_data = [['#', 'Title', 'Severity', 'CVSS', 'Status']]
         for i, f in enumerate(findings, 1):
             findings_table_data.append([
@@ -215,7 +262,6 @@ def generate_report_pdf(engagement, report_type='full'):
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ]
-        # Color severity column
         for i, f in enumerate(findings, 1):
             sev_color = SEVERITY_COLORS.get(f.severity, colors.gray)
             table_style.append(('TEXTCOLOR', (2, i), (2, i), sev_color))
@@ -227,79 +273,101 @@ def generate_report_pdf(engagement, report_type='full'):
         elements.append(Paragraph('No findings were identified.', styles['BodyText2']))
     elements.append(PageBreak())
 
-    # ── 4. Detailed findings ──
+    # ── 4. Detailed findings (grouped by host) ──
     if report_type in ('full', 'technical'):
         elements.append(Paragraph('4. Detailed findings', styles['SectionHeading']))
-        for i, f in enumerate(findings, 1):
-            sev_color = SEVERITY_COLORS.get(f.severity, colors.gray)
-            elements.append(Paragraph(
-                f'{i}. {f.title}', styles['SubHeading']
-            ))
 
-            # Info box
-            info_data = [
-                ['Severity', f.get_severity_display()],
-                ['CVSS Score', f'{f.cvss_score:.1f}' if f.cvss_score else 'N/A'],
-                ['CVSS Vector', f.cvss_vector_string],
-                ['Status', f.get_status_display()],
-            ]
-            if f.host:
-                location = _esc(f.host)
-                if f.port:
-                    location += f':{f.port}'
-                info_data.append(['Host', location])
-            if f.url:
-                info_data.append(['URL', _esc(f.url[:100])])
-            if f.endpoint:
-                method_str = f'{f.http_method} ' if f.http_method else ''
-                info_data.append(['Endpoint', f'{method_str}{_esc(f.endpoint)}'])
-            if f.parameter:
-                info_data.append(['Parameter', _esc(f.parameter)])
-            if f.cwe_id:
-                info_data.append(['CWE', f.cwe_id])
-            if f.affected_hosts:
-                info_data.append(['Other Hosts', _esc(f.affected_hosts[:200])])
-            if f.tool_source:
-                info_data.append(['Discovered By', f.tool_source])
+        if total > 0:
+            host_groups = _group_findings_by_host(findings)
+            finding_num = 0
 
-            info_table = Table(info_data, colWidths=[100, 360])
-            info_table.setStyle(TableStyle([
-                ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-                ('TEXTCOLOR', (1, 0), (1, 0), sev_color),
-                ('FONTNAME', (1, 0), (1, 0), 'Helvetica-Bold'),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f5f5f5')),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-                ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ]))
-            elements.append(info_table)
-            elements.append(Spacer(1, 8))
-
-            elements.append(Paragraph('<b>Description</b>', styles['BodyText2']))
-            elements.append(Paragraph(_esc(f.description), styles['BodyText2']))
-
-            if f.proof_of_concept:
-                elements.append(Paragraph('<b>Proof of Concept</b>', styles['BodyText2']))
+            for host_label, host_findings in host_groups:
+                # Host header
+                host_risk = calculate_engagement_risk_score(host_findings)
+                hr_label, hr_color = _risk_label(host_risk)
                 elements.append(Paragraph(
-                    _esc(f.proof_of_concept).replace('\n', '<br/>'), styles['BodyText2']
+                    f'<b>{_esc(host_label)}</b> &mdash; '
+                    f'<font color="{hr_color}">{hr_label} ({host_risk:.1f})</font> &mdash; '
+                    f'{len(host_findings)} finding{"s" if len(host_findings) != 1 else ""}',
+                    styles['SubHeading'],
                 ))
+                elements.append(HRFlowable(
+                    width='100%', color=colors.HexColor('#534AB7'), thickness=1,
+                ))
+                elements.append(Spacer(1, 6))
 
-            if f.remediation:
-                elements.append(Paragraph('<b>Remediation</b>', styles['BodyText2']))
-                elements.append(Paragraph(_esc(f.remediation), styles['BodyText2']))
+                for f in host_findings:
+                    finding_num += 1
+                    sev_color = SEVERITY_COLORS.get(f.severity, colors.gray)
+                    elements.append(Paragraph(
+                        f'{finding_num}. {_esc(f.title)}', styles['SubHeading']
+                    ))
 
-            if f.references:
-                elements.append(Paragraph('<b>References</b>', styles['BodyText2']))
-                for ref in f.references.splitlines():
-                    if ref.strip():
-                        elements.append(Paragraph(f'&bull; {_esc(ref.strip())}', styles['BodyText2']))
+                    info_data = [
+                        ['Severity', f.get_severity_display()],
+                        ['CVSS Score', f'{f.cvss_score:.1f}' if f.cvss_score else 'N/A'],
+                        ['CVSS Vector', f.cvss_vector_string],
+                        ['Status', f.get_status_display()],
+                    ]
+                    if f.host:
+                        location = _esc(f.host)
+                        if f.port:
+                            location += f':{f.port}'
+                        info_data.append(['Host', location])
+                    if f.url:
+                        info_data.append(['URL', _esc(f.url[:100])])
+                    if f.endpoint:
+                        method_str = f'{f.http_method} ' if f.http_method else ''
+                        info_data.append(['Endpoint', f'{method_str}{_esc(f.endpoint)}'])
+                    if f.parameter:
+                        info_data.append(['Parameter', _esc(f.parameter)])
+                    if f.cwe_id:
+                        info_data.append(['CWE', f.cwe_id])
+                    if f.affected_hosts:
+                        info_data.append(['Other Hosts', _esc(f.affected_hosts[:200])])
+                    if f.tool_source:
+                        info_data.append(['Discovered By', f.tool_source])
 
-            elements.append(HRFlowable(
-                width='100%', color=colors.HexColor('#eeeeee'), thickness=0.5
-            ))
-            elements.append(Spacer(1, 10))
+                    info_table = Table(info_data, colWidths=[100, 360])
+                    info_table.setStyle(TableStyle([
+                        ('FONTSIZE', (0, 0), (-1, -1), 9),
+                        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                        ('TEXTCOLOR', (1, 0), (1, 0), sev_color),
+                        ('FONTNAME', (1, 0), (1, 0), 'Helvetica-Bold'),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
+                        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f5f5f5')),
+                        ('TOPPADDING', (0, 0), (-1, -1), 4),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ]))
+                    elements.append(info_table)
+                    elements.append(Spacer(1, 8))
+
+                    elements.append(Paragraph('<b>Description</b>', styles['BodyText2']))
+                    elements.append(Paragraph(_esc(f.description), styles['BodyText2']))
+
+                    if f.proof_of_concept:
+                        elements.append(Paragraph('<b>Proof of Concept</b>', styles['BodyText2']))
+                        elements.append(Paragraph(
+                            _esc(f.proof_of_concept).replace('\n', '<br/>'), styles['BodyText2']
+                        ))
+
+                    if f.remediation:
+                        elements.append(Paragraph('<b>Remediation</b>', styles['BodyText2']))
+                        elements.append(Paragraph(_esc(f.remediation), styles['BodyText2']))
+
+                    if f.references:
+                        elements.append(Paragraph('<b>References</b>', styles['BodyText2']))
+                        for ref in f.references.splitlines():
+                            if ref.strip():
+                                elements.append(Paragraph(f'&bull; {_esc(ref.strip())}', styles['BodyText2']))
+
+                    elements.append(HRFlowable(
+                        width='100%', color=colors.HexColor('#eeeeee'), thickness=0.5
+                    ))
+                    elements.append(Spacer(1, 10))
+
+                elements.append(PageBreak())
 
     # Build
     doc.build(elements)
@@ -318,4 +386,84 @@ def models_severity_order():
         When(severity='info', then=Value(4)),
         output_field=IntegerField(),
     )
+
+
+def _group_findings_by_host(findings):
+    """Group findings by their host field. Returns list of (host_label, [findings])."""
+    groups = defaultdict(list)
+    severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4}
+
+    for f in findings:
+        host_label = f.host
+        if not host_label and f.affected_hosts:
+            host_label = f.affected_hosts.split('\n')[0].strip()
+        if not host_label:
+            host_label = 'General'
+        groups[host_label].append(f)
+
+    # Sort groups: highest-risk host first
+    sorted_groups = sorted(
+        groups.items(),
+        key=lambda item: min(severity_order.get(f.severity, 99) for f in item[1]),
+    )
+    return sorted_groups
+
+
+def calculate_engagement_risk_score(findings):
+    """Calculate an aggregate risk score (0-10) for a set of findings.
+
+    Uses a weighted formula that considers:
+    - Severity distribution (critical findings weigh more)
+    - Volume of open/confirmed findings
+    - Highest individual CVSS score
+    """
+    severity_weights = {
+        'critical': 10.0,
+        'high': 7.5,
+        'medium': 4.5,
+        'low': 2.0,
+        'info': 0.5,
+    }
+
+    if hasattr(findings, '__iter__') and not hasattr(findings, 'count'):
+        finding_list = list(findings)
+    else:
+        finding_list = list(findings.all()) if hasattr(findings, 'all') else list(findings)
+
+    if not finding_list:
+        return 0.0
+
+    # Only count open/confirmed findings for risk
+    active = [f for f in finding_list if f.status in ('open', 'confirmed')]
+    if not active:
+        # All remediated/accepted — low residual risk
+        return max(0.5, len(finding_list) * 0.1)
+
+    # Weighted severity score
+    weighted_sum = sum(severity_weights.get(f.severity, 0) for f in active)
+    avg_weighted = weighted_sum / len(active)
+
+    # Peak CVSS
+    peak_cvss = max((f.cvss_score or 0) for f in active)
+
+    # Volume factor: more active findings = higher risk, with diminishing returns
+    volume_factor = min(1.0 + math.log10(max(len(active), 1)) * 0.3, 1.8)
+
+    # Blend: 40% average severity, 40% peak CVSS, 20% volume-adjusted
+    score = (avg_weighted * 0.4 + peak_cvss * 0.4 + avg_weighted * volume_factor * 0.2)
+
+    return min(round(score, 1), 10.0)
+
+
+def _risk_label(score):
+    """Return (label, hex_color) for a risk score."""
+    if score >= 9.0:
+        return 'Critical', '#E24B4A'
+    elif score >= 7.0:
+        return 'High', '#D85A30'
+    elif score >= 4.0:
+        return 'Medium', '#EF9F27'
+    elif score >= 0.1:
+        return 'Low', '#378ADD'
+    return 'Info', '#888780'
 

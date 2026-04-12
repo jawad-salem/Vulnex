@@ -1,4 +1,4 @@
-Django>=4.2,<6.0
+Django<6.0,>=4.2
 reportlab>=4.0
 dj-database-url>=2.1
 python-dotenv>=1.0
