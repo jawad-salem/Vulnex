@@ -17,4 +17,4 @@ resutls.json
 staticfiles/
 .git
 .gitignore
-
+data/
