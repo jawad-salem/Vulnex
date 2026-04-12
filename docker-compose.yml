@@ -1,4 +1,16 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=vulnex
+      - POSTGRES_USER=vulnex
+      - POSTGRES_PASSWORD=vulnex
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
   web:
     build: .
     ports:
@@ -6,17 +18,19 @@ services:
     environment:
       - DJANGO_SECRET_KEY=change-me-in-production
       - DJANGO_DEBUG=True
+      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - SITE_URL=http://localhost:8000
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
-      - app_data:/app/data
       - media_data:/app/media
     depends_on:
+      - db
       - redis
     command: >
-      sh -c "python manage.py migrate --noinput &&
+      sh -c "sleep 3 &&
+             python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput 2>/dev/null;
              gunicorn vulnex.wsgi:application --bind 0.0.0.0:8000 --reload"
 
@@ -25,36 +39,35 @@ services:
     environment:
       - DJANGO_SECRET_KEY=change-me-in-production
       - DJANGO_DEBUG=True
+      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
-      - app_data:/app/data
       - media_data:/app/media
     depends_on:
+      - db
       - redis
-      - web
-    command: celery -A vulnex worker -l info
+    command: >
+      sh -c "sleep 8 && celery -A vulnex worker -l info"
 
   celery-beat:
     build: .
     environment:
       - DJANGO_SECRET_KEY=change-me-in-production
       - DJANGO_DEBUG=True
+      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     volumes:
       - .:/app
-      - app_data:/app/data
       - media_data:/app/media
     depends_on:
+      - db
       - redis
-      - web
-    command: celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-
-  redis:
-    image: redis:7-alpine
+    command: >
+      sh -c "sleep 10 && celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
 
 volumes:
-  app_data:
+  postgres_data:
   media_data:
