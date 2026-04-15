@@ -9,243 +9,370 @@
 </nav>
 {% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
-        <h1 class="page-title">{{ engagement.name }}</h1>
-        <p class="page-subtitle">{{ engagement.client_name }} &middot; {{ engagement.get_engagement_type_display }}</p>
+
+<!-- ── Hero ── -->
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        <h1 class="eng-hero-title">{{ engagement.name }}</h1>
+        <div class="eng-hero-meta">
+            <span class="eng-meta-item eng-meta-client">{{ engagement.client_name }}</span>
+            <span class="eng-meta-item">{{ engagement.get_engagement_type_display }}</span>
+            {% if engagement.start_date %}
+            <span class="eng-meta-item">
+                {{ engagement.start_date|date:"M d" }}{% if engagement.end_date %} — {{ engagement.end_date|date:"M d, Y" }}{% endif %}
+            </span>
+            {% endif %}
+        </div>
     </div>
-    {% if can_edit %}
-    <div class="btn-group">
+    <div class="eng-hero-actions">
+        {% if can_edit %}
+        <form method="post" action="{% url 'engagements:update_status' engagement.pk %}" class="eng-status-form">
+            {% csrf_token %}
+            <select name="status" class="form-input status-select" onchange="this.form.classList.add('form-loading'); this.form.submit()" aria-label="Engagement status">
+                {% for val, label in engagement.Status.choices %}
+                <option value="{{ val }}" {% if engagement.status == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
         <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">+ Add finding</a>
         <a href="{% url 'engagements:edit' engagement.pk %}" class="btn">Edit</a>
         {% if can_manage %}
         <a href="{% url 'engagements:delete' engagement.pk %}" class="btn btn-danger">Delete</a>
         {% endif %}
-    </div>
-    {% endif %}
-</div>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Risk Score</div>
-        <div class="stat-value" style="color:{{ risk_color }}">{{ risk_score }}</div>
-        <div class="stat-sublabel" style="color:{{ risk_color }}">{{ risk_label }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Status</div>
+        {% else %}
         <span class="badge badge-{{ engagement.status }} badge-lg">{{ engagement.get_status_display }}</span>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Findings</div>
-        <div class="stat-value">{{ engagement.finding_count }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Critical / High</div>
-        <div class="stat-value critical">{{ engagement.critical_count }}</div>
-        <div class="stat-sublabel high">{{ engagement.high_count }} high</div>
+        {% endif %}
     </div>
 </div>
 
-<div class="grid-3">
-    <div>
+<!-- ── Phase stepper ── -->
+<div class="phase-stepper">
+    {% for p in engagement.phase_progress %}
+    <div class="phase-step phase-{{ p.state }}">
+        <div class="phase-dot">{% if p.state == 'done' %}&#10003;{% else %}{{ forloop.counter }}{% endif %}</div>
+        <div class="phase-label">{{ p.label }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ── KPI strip ── -->
+<div class="kpi-strip">
+    <div class="kpi-item">
+        <div class="kpi-label">Risk Score</div>
+        <div class="kpi-value" style="color:{{ risk_color }}">{{ risk_score }}</div>
+        <div class="kpi-sub" style="color:{{ risk_color }}">{{ risk_label }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Findings</div>
+        <div class="kpi-value">{{ engagement.finding_count }}</div>
+        <div class="kpi-sub">total</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Critical</div>
+        <div class="kpi-value" style="color:var(--critical)">{{ engagement.critical_count }}</div>
+        <div class="kpi-sub" style="color:var(--high)">{{ engagement.high_count }} high</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Team</div>
+        <div class="kpi-value">{{ members|length }}</div>
+        <div class="kpi-sub">member{{ members|length|pluralize }}</div>
+    </div>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+    <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" data-tab="overview" role="tab">Overview</button>
         {% if not is_client %}
-        <!-- Status update -->
-        {% if can_edit %}
+        <button class="tab-btn" data-tab="team" role="tab">Team{% if pending_invitations %} <span class="tab-count">{{ pending_invitations|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="notes" role="tab">Notes{% if notes %} <span class="tab-count">{{ notes|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="activity" role="tab">Activity</button>
+        {% endif %}
+    </div>
+
+    <!-- Overview tab -->
+    <div class="tab-panel active" id="tab-overview" role="tabpanel">
+        {% if engagement.description %}
         <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Phase</h2>
-            </div>
-            <div class="progress-bar mb-3"><div class="progress-fill" style="width:{{ engagement.progress_percent }}%"></div></div>
-            <form method="post" action="{% url 'engagements:update_status' engagement.pk %}" class="flex gap-2">
-                {% csrf_token %}
-                <select name="status" class="form-input" style="flex:1">
-                    {% for val, label in engagement.Status.choices %}
-                    <option value="{{ val }}" {% if engagement.status == val %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn">Update</button>
-            </form>
+            <h2 class="card-title mb-3">Description</h2>
+            <div class="prose">{{ engagement.description|linebreaksbr }}</div>
         </div>
         {% endif %}
 
-        <!-- Scope -->
-        <div class="card">
-            <div class="card-header"><h2 class="card-title">Scope</h2></div>
-            {% if engagement.scope_targets %}
-            <div class="mono-block">
-                {% for target in engagement.scope_targets %}
-                <div style="padding:2px 0">{{ target }}</div>
-                {% endfor %}
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Scope</h2></div>
+                {% if engagement.scope_targets %}
+                <div class="mono-block">
+                    {% for target in engagement.scope_targets %}
+                    <div class="scope-target">{{ target }}</div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state compact">
+                    <p class="text-secondary text-sm">No targets defined yet.</p>
+                    {% if can_edit %}
+                    <a href="{% url 'engagements:edit' engagement.pk %}" class="btn btn-sm btn-primary mt-2">+ Add targets</a>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
-            {% else %}
-            <p class="text-secondary text-sm">No targets defined.</p>
+
+            {% if not is_client %}
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Quick actions</h2></div>
+                <div class="quick-actions">
+                    <a href="{% url 'recon:dashboard' engagement.pk %}" class="quick-action">
+                        <div class="qa-icon">&#128269;</div>
+                        <div class="qa-label">Recon</div>
+                    </a>
+                    <a href="{% url 'methodology:dashboard' engagement.pk %}" class="quick-action">
+                        <div class="qa-icon">&#10003;</div>
+                        <div class="qa-label">Methodology</div>
+                    </a>
+                    {% if can_edit %}
+                    <a href="{% url 'vulns:import' engagement.pk %}" class="quick-action">
+                        <div class="qa-icon">&#8681;</div>
+                        <div class="qa-label">Import vulns</div>
+                    </a>
+                    {% endif %}
+                    <a href="{% url 'reports:dashboard' engagement.pk %}" class="quick-action qa-primary">
+                        <div class="qa-icon">&#128196;</div>
+                        <div class="qa-label">Reports</div>
+                    </a>
+                </div>
+            </div>
             {% endif %}
         </div>
-        {% endif %}
 
-        <!-- Recent findings -->
-        <div class="card">
+        <div class="card mt-4">
             <div class="card-header">
                 <h2 class="card-title">Recent findings</h2>
                 <a href="{% url 'vulns:list' engagement.pk %}" class="btn btn-sm">View all</a>
             </div>
             {% if findings %}
-            <table>
-                <thead><tr><th>Title</th><th>Severity</th><th>CVSS</th></tr></thead>
-                <tbody>
-                {% for f in findings %}
-                <tr>
-                    <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:40 }}</a></td>
-                    <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                    <td class="text-mono">{{ f.cvss_score|floatformat:1 }}</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Host</th>
+                            <th>Severity</th>
+                            <th>CVSS</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for f in findings %}
+                    <tr>
+                        <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:50 }}</strong></a></td>
+                        <td class="text-mono text-sm">{{ f.host|default:"—" }}{% if f.port %}<span class="text-muted">:{{ f.port }}</span>{% endif %}</td>
+                        <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                        <td class="text-mono font-semibold">{{ f.cvss_score|floatformat:1 }}</td>
+                        <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
+                        <td class="text-sm text-secondary">{{ f.created_at|date:"M d" }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             {% else %}
-            <p class="text-secondary text-sm">No findings yet.</p>
-            {% endif %}
-        </div>
-
-        {% if not is_client %}
-        <!-- Quick actions -->
-        <div class="card">
-            <h2 class="card-title mb-3">Quick actions</h2>
-            <div class="btn-group flex-wrap">
-                <a href="{% url 'recon:dashboard' engagement.pk %}" class="btn">Recon</a>
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No findings yet.</p>
                 {% if can_edit %}
-                <a href="{% url 'vulns:create' engagement.pk %}" class="btn">+ Add finding</a>
-                <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import vulns</a>
+                <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-sm btn-primary mt-2">+ Add first finding</a>
                 {% endif %}
-                <a href="{% url 'methodology:dashboard' engagement.pk %}" class="btn">Methodology</a>
-                <a href="{% url 'reports:dashboard' engagement.pk %}" class="btn btn-primary">Reports</a>
-            </div>
-        </div>
-        {% else %}
-        <!-- Client quick actions -->
-        <div class="card">
-            <h2 class="card-title mb-3">Quick actions</h2>
-            <div class="btn-group flex-wrap">
-                <a href="{% url 'vulns:list' engagement.pk %}" class="btn">View findings</a>
-                <a href="{% url 'reports:dashboard' engagement.pk %}" class="btn btn-primary">Reports</a>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <div>
-        <!-- Team -->
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Team</h2>
-            </div>
-            {% for m in members %}
-            <div class="member-row">
-                <div class="flex items-center gap-3">
-                    <div class="avatar-sm" style="background:{{ m.user.avatar_color }}">{{ m.user.initials }}</div>
-                    <div>
-                        <div class="text-sm font-semibold">{{ m.user.get_full_name|default:m.user.username }}</div>
-                        <div class="text-xs text-muted">{{ m.user.email }}</div>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <span class="badge badge-{% if m.role == 'lead' %}completed{% elif m.role == 'pentester' %}low{% elif m.role == 'reviewer' %}medium{% else %}info{% endif %}">{{ m.get_role_display }}</span>
-                    {% if can_manage and m.user != request.user %}
-                    <form method="post" action="{% url 'engagements:remove_member' engagement.pk m.pk %}" style="margin:0">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-danger" style="padding:2px 6px;font-size:11px" onclick="return confirm('Remove {{ m.user }}?')">&times;</button>
-                    </form>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
-
-            {% if can_manage %}
-            <!-- Invite form -->
-            <form method="post" action="{% url 'engagements:invite' engagement.pk %}" class="mt-3">
-                {% csrf_token %}
-                <div class="invite-form-section">Invite member</div>
-                <div class="flex gap-2">
-                    <input type="email" name="email" placeholder="email@example.com" required class="form-input" style="flex:1;font-size:12px">
-                    <select name="role" class="form-input" style="width:auto;font-size:12px">
-                        <option value="pentester">Pentester</option>
-                        <option value="lead">Lead</option>
-                        <option value="reviewer">Reviewer</option>
-                        <option value="client">Client</option>
-                    </select>
-                    <button type="submit" class="btn btn-sm btn-primary">Invite</button>
-                </div>
-            </form>
-
-            {% if pending_invitations %}
-            <div class="mt-3">
-                <div class="text-xs text-muted" style="text-transform:uppercase;margin-bottom:6px">Pending invitations</div>
-                {% for inv in pending_invitations %}
-                <div class="flex-between" style="padding:4px 0;font-size:12px">
-                    <span class="text-secondary">{{ inv.email }} — {{ inv.get_role_display }}</span>
-                    <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm" style="padding:2px 8px;font-size:11px">Cancel</button>
-                    </form>
-                </div>
-                {% endfor %}
             </div>
             {% endif %}
-            {% endif %}
         </div>
 
-        {% if not is_client %}
-        <!-- Notes -->
-        <div class="card">
-            <div class="card-header"><h2 class="card-title">Notes</h2></div>
-            {% if can_edit %}
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="add_note" value="1">
-                {{ note_form.content }}
-                <button type="submit" class="btn btn-sm mt-2">Add note</button>
-            </form>
-            {% endif %}
-            <div class="mt-3">
-                {% for note in notes %}
-                <div style="padding:8px 0;border-top:1px solid var(--border-light)">
-                    <div class="text-sm text-muted">{{ note.author }} &middot; {{ note.created_at|timesince }} ago</div>
-                    <div class="text-sm mt-1">{{ note.content }}</div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <!-- Activity -->
-        <div class="card">
-            <h2 class="card-title mb-3">Activity</h2>
-            {% for log in activity %}
-            <div class="activity-item">
-                <div class="activity-dot"></div>
-                <div>
-                    <div style="font-size:13px"><strong>{{ log.user }}</strong> {{ log.action }}</div>
-                    <div class="activity-time">{{ log.timestamp|timesince }} ago</div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <!-- Reports -->
-        <div class="card">
-            <h2 class="card-title mb-3">Reports</h2>
+        <div class="card mt-4">
+            <div class="card-header"><h2 class="card-title">Reports</h2></div>
             {% for r in engagement.reports.all %}
-            <div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--border-light)">
+            <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
                 <div>
-                    <div class="text-sm">{{ r.get_report_type_display }}</div>
+                    <div class="text-sm font-semibold">{{ r.get_report_type_display }}</div>
                     <div class="text-xs text-muted">{{ r.created_at|date:"M d, Y H:i" }}</div>
                 </div>
                 <a href="{% url 'reports:download' r.pk %}" class="btn btn-sm">Download</a>
             </div>
             {% empty %}
-            <p class="text-secondary text-sm">No reports generated yet.</p>
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No reports generated yet.</p>
+                <a href="{% url 'reports:dashboard' engagement.pk %}" class="btn btn-sm btn-primary mt-2">Generate report</a>
+            </div>
             {% endfor %}
         </div>
     </div>
+
+    {% if not is_client %}
+    <!-- Team tab -->
+    <div class="tab-panel" id="tab-team" role="tabpanel">
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Members</h2>
+                    <span class="text-xs text-muted">{{ members|length }} active</span>
+                </div>
+                {% for m in members %}
+                <div class="member-row">
+                    <div class="flex items-center gap-3">
+                        <div class="avatar-sm" style="background:{{ m.user.avatar_color }}">{{ m.user.initials }}</div>
+                        <div>
+                            <div class="text-sm font-semibold">{{ m.user.get_full_name|default:m.user.username }}</div>
+                            <div class="text-xs text-muted">{{ m.user.email }}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="badge badge-{% if m.role == 'lead' %}completed{% elif m.role == 'pentester' %}low{% elif m.role == 'reviewer' %}medium{% else %}info{% endif %}">{{ m.get_role_display }}</span>
+                        {% if can_manage and m.user != request.user %}
+                        <form method="post" action="{% url 'engagements:remove_member' engagement.pk m.pk %}" style="margin:0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger icon-btn" onclick="return confirm('Remove {{ m.user }}?')" aria-label="Remove">&times;</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if can_manage %}
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Invite member</h2></div>
+                <form method="post" action="{% url 'engagements:invite' engagement.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="invite-email">Email</label>
+                        <input type="email" id="invite-email" name="email" placeholder="email@example.com" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="invite-role">Role</label>
+                        <select id="invite-role" name="role" class="form-input">
+                            <option value="pentester">Pentester</option>
+                            <option value="lead">Lead</option>
+                            <option value="reviewer">Reviewer</option>
+                            <option value="client">Client</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Send invite</button>
+                </form>
+
+                {% if pending_invitations %}
+                <div class="mt-4">
+                    <div class="card-section-title">Pending invitations</div>
+                    {% for inv in pending_invitations %}
+                    <div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--border-light)">
+                        <div>
+                            <div class="text-sm">{{ inv.email }}</div>
+                            <div class="text-xs text-muted">{{ inv.get_role_display }} &middot; {{ inv.created_at|timesince }} ago</div>
+                        </div>
+                        <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm">Cancel</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Notes tab -->
+    <div class="tab-panel" id="tab-notes" role="tabpanel">
+        {% if can_edit %}
+        <div class="card">
+            <h2 class="card-title mb-3">Add note</h2>
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="add_note" value="1">
+                <div class="form-group">
+                    {{ note_form.content }}
+                </div>
+                <button type="submit" class="btn btn-primary">Post note</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2 class="card-title">Notes</h2>
+                <span class="text-xs text-muted">{{ notes|length }}</span>
+            </div>
+            {% for note in notes %}
+            <div class="note-item">
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="avatar-sm" style="background:{{ note.author.avatar_color }}">{{ note.author.initials }}</div>
+                    <div>
+                        <div class="text-sm font-semibold">{{ note.author|default:"Unknown" }}</div>
+                        <div class="text-xs text-muted">{{ note.created_at|timesince }} ago</div>
+                    </div>
+                </div>
+                <div class="note-content">{{ note.content|linebreaksbr }}</div>
+            </div>
+            {% empty %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No notes yet.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Activity tab -->
+    <div class="tab-panel" id="tab-activity" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Activity log</h2>
+                <span class="text-xs text-muted">Last {{ activity|length }}</span>
+            </div>
+            {% for log in activity %}
+            <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div>
+                    <div><strong>{{ log.user }}</strong> {{ log.action }}</div>
+                    <div class="activity-time">{{ log.timestamp|date:"M d, Y H:i" }}</div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-secondary text-sm">No activity yet.</p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    var tabs = document.querySelectorAll('.tab-btn');
+    var panels = document.querySelectorAll('.tab-panel');
+
+    function activate(name) {
+        tabs.forEach(function(t) {
+            t.classList.toggle('active', t.dataset.tab === name);
+        });
+        panels.forEach(function(p) {
+            p.classList.toggle('active', p.id === 'tab-' + name);
+        });
+    }
+
+    tabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+            var name = this.dataset.tab;
+            activate(name);
+            history.replaceState(null, '', '#' + name);
+        });
+    });
+
+    // Honor URL hash on load
+    var hash = (location.hash || '').replace('#', '');
+    if (hash && document.getElementById('tab-' + hash)) {
+        activate(hash);
+    }
+})();
+</script>
 {% endblock %}

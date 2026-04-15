@@ -392,6 +392,11 @@ def _run_pipeline_sync(pipeline):
             step_results = []
             step_targets = list(targets)
 
+            # Deduplicate by IP — skip scanning the same server multiple times
+            if step in ('port_scan', 'tech_detect', 'dir_brute'):
+                from .tasks import _dedupe_targets_by_ip
+                step_targets = _dedupe_targets_by_ip(step_targets)
+
             for target in step_targets:
                 scan = ReconScan.objects.create(
                     engagement=pipeline.engagement,
@@ -432,19 +437,21 @@ def _run_pipeline_sync(pipeline):
                 'count': len(step_results),
                 'targets_scanned': len(step_targets),
             }
+            # Save incremental results so the detail page shows progress mid-run
+            pipeline.results_summary = results_summary
+            pipeline.save(update_fields=['results_summary'])
 
         pipeline.current_step = len(pipeline.steps)
         pipeline.status = 'completed'
         pipeline.completed_at = timezone.now()
-        pipeline.results_summary = results_summary
-        pipeline.save()
+        pipeline.save(update_fields=['current_step', 'status', 'completed_at'])
 
     except Exception as e:
         pipeline.status = 'failed'
         pipeline.error_message = str(e)
         pipeline.completed_at = timezone.now()
         pipeline.results_summary = results_summary
-        pipeline.save()
+        pipeline.save(update_fields=['status', 'error_message', 'completed_at', 'results_summary'])
 
 
 # ── Host management ──

@@ -42,14 +42,14 @@
             </form>
         </div>
 
-        <!-- Scan Pipeline -->
+        <!-- Multi-scan -->
         <div class="card">
-            <h2 class="card-title mb-4">Scan pipeline</h2>
+            <h2 class="card-title mb-4">Multi-scan</h2>
             <form method="post" action="{% url 'recon:start_pipeline' engagement.pk %}">
                 {% csrf_token %}
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="{{ pipeline_form.preset.id_for_label }}">Pipeline type</label>
+                        <label for="{{ pipeline_form.preset.id_for_label }}">Scan type</label>
                         {{ pipeline_form.preset }}
                     </div>
                     <div class="form-group">
@@ -58,44 +58,7 @@
                     </div>
                 </div>
                 <div id="pipeline-desc" class="text-xs text-secondary mb-3" style="min-height:18px"></div>
-                <button type="submit" class="btn btn-primary">Start pipeline</button>
-            </form>
-        </div>
-
-        <!-- Schedule Recurring Scan -->
-        <div class="card">
-            <h2 class="card-title mb-4">Schedule recurring scan</h2>
-            <form method="post" action="{% url 'recon:create_scheduled' engagement.pk %}">
-                {% csrf_token %}
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="{{ scheduled_form.scan_type.id_for_label }}">Scan type</label>
-                        {{ scheduled_form.scan_type }}
-                    </div>
-                    <div class="form-group">
-                        <label for="{{ scheduled_form.target.id_for_label }}">Target</label>
-                        {{ scheduled_form.target }}
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="{{ scheduled_form.frequency.id_for_label }}">Frequency</label>
-                    {{ scheduled_form.frequency }}
-                </div>
-                <button type="submit" class="btn btn-primary">Create schedule</button>
-            </form>
-        </div>
-
-        <!-- Import Nmap XML -->
-        <div class="card">
-            <h2 class="card-title mb-4">Import Nmap scan</h2>
-            <form method="post" action="{% url 'recon:import_nmap' engagement.pk %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="{{ import_form.file.id_for_label }}">Nmap XML file</label>
-                    {{ import_form.file }}
-                    <span class="form-help">Upload Nmap XML output (<code>nmap -oX scan.xml target</code>)</span>
-                </div>
-                <button type="submit" class="btn btn-primary">Import hosts</button>
+                <button type="submit" class="btn btn-primary">Run multi-scan</button>
             </form>
         </div>
 
@@ -243,7 +206,7 @@
                 {% if host.technologies %}
                 <div class="flex gap-1 flex-wrap mt-1">
                     {% for tech in host.technologies|slice:":5" %}
-                    <span class="tech-tag">{{ tech }}</span>
+                    <span class="tech-tag" title="{{ tech }}">{{ tech }}</span>
                     {% endfor %}
                     {% if host.technologies|length > 5 %}
                     <span class="text-xs text-muted">+{{ host.technologies|length|add:"-5" }} more</span>
@@ -262,6 +225,41 @@
                 <p class="text-xs">Run a scan or add a host manually.</p>
             </div>
             {% endif %}
+        </div>
+
+        <!-- Schedule Recurring Scan -->
+        <div class="card">
+            <h2 class="card-title mb-4">Schedule recurring scan</h2>
+            <form method="post" action="{% url 'recon:create_scheduled' engagement.pk %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ scheduled_form.scan_type.id_for_label }}">Scan type</label>
+                    {{ scheduled_form.scan_type }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ scheduled_form.target.id_for_label }}">Target</label>
+                    {{ scheduled_form.target }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ scheduled_form.frequency.id_for_label }}">Frequency</label>
+                    {{ scheduled_form.frequency }}
+                </div>
+                <button type="submit" class="btn btn-primary">Create schedule</button>
+            </form>
+        </div>
+
+        <!-- Import Nmap XML -->
+        <div class="card">
+            <h2 class="card-title mb-4">Import Nmap scan</h2>
+            <form method="post" action="{% url 'recon:import_nmap' engagement.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ import_form.file.id_for_label }}">Nmap XML file</label>
+                    {{ import_form.file }}
+                    <span class="form-help">Upload Nmap XML output (<code>nmap -oX scan.xml target</code>)</span>
+                </div>
+                <button type="submit" class="btn btn-primary">Import hosts</button>
+            </form>
         </div>
     </div>
 </div>

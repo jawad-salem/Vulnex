@@ -46,6 +46,10 @@ class Finding(models.Model):
         LOW = 'L', 'Low'
         NONE = 'N', 'None'
 
+    class Scope(models.TextChoices):
+        UNCHANGED = 'U', 'Unchanged'
+        CHANGED = 'C', 'Changed'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='findings')
     title = models.CharField(max_length=300)
@@ -58,6 +62,7 @@ class Finding(models.Model):
     attack_complexity = models.CharField(max_length=1, choices=AttackComplexity.choices, default='L')
     privileges_required = models.CharField(max_length=1, choices=PrivilegesRequired.choices, default='N')
     user_interaction = models.CharField(max_length=1, choices=UserInteraction.choices, default='N')
+    scope = models.CharField(max_length=1, choices=Scope.choices, default='U')
     confidentiality_impact = models.CharField(max_length=1, choices=Impact.choices, default='N')
     integrity_impact = models.CharField(max_length=1, choices=Impact.choices, default='N')
     availability_impact = models.CharField(max_length=1, choices=Impact.choices, default='N')
@@ -121,17 +126,28 @@ class Finding(models.Model):
         return (
             f"CVSS:3.1/AV:{self.attack_vector}/AC:{self.attack_complexity}"
             f"/PR:{self.privileges_required}/UI:{self.user_interaction}"
-            f"/S:U/C:{self.confidentiality_impact}/I:{self.integrity_impact}"
-            f"/A:{self.availability_impact}"
+            f"/S:{self.scope}/C:{self.confidentiality_impact}"
+            f"/I:{self.integrity_impact}/A:{self.availability_impact}"
         )
 
     def calculate_cvss(self):
-        """Calculate CVSS v3.1 base score."""
+        """Calculate CVSS v3.1 base score.
+
+        Follows the official spec at https://www.first.org/cvss/v3.1/specification-document
+        Supports both Scope:Unchanged and Scope:Changed.
+        """
+        import math
+
         av_scores = {'N': 0.85, 'A': 0.62, 'L': 0.55, 'P': 0.20}
         ac_scores = {'L': 0.77, 'H': 0.44}
-        pr_scores = {'N': 0.85, 'L': 0.62, 'H': 0.27}
+        # PR weights depend on Scope: Changed uses higher values
+        pr_scores_unchanged = {'N': 0.85, 'L': 0.62, 'H': 0.27}
+        pr_scores_changed = {'N': 0.85, 'L': 0.68, 'H': 0.50}
         ui_scores = {'N': 0.85, 'R': 0.62}
         impact_scores = {'H': 0.56, 'L': 0.22, 'N': 0.0}
+
+        scope_changed = self.scope == 'C'
+        pr_scores = pr_scores_changed if scope_changed else pr_scores_unchanged
 
         iss = 1 - (
             (1 - impact_scores[self.confidentiality_impact])
@@ -143,7 +159,11 @@ class Finding(models.Model):
             self.cvss_score = 0.0
             return self.cvss_score
 
-        impact = 6.42 * iss  # Scope Unchanged
+        # Impact formula differs by Scope
+        if scope_changed:
+            impact = 7.52 * (iss - 0.029) - 3.25 * ((iss - 0.02) ** 15)
+        else:
+            impact = 6.42 * iss
 
         exploitability = (
             8.22
@@ -153,9 +173,22 @@ class Finding(models.Model):
             * ui_scores[self.user_interaction]
         )
 
-        import math
-        score = min(impact + exploitability, 10.0)
-        self.cvss_score = math.ceil(score * 10) / 10
+        if impact <= 0:
+            self.cvss_score = 0.0
+            return self.cvss_score
+
+        raw = impact + exploitability
+        if scope_changed:
+            raw *= 1.08
+        score = min(raw, 10.0)
+
+        # Official CVSS Roundup: operates in integer arithmetic at 100000
+        # precision to tolerate floating-point error (spec §7.1).
+        int_input = round(score * 100000)
+        if int_input % 10000 == 0:
+            self.cvss_score = int_input / 100000.0
+        else:
+            self.cvss_score = (math.floor(int_input / 10000) + 1) / 10.0
         return self.cvss_score
 
     def save(self, *args, **kwargs):
@@ -188,6 +221,7 @@ class FindingTemplate(models.Model):
     attack_complexity = models.CharField(max_length=1, default='L')
     privileges_required = models.CharField(max_length=1, default='N')
     user_interaction = models.CharField(max_length=1, default='N')
+    scope = models.CharField(max_length=1, default='U')
     confidentiality_impact = models.CharField(max_length=1, default='N')
     integrity_impact = models.CharField(max_length=1, default='N')
     availability_impact = models.CharField(max_length=1, default='N')

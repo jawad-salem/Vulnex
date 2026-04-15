@@ -136,6 +136,11 @@ def _pinned_http_get(hostname: str, ip: str, path: str, use_https: bool, timeout
         conn.close()
 
 
+def _sanitize_banner(raw: str) -> str:
+    """Remove null bytes and control chars that break PostgreSQL jsonb."""
+    return raw.replace('\x00', '').replace('\u0000', '')[:200]
+
+
 def _grab_banner(ip: str, port: int, timeout: float = 2.0) -> str:
     """Try to grab service banner from an open port."""
     try:
@@ -151,7 +156,7 @@ def _grab_banner(ip: str, port: int, timeout: float = 2.0) -> str:
                         if port in (443, 8443):
                             s.sendall(b'HEAD / HTTP/1.0\r\nHost: ' + ip.encode() + b'\r\n\r\n')
                         banner = s.recv(512).decode('utf-8', errors='replace').strip()
-                        return banner[:200]
+                        return _sanitize_banner(banner)
                     except (socket.timeout, OSError):
                         return ''
         else:
@@ -161,7 +166,7 @@ def _grab_banner(ip: str, port: int, timeout: float = 2.0) -> str:
                     s.sendall(b'HEAD / HTTP/1.0\r\nHost: ' + ip.encode() + b'\r\n\r\n')
                 try:
                     banner = s.recv(512).decode('utf-8', errors='replace').strip()
-                    return banner[:200]
+                    return _sanitize_banner(banner)
                 except (socket.timeout, OSError):
                     return ''
     except Exception:

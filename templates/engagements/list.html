@@ -12,13 +12,13 @@
 <div class="filter-bar">
     <form method="get" class="flex gap-2 flex-wrap" style="width:100%">
         <input type="text" name="q" value="{{ search_query }}" placeholder="Search engagements..." class="form-input search-input">
-        <select name="status" class="form-input" onchange="this.form.submit()">
+        <select name="status" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
             <option value="">All statuses</option>
             {% for val, label in status_choices %}
             <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
-        <select name="type" class="form-input" onchange="this.form.submit()">
+        <select name="type" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
             <option value="">All types</option>
             {% for val, label in type_choices %}
             <option value="{{ val }}" {% if current_type == val %}selected{% endif %}>{{ label }}</option>
@@ -43,7 +43,9 @@
                 <td class="text-sm">{{ e.get_engagement_type_display }}</td>
                 <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
                 <td style="width:100px">
-                    <div class="progress-bar"><div class="progress-fill" style="width:{{ e.progress_percent }}%"></div></div>
+                    <div class="progress-bar" title="{{ e.get_status_display }} — {{ e.progress_percent }}%">
+                        <div class="progress-fill" style="width:{{ e.progress_percent }}%"></div>
+                    </div>
                 </td>
                 <td class="text-mono">
                     {{ e.finding_count }}

@@ -40,7 +40,8 @@
 
             {% if engagement %}
             <div class="sidebar-section">
-                <div class="sidebar-section-title">{{ engagement.name|truncatechars:24 }}</div>
+                <div class="sidebar-section-title">Engagement</div>
+                <div class="sidebar-section-name" title="{{ engagement.name }}">{{ engagement.name|truncatechars:28 }}</div>
                 <a href="{% url 'engagements:detail' engagement.pk %}" class="nav-item sub">Overview</a>
                 <a href="{% url 'vulns:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'vulns' %}active{% endif %}">Findings</a>
                 {% if not is_client_role %}

@@ -3,11 +3,30 @@ Celery tasks for asynchronous recon scanning, scheduling, and pipelines.
 """
 import json
 import logging
+import socket
 
 from celery import shared_task
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+def _dedupe_targets_by_ip(targets):
+    """Remove targets that resolve to the same IP, keeping the first seen."""
+    seen_ips = {}
+    unique = []
+    for t in targets:
+        try:
+            ip = socket.gethostbyname(t)
+        except socket.gaierror:
+            unique.append(t)
+            continue
+        if ip not in seen_ips:
+            seen_ips[ip] = t
+            unique.append(t)
+        else:
+            logger.info(f'Skipping {t} — same IP ({ip}) as {seen_ips[ip]}')
+    return unique
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
@@ -109,6 +128,11 @@ def run_pipeline(self, pipeline_id):
             step_results = []
             step_targets = list(targets)  # snapshot current targets
 
+            # Deduplicate by IP for scan steps — no point port-scanning
+            # the same server four times because four subdomains share it
+            if step in ('port_scan', 'tech_detect', 'dir_brute'):
+                step_targets = _dedupe_targets_by_ip(step_targets)
+
             for target in step_targets:
                 # Create a ReconScan record for each step+target
                 scan = ReconScan.objects.create(
@@ -156,13 +180,15 @@ def run_pipeline(self, pipeline_id):
                 'count': len(step_results),
                 'targets_scanned': len(step_targets),
             }
+            # Save incremental results so the detail page shows progress mid-run
+            pipeline.results_summary = results_summary
+            pipeline.save(update_fields=['results_summary'])
 
         pipeline.current_step = len(pipeline.steps)
         pipeline.status = 'completed'
         pipeline.completed_at = timezone.now()
-        pipeline.results_summary = results_summary
         pipeline.save(update_fields=[
-            'current_step', 'status', 'completed_at', 'results_summary',
+            'current_step', 'status', 'completed_at',
         ])
 
         # Log activity

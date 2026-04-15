@@ -117,6 +117,24 @@ class Engagement(models.Model):
         except ValueError:
             return 0
 
+    @property
+    def phase_progress(self):
+        """List of {value, label, state} for the phase stepper — excludes Cancelled."""
+        phases = [c for c in self.Status.choices if c[0] != self.Status.CANCELLED]
+        current_idx = next(
+            (i for i, (v, _) in enumerate(phases) if v == self.status), 0
+        )
+        result = []
+        for i, (v, label) in enumerate(phases):
+            if i < current_idx:
+                state = 'done'
+            elif i == current_idx:
+                state = 'active'
+            else:
+                state = 'pending'
+            result.append({'value': v, 'label': label, 'state': state})
+        return result
+
 
 class EngagementNote(models.Model):
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='notes')

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load recon_tags %}
 {% block title %}Pipeline: {{ pipeline.name }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
@@ -41,12 +42,12 @@
                         {% else %}
                             <span style="color:var(--text-muted)">&#9675;</span>
                         {% endif %}
-                        Step {{ forloop.counter }}: {{ step }}
+                        Step {{ forloop.counter }}: {{ step|step_label }}
                     </span>
                     <span class="text-mono text-sm">
-                        {% with step_data=pipeline.results_summary %}
-                            {% if step_data and step in step_data %}
-                                {{ step_data|default_if_none:"" }}
+                        {% with step_info=pipeline.results_summary|dictget:step %}
+                            {% if step_info %}
+                                {{ step_info.targets_scanned }} scanned &middot; {{ step_info.count }} results
                             {% endif %}
                         {% endwith %}
                     </span>
@@ -67,7 +68,7 @@
                     <tbody>
                     {% for step_name, step_data in pipeline.results_summary.items %}
                     <tr>
-                        <td>{{ step_name }}</td>
+                        <td>{{ step_name|step_label }}</td>
                         <td class="text-mono">{{ step_data.targets_scanned }}</td>
                         <td class="text-mono">{{ step_data.count }}</td>
                     </tr>
@@ -108,7 +109,12 @@
                     <tr>
                         <td><a href="{% url 'recon:scan_detail' scan.pk %}">{{ scan.get_scan_type_display }}</a></td>
                         <td class="text-mono text-sm">{{ scan.target|truncatechars:25 }}</td>
-                        <td><span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span></td>
+                        <td>
+                            <span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span>
+                            {% if scan.status == 'failed' and scan.error_message %}
+                            <div class="text-xs text-danger mt-1" style="max-width:200px;word-break:break-word">{{ scan.error_message|truncatechars:80 }}</div>
+                            {% endif %}
+                        </td>
                         <td class="text-mono">{{ scan.result_count }}</td>
                     </tr>
                     {% endfor %}

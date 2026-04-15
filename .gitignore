@@ -16,5 +16,4 @@ resutls.json
 *.swp
 staticfiles/
 .git
-.gitignore
 data/

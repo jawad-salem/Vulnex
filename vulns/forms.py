@@ -17,8 +17,8 @@ class FindingForm(forms.ModelForm):
             'remediation', 'references', 'cwe_id', 'tool_source',
             # CVSS
             'attack_vector', 'attack_complexity', 'privileges_required',
-            'user_interaction', 'confidentiality_impact', 'integrity_impact',
-            'availability_impact', 'status',
+            'user_interaction', 'scope', 'confidentiality_impact',
+            'integrity_impact', 'availability_impact', 'status',
         ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4}),

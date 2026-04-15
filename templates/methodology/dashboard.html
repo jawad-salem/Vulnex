@@ -43,7 +43,7 @@
         </h3>
         {% for item in category.items.all %}
         {% with ec=checklist_progress|get_checklist:item.pk %}
-        <div class="checklist-item flex items-start gap-3" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
+        <div class="checklist-item flex items-start gap-3 flex-wrap" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
             <div style="flex:1;min-width:0">
                 <div class="flex items-center gap-2">
                     {% if item.reference_id %}

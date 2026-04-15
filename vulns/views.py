@@ -283,6 +283,7 @@ def api_template_detail(request, pk):
         'attack_complexity': tpl.attack_complexity,
         'privileges_required': tpl.privileges_required,
         'user_interaction': tpl.user_interaction,
+        'scope': tpl.scope,
         'confidentiality_impact': tpl.confidentiality_impact,
         'integrity_impact': tpl.integrity_impact,
         'availability_impact': tpl.availability_impact,

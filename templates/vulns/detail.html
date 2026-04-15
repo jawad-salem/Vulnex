@@ -210,32 +210,36 @@
         <!-- CVSS Breakdown -->
         <div class="card">
             <h2 class="card-title mb-3">CVSS v3.1 breakdown</h2>
-            <div class="detail-list">
-                <div class="detail-row">
+            <div class="cvss-grid">
+                <div class="cvss-item">
                     <span class="detail-label">Attack Vector</span>
                     <span>{{ finding.get_attack_vector_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
                     <span class="detail-label">Attack Complexity</span>
                     <span>{{ finding.get_attack_complexity_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
                     <span class="detail-label">Privileges Required</span>
                     <span>{{ finding.get_privileges_required_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
                     <span class="detail-label">User Interaction</span>
                     <span>{{ finding.get_user_interaction_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
+                    <span class="detail-label">Scope</span>
+                    <span>{{ finding.get_scope_display }}</span>
+                </div>
+                <div class="cvss-item">
                     <span class="detail-label">Confidentiality</span>
                     <span>{{ finding.get_confidentiality_impact_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
                     <span class="detail-label">Integrity</span>
                     <span>{{ finding.get_integrity_impact_display }}</span>
                 </div>
-                <div class="detail-row">
+                <div class="cvss-item">
                     <span class="detail-label">Availability</span>
                     <span>{{ finding.get_availability_impact_display }}</span>
                 </div>

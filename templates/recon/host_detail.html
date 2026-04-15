@@ -55,7 +55,7 @@
             <div class="table-wrap">
                 <table>
                     <thead>
-                        <tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th><th>State</th></tr>
+                        <tr><th>Port</th><th>Protocol</th><th>Service</th><th>Product</th></tr>
                     </thead>
                     <tbody>
                     {% for port in host.ports %}
@@ -65,9 +65,8 @@
                         <td>{{ port.protocol|default:"tcp" }}</td>
                         <td>{{ port.service|default:"unknown" }}</td>
                         <td class="text-xs text-secondary">{{ port.product|default:"" }}</td>
-                        <td><span class="badge badge-completed" style="font-size:10px">{{ port.state|default:"open" }}</span></td>
                         {% else %}
-                        <td class="text-mono font-semibold" colspan="5">{{ port }}</td>
+                        <td class="text-mono font-semibold" colspan="4">{{ port }}</td>
                         {% endif %}
                     </tr>
                     {% endfor %}
