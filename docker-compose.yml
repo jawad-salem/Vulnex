@@ -16,8 +16,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=change-me-in-production
-      - DJANGO_DEBUG=True
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - SITE_URL=http://localhost:8000
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -37,8 +38,9 @@ services:
   celery-worker:
     build: .
     environment:
-      - DJANGO_SECRET_KEY=change-me-in-production
-      - DJANGO_DEBUG=True
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -54,8 +56,9 @@ services:
   celery-beat:
     build: .
     environment:
-      - DJANGO_SECRET_KEY=change-me-in-production
-      - DJANGO_DEBUG=True
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
+      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
       - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
