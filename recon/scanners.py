@@ -245,15 +245,22 @@ def scan_subdomains(target: str) -> list[dict]:
     if len(parts) > 2:
         target = '.'.join(parts[-2:])
 
+    # SSRF guard: refuse to enumerate when the base domain resolves to
+    # an internal/private IP. Raises ValueError for internal targets.
+    _validate_target(target)
+
     found = []
 
     def _try_resolve(sub):
         fqdn = f'{sub}.{target}'
         try:
             ip = socket.gethostbyname(fqdn)
-            return {'hostname': fqdn, 'ip': ip}
         except socket.gaierror:
             return None
+        # Drop subdomains that resolve to internal IPs (split-horizon DNS).
+        if _is_internal_ip(ip):
+            return None
+        return {'hostname': fqdn, 'ip': ip}
 
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {
@@ -268,7 +275,8 @@ def scan_subdomains(target: str) -> list[dict]:
     # Also check the base domain itself
     try:
         base_ip = socket.gethostbyname(target)
-        found.insert(0, {'hostname': target, 'ip': base_ip})
+        if not _is_internal_ip(base_ip):
+            found.insert(0, {'hostname': target, 'ip': base_ip})
     except socket.gaierror:
         pass
 

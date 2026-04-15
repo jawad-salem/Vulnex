@@ -1,11 +1,30 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.core.cache import cache
 from django.http import HttpResponse
 from engagements.models import Engagement, ActivityLog
 from .models import Report
 from .generator import generate_report_pdf
 from accounts.decorators import engagement_access, engagement_edit_required
+
+
+REPORT_RATE_LIMIT_WINDOW = 60  # seconds
+REPORT_RATE_LIMIT_MAX = 5      # max generations per window per user
+
+
+def _rate_limit_report(user_id: int) -> bool:
+    """Returns True if the request is allowed, False if rate-limited."""
+    key = f'report_gen_rate:{user_id}'
+    count = cache.get(key, 0)
+    if count >= REPORT_RATE_LIMIT_MAX:
+        return False
+    # Increment + set TTL on first hit of window
+    if count == 0:
+        cache.set(key, 1, REPORT_RATE_LIMIT_WINDOW)
+    else:
+        cache.incr(key)
+    return True
 
 
 @login_required
@@ -26,6 +45,10 @@ def report_dashboard(request, engagement_pk):
 def generate_report(request, engagement_pk):
     engagement = request.engagement
     report_type = request.POST.get('report_type', 'full')
+
+    if not _rate_limit_report(request.user.pk):
+        messages.error(request, 'Too many report generations. Please wait a minute and try again.')
+        return redirect('reports:dashboard', engagement_pk=engagement_pk)
 
     pdf_bytes = generate_report_pdf(engagement, report_type)
 
@@ -66,6 +89,10 @@ def download_report(request, pk):
 def preview_report(request, engagement_pk):
     engagement = request.engagement
     report_type = request.GET.get('type', 'full')
+
+    if not _rate_limit_report(request.user.pk):
+        return HttpResponse('Too many requests. Please wait a minute.', status=429)
+
     pdf_bytes = generate_report_pdf(engagement, report_type)
 
     response = HttpResponse(pdf_bytes, content_type='application/pdf')

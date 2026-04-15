@@ -2,10 +2,12 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
+from django.http import HttpResponse
 from .models import Engagement, EngagementMember, Invitation, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
 from reports.generator import calculate_engagement_risk_score, _risk_label
@@ -162,8 +164,9 @@ def engagement_edit(request, pk):
 
 
 @login_required
+@engagement_access()
 def engagement_delete(request, pk):
-    engagement = get_object_or_404(Engagement, pk=pk)
+    engagement = request.engagement
     # Only lead or global admin can delete
     if not engagement.user_is_lead(request.user):
         messages.error(request, 'Only the engagement lead can delete this.')
@@ -329,11 +332,20 @@ def accept_invitation(request, token):
     3. Anonymous user with existing account -> redirect to login
     4. Anonymous user, no account -> show registration form
     """
+    # IP-based rate limit to blunt token-enumeration attempts.
+    ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR', '')).split(',')[0].strip()
+    if ip:
+        key = f'invite_attempts:{ip}'
+        attempts = cache.get(key, 0)
+        if attempts >= 20:
+            return HttpResponse('Too many attempts. Try again later.', status=429)
+        cache.set(key, attempts + 1, 300)  # 5-minute window
+
     invitation = get_object_or_404(Invitation, token=token, status='pending')
 
     if invitation.is_expired:
         invitation.status = 'expired'
-        invitation.save()
+        invitation.save(update_fields=['status'])
         messages.error(request, 'This invitation has expired.')
         if request.user.is_authenticated:
             return redirect('dashboard:home')

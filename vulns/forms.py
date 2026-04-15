@@ -83,6 +83,8 @@ class EvidenceForm(forms.ModelForm):
             )
 
         name = f.name or ''
+        if '/' in name or '\\' in name or '..' in name or name.startswith('.'):
+            raise forms.ValidationError('Invalid filename.')
         if '.' not in name:
             raise forms.ValidationError('File must have an extension.')
 
