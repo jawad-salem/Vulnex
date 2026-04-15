@@ -86,92 +86,35 @@
 </div>
 {% endif %}
 
-<div class="grid-2 mb-4">
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Recent engagements</h2>
-            <a href="{% url 'engagements:list' %}" class="btn btn-sm">View all</a>
-        </div>
-        {% if recent_engagements %}
-        <div class="table-wrap">
-            <table>
-                <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
-                <tbody>
-                {% for e in recent_engagements %}
-                <tr>
-                    <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
-                    <td>{{ e.client_name }}</td>
-                    <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
-                    <td class="text-mono">{{ e.finding_count }}</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-            <p>No engagements yet.</p>
-            {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>{% endif %}
-        </div>
-        {% endif %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Recent engagements</h2>
+        <a href="{% url 'engagements:list' %}" class="btn btn-sm">View all</a>
     </div>
-
-    <div class="card">
-        <div class="card-header">
-            <h2 class="card-title">Recent activity</h2>
-        </div>
-        <div class="scroll-list">
-            {% for log in recent_activity %}
-            <div class="activity-item">
-                <div class="activity-dot"></div>
-                <div>
-                    <div><strong>{{ log.user }}</strong> {{ log.action }}</div>
-                    <div class="activity-time">{{ log.timestamp|timesince }} ago</div>
-                </div>
-            </div>
-            {% empty %}
-            <p class="text-secondary text-sm">No activity yet.</p>
+    {% if recent_engagements %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
+            <tbody>
+            {% for e in recent_engagements %}
+            <tr>
+                <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
+                <td>{{ e.client_name }}</td>
+                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+                <td class="text-mono">{{ e.finding_count }}</td>
+            </tr>
             {% endfor %}
-        </div>
+            </tbody>
+        </table>
     </div>
-</div>
-
-{% if total_findings or engagement_risks %}
-<div class="grid-2">
-    {% if total_findings %}
-    <div class="card">
-        <h2 class="card-title mb-3">Severity breakdown</h2>
-        {% for sev, count in severity_counts.items %}
-        {% if count %}
-        <div class="flex-between" style="padding:6px 0">
-            <span class="badge badge-{{ sev }}">{{ sev|title }}</span>
-            <span class="text-mono font-semibold" style="font-size:15px">{{ count }}</span>
-        </div>
-        {% endif %}
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if engagement_risks %}
-    <div class="card">
-        <h2 class="card-title mb-3">Engagement risk scores</h2>
-        {% for er in engagement_risks %}
-        <div class="flex-between" style="padding:8px 0;border-bottom:1px solid var(--border)">
-            <div>
-                <a href="{{ er.engagement.get_absolute_url }}" class="text-sm font-semibold">{{ er.engagement.name|truncatechars:25 }}</a>
-                <div class="text-xs text-secondary">{{ er.finding_count }} finding{{ er.finding_count|pluralize }}</div>
-            </div>
-            <div style="text-align:right">
-                <span class="text-mono font-semibold" style="color:{{ er.color }};font-size:16px">{{ er.score }}</span>
-                <div class="text-xs" style="color:{{ er.color }}">{{ er.label }}</div>
-            </div>
-        </div>
-        {% endfor %}
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <p>No engagements yet.</p>
+        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>{% endif %}
     </div>
     {% endif %}
 </div>
-{% endif %}
 {% endblock %}
 
 {% block extra_js %}

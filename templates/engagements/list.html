@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block title %}Engagements — Vulnex{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
-        <h1 class="page-title">Engagements</h1>
-        <p class="page-subtitle">{{ page_obj.paginator.count }} total</p>
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        <h1 class="eng-hero-title">Engagements</h1>
+        <div class="eng-hero-meta">
+            <span class="eng-meta-item">{{ total_count }} total</span>
+            <span class="eng-meta-item">{{ active_count }} active</span>
+            <span class="eng-meta-item">{{ completed_count }} completed</span>
+        </div>
     </div>
-    {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
+    <div class="eng-hero-actions">
+        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
+    </div>
 </div>
 
 <div class="filter-bar">

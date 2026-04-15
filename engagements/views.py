@@ -21,6 +21,12 @@ def engagement_list(request):
             members__user=request.user
         ).distinct()
 
+    total_count = engagements.count()
+    active_count = engagements.exclude(
+        status__in=[Engagement.Status.COMPLETED, Engagement.Status.CANCELLED]
+    ).count()
+    completed_count = engagements.filter(status=Engagement.Status.COMPLETED).count()
+
     status_filter = request.GET.get('status')
     type_filter = request.GET.get('type')
     search = request.GET.get('q')
@@ -55,6 +61,9 @@ def engagement_list(request):
         'current_status': status_filter,
         'current_type': type_filter,
         'search_query': search or '',
+        'total_count': total_count,
+        'active_count': active_count,
+        'completed_count': completed_count,
     }
     return render(request, 'engagements/list.html', context)
 
