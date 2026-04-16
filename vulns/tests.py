@@ -1,6 +1,7 @@
-from django.test import TestCase
+from django.test import TestCase, Client
+from django.urls import reverse
 from accounts.models import User
-from engagements.models import Engagement
+from engagements.models import Engagement, EngagementMember
 from .models import Finding
 
 
@@ -127,3 +128,125 @@ class CVSSCalculationTests(TestCase):
         )
         # Should be overridden to critical by save()
         self.assertEqual(f.severity, 'critical')
+
+
+class CVSSVectorParsingTests(TestCase):
+    def test_parse_full_vector(self):
+        parsed = Finding.parse_cvss_vector('CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H')
+        self.assertEqual(parsed['attack_vector'], 'N')
+        self.assertEqual(parsed['attack_complexity'], 'L')
+        self.assertEqual(parsed['scope'], 'U')
+        self.assertEqual(parsed['confidentiality_impact'], 'H')
+        self.assertEqual(parsed['availability_impact'], 'H')
+
+    def test_parse_scope_changed(self):
+        parsed = Finding.parse_cvss_vector('CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:L/A:N')
+        self.assertEqual(parsed['scope'], 'C')
+        self.assertEqual(parsed['privileges_required'], 'L')
+        self.assertEqual(parsed['user_interaction'], 'R')
+
+    def test_parse_cvss_3_0_also_accepted(self):
+        parsed = Finding.parse_cvss_vector('CVSS:3.0/AV:L/AC:H/PR:H/UI:R/S:U/C:L/I:N/A:N')
+        self.assertEqual(parsed['attack_vector'], 'L')
+
+    def test_parse_lowercase_values_accepted(self):
+        parsed = Finding.parse_cvss_vector('cvss:3.1/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/a:h')
+        self.assertEqual(parsed['attack_vector'], 'N')
+
+    def test_parse_partial_vector(self):
+        parsed = Finding.parse_cvss_vector('CVSS:3.1/AV:N/C:H')
+        self.assertEqual(parsed, {'attack_vector': 'N', 'confidentiality_impact': 'H'})
+
+    def test_parse_empty_raises(self):
+        with self.assertRaises(ValueError):
+            Finding.parse_cvss_vector('')
+
+    def test_parse_wrong_prefix_raises(self):
+        with self.assertRaises(ValueError):
+            Finding.parse_cvss_vector('CVSS:2.0/AV:N/C:H')
+
+    def test_parse_invalid_metric_value_raises(self):
+        with self.assertRaises(ValueError):
+            Finding.parse_cvss_vector('CVSS:3.1/AV:X')
+
+    def test_parse_malformed_metric_raises(self):
+        with self.assertRaises(ValueError):
+            Finding.parse_cvss_vector('CVSS:3.1/AVN')
+
+    def test_unknown_metric_skipped_not_raised(self):
+        """Unknown metrics (e.g. temporal/environmental prefixes) should be ignored."""
+        parsed = Finding.parse_cvss_vector('CVSS:3.1/AV:N/E:F/RL:O')
+        self.assertEqual(parsed, {'attack_vector': 'N'})
+
+
+class RetestWorkflowTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.pentester = User.objects.create_user('pt', role='pentester', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='Test', client_name='ACME', created_by=self.pentester,
+        )
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=self.pentester, role='lead',
+        )
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='Test Finding',
+            description='test', found_by=self.pentester,
+            confidentiality_impact='H',
+        )
+
+    def test_default_retest_status_is_not_retested(self):
+        self.assertEqual(self.finding.retest_status, 'not_retested')
+        self.assertIsNone(self.finding.retest_date)
+        self.assertIsNone(self.finding.retested_by)
+
+    def test_record_retest_sets_retested_by(self):
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.post(reverse('vulns:detail', args=[self.finding.pk]), {
+            'record_retest': '1',
+            'retest_status': 'fixed',
+            'retest_date': '2026-04-01',
+            'retest_notes': 'Verified via curl — returns 403.',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.retest_status, 'fixed')
+        self.assertEqual(self.finding.retested_by, self.pentester)
+
+    def test_retest_fixed_flips_status_to_remediated(self):
+        self.client.login(username='pt', password='testpass1')
+        self.client.post(reverse('vulns:detail', args=[self.finding.pk]), {
+            'record_retest': '1',
+            'retest_status': 'fixed',
+            'retest_date': '2026-04-01',
+            'retest_notes': '',
+        })
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.status, Finding.Status.REMEDIATED)
+
+    def test_retest_still_present_keeps_status(self):
+        self.client.login(username='pt', password='testpass1')
+        self.client.post(reverse('vulns:detail', args=[self.finding.pk]), {
+            'record_retest': '1',
+            'retest_status': 'still_present',
+            'retest_date': '2026-04-01',
+            'retest_notes': 'Still exploitable.',
+        })
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.status, Finding.Status.OPEN)
+        self.assertEqual(self.finding.retest_status, 'still_present')
+
+    def test_client_cannot_record_retest(self):
+        cli = User.objects.create_user('cli', role='client', password='testpass1')
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=cli, role='client',
+        )
+        self.client.login(username='cli', password='testpass1')
+        self.client.post(reverse('vulns:detail', args=[self.finding.pk]), {
+            'record_retest': '1',
+            'retest_status': 'fixed',
+            'retest_date': '2026-04-01',
+            'retest_notes': 'hax',
+        })
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.retest_status, 'not_retested')

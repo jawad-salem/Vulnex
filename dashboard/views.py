@@ -1,9 +1,10 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from engagements.models import Engagement, ActivityLog
 from vulns.models import Finding
+from recon.models import DiscoveredHost
 from reports.generator import calculate_engagement_risk_score, _risk_label
 
 
@@ -108,3 +109,60 @@ def home(request):
         'engagement_risks': engagement_risks,
     }
     return render(request, 'dashboard/home.html', context)
+
+
+@login_required
+def global_search(request):
+    """Search across engagements, findings, and discovered hosts.
+
+    Scopes by engagement membership (admins see everything). Clients get the
+    same scope rules as elsewhere — they only see engagements they're part of,
+    and are excluded from recon results.
+    """
+    query = (request.GET.get('q') or '').strip()
+    results = {'engagements': [], 'findings': [], 'hosts': [], 'query': query}
+
+    if not query or len(query) < 2:
+        return render(request, 'dashboard/search.html', results)
+
+    is_admin = request.user.role == 'admin'
+    is_client = request.user.is_client
+
+    if is_admin:
+        eng_qs = Engagement.objects.all()
+    else:
+        eng_ids = request.user.memberships.values_list('engagement_id', flat=True)
+        eng_qs = Engagement.objects.filter(pk__in=eng_ids)
+
+    results['engagements'] = list(
+        eng_qs.filter(
+            Q(name__icontains=query)
+            | Q(client_name__icontains=query)
+            | Q(description__icontains=query)
+        )[:15]
+    )
+
+    results['findings'] = list(
+        Finding.objects.filter(engagement__in=eng_qs)
+        .filter(
+            Q(title__icontains=query)
+            | Q(description__icontains=query)
+            | Q(host__icontains=query)
+            | Q(url__icontains=query)
+            | Q(cwe_id__icontains=query)
+        )
+        .select_related('engagement')[:25]
+    )
+
+    # Clients cannot access recon at all — skip hosts entirely
+    if not is_client:
+        results['hosts'] = list(
+            DiscoveredHost.objects.filter(engagement__in=eng_qs)
+            .filter(Q(hostname__icontains=query) | Q(ip_address__icontains=query))
+            .select_related('engagement')[:15]
+        )
+
+    results['total'] = (
+        len(results['engagements']) + len(results['findings']) + len(results['hosts'])
+    )
+    return render(request, 'dashboard/search.html', results)

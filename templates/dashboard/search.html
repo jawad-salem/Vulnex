@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Search{% if query %} — {{ query }}{% endif %} — Vulnex{% endblock %}
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Search</h1>
+        {% if query %}
+        <p class="page-subtitle">{{ total|default:0 }} result{{ total|default:0|pluralize }} for &ldquo;{{ query }}&rdquo;</p>
+        {% endif %}
+    </div>
+</div>
+
+<form method="get" class="card mb-4">
+    <div class="flex gap-2">
+        <input type="text" name="q" value="{{ query }}" class="form-input"
+               placeholder="Search findings, engagements, hosts…" autofocus>
+        <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+</form>
+
+{% if total %}
+
+{% if engagements %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Engagements</h2>
+        <span class="text-xs text-muted">{{ engagements|length }}</span>
+    </div>
+    <div class="detail-list">
+        {% for eng in engagements %}
+        <a href="{% url 'engagements:detail' eng.pk %}" class="detail-row" style="text-decoration:none">
+            <div>
+                <div class="font-semibold">{{ eng.name }}</div>
+                <div class="text-xs text-muted">{{ eng.client_name }}</div>
+            </div>
+            <span class="badge badge-{{ eng.status }}">{{ eng.get_status_display }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if findings %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Findings</h2>
+        <span class="text-xs text-muted">{{ findings|length }}</span>
+    </div>
+    <div class="detail-list">
+        {% for f in findings %}
+        <a href="{% url 'vulns:detail' f.pk %}" class="detail-row" style="text-decoration:none">
+            <div>
+                <div class="font-semibold">{{ f.title }}</div>
+                <div class="text-xs text-muted">
+                    {{ f.engagement.name }}
+                    {% if f.host %} &middot; <span class="text-mono">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</span>{% endif %}
+                    {% if f.cwe_id %} &middot; <span class="text-mono">{{ f.cwe_id }}</span>{% endif %}
+                </div>
+            </div>
+            <span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if hosts %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Discovered hosts</h2>
+        <span class="text-xs text-muted">{{ hosts|length }}</span>
+    </div>
+    <div class="detail-list">
+        {% for h in hosts %}
+        <a href="{% url 'recon:host_detail' h.engagement.pk h.pk %}" class="detail-row" style="text-decoration:none">
+            <div>
+                <div class="text-mono">{{ h.hostname }}</div>
+                <div class="text-xs text-muted">
+                    {{ h.engagement.name }}
+                    {% if h.ip_address %} &middot; <span class="text-mono">{{ h.ip_address }}</span>{% endif %}
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    {% if query %}
+        {% if query|length < 2 %}
+        <p class="text-secondary">Enter at least 2 characters to search.</p>
+        {% else %}
+        <p class="text-secondary">No results found.</p>
+        {% endif %}
+    {% else %}
+    <p class="text-secondary">Enter at least 2 characters to search.</p>
+    <p class="text-xs text-muted mt-2">Searches titles, descriptions, hosts, URLs, CWEs, engagement names, and client names across engagements you have access to.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

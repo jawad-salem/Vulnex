@@ -7,6 +7,7 @@ from engagements.models import Engagement, ActivityLog
 from .models import Report
 from .generator import generate_report_pdf
 from accounts.decorators import engagement_access, engagement_edit_required
+from accounts.models import AuditLog
 
 
 REPORT_RATE_LIMIT_WINDOW = 60  # seconds
@@ -69,6 +70,13 @@ def generate_report(request, engagement_pk):
         engagement=engagement, user=request.user,
         action=f'Generated {report.get_report_type_display()} report'
     )
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.REPORT_GENERATE,
+        target=str(report.pk),
+        details={'engagement': engagement.name, 'type': report_type},
+        request=request,
+    )
     messages.success(request, 'Report generated successfully.')
     return redirect('reports:dashboard', engagement_pk=engagement_pk)
 
@@ -81,6 +89,13 @@ def download_report(request, pk):
         return redirect('engagements:list')
     response = HttpResponse(report.file.read(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{report.file.name.split("/")[-1]}"'
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.REPORT_DOWNLOAD,
+        target=str(report.pk),
+        details={'engagement': report.engagement.name, 'type': report.report_type},
+        request=request,
+    )
     return response
 
 

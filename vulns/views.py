@@ -8,7 +8,7 @@ from django.http import HttpResponse
 from django.db.models import Q
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence, FindingTemplate
-from .forms import FindingForm, EvidenceForm, ToolImportForm
+from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm
 from .parsers import parse_nuclei_json, parse_nikto_json
 from accounts.decorators import engagement_access, engagement_edit_required
 from recon.models import DiscoveredHost
@@ -57,12 +57,14 @@ def finding_list(request, engagement_pk):
 
 @login_required
 def finding_detail(request, pk):
-    finding = get_object_or_404(Finding.objects.select_related('engagement', 'found_by'), pk=pk)
+    finding = get_object_or_404(Finding.objects.select_related('engagement', 'found_by', 'retested_by'), pk=pk)
     if not finding.engagement.user_can_access(request.user):
         messages.error(request, 'You are not a member of this engagement.')
         return redirect('engagements:list')
     evidence_form = EvidenceForm()
+    retest_form = RetestForm(instance=finding)
     is_client = finding.engagement.user_is_client(request.user)
+    can_edit = finding.engagement.user_can_edit(request.user)
 
     if request.method == 'POST' and 'upload_evidence' in request.POST and not is_client:
         evidence_form = EvidenceForm(request.POST, request.FILES)
@@ -74,12 +76,28 @@ def finding_detail(request, pk):
             messages.success(request, 'Evidence uploaded.')
             return redirect('vulns:detail', pk=pk)
 
+    if request.method == 'POST' and 'record_retest' in request.POST and can_edit:
+        retest_form = RetestForm(request.POST, instance=finding)
+        if retest_form.is_valid():
+            f = retest_form.save(commit=False)
+            f.retested_by = request.user
+            if f.retest_status == Finding.RetestStatus.FIXED:
+                f.status = Finding.Status.REMEDIATED
+            f.save()
+            ActivityLog.objects.create(
+                engagement=finding.engagement, user=request.user,
+                action=f'Retested finding: {finding.title} → {f.get_retest_status_display()}',
+            )
+            messages.success(request, 'Retest recorded.')
+            return redirect('vulns:detail', pk=pk)
+
     context = {
         'finding': finding,
         'evidence': finding.evidence.all(),
         'evidence_form': evidence_form,
+        'retest_form': retest_form,
         'is_client': is_client,
-        'can_edit': finding.engagement.user_can_edit(request.user),
+        'can_edit': can_edit,
     }
     return render(request, 'vulns/detail.html', context)
 

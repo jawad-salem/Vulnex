@@ -12,6 +12,7 @@ from .models import Engagement, EngagementMember, Invitation, ActivityLog
 from .forms import EngagementForm, EngagementNoteForm
 from reports.generator import calculate_engagement_risk_score, _risk_label
 from accounts.decorators import role_required, engagement_access, engagement_edit_required
+from accounts.models import AuditLog
 
 
 @login_required
@@ -137,6 +138,13 @@ def engagement_create(request):
                 engagement=engagement, user=request.user,
                 action='Created engagement'
             )
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.ENGAGEMENT_CREATE,
+                target=engagement.name,
+                details={'client': engagement.client_name, 'type': engagement.engagement_type},
+                request=request,
+            )
             messages.success(request, f'Engagement "{engagement.name}" created.')
             return redirect('engagements:detail', pk=engagement.pk)
     else:
@@ -173,7 +181,15 @@ def engagement_delete(request, pk):
         return redirect('engagements:detail', pk=pk)
     if request.method == 'POST':
         name = engagement.name
+        client_name = engagement.client_name
         engagement.delete()
+        AuditLog.record(
+            actor=request.user,
+            action=AuditLog.Action.ENGAGEMENT_DELETE,
+            target=name,
+            details={'client': client_name},
+            request=request,
+        )
         messages.success(request, f'Engagement "{name}" deleted.')
         return redirect('engagements:list')
     return render(request, 'engagements/confirm_delete.html', {'engagement': engagement})

@@ -50,6 +50,12 @@ class Finding(models.Model):
         UNCHANGED = 'U', 'Unchanged'
         CHANGED = 'C', 'Changed'
 
+    class RetestStatus(models.TextChoices):
+        NOT_RETESTED = 'not_retested', 'Not retested'
+        FIXED = 'fixed', 'Fixed'
+        PARTIALLY_FIXED = 'partial', 'Partially fixed'
+        STILL_PRESENT = 'still_present', 'Still present'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='findings')
     title = models.CharField(max_length=300)
@@ -102,6 +108,18 @@ class Finding(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # Retest / verification
+    retest_status = models.CharField(
+        max_length=20, choices=RetestStatus.choices,
+        default=RetestStatus.NOT_RETESTED,
+    )
+    retest_date = models.DateField(null=True, blank=True)
+    retest_notes = models.TextField(blank=True)
+    retested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='retested_findings',
+    )
+
     class Meta:
         ordering = ['-created_at']
 
@@ -120,6 +138,45 @@ class Finding(models.Model):
             'low': '#378ADD',
             'info': '#888780',
         }.get(self.severity, '#888780')
+
+    # Map from vector abbreviation → (model field name, allowed value set)
+    CVSS_VECTOR_MAP = {
+        'AV': ('attack_vector', {'N', 'A', 'L', 'P'}),
+        'AC': ('attack_complexity', {'L', 'H'}),
+        'PR': ('privileges_required', {'N', 'L', 'H'}),
+        'UI': ('user_interaction', {'N', 'R'}),
+        'S':  ('scope', {'U', 'C'}),
+        'C':  ('confidentiality_impact', {'H', 'L', 'N'}),
+        'I':  ('integrity_impact', {'H', 'L', 'N'}),
+        'A':  ('availability_impact', {'H', 'L', 'N'}),
+    }
+
+    @classmethod
+    def parse_cvss_vector(cls, vector_string):
+        """Parse a CVSS:3.1 vector string into a dict of model field values.
+
+        Raises ValueError on malformed input. Accepts partial vectors — unknown
+        or missing metrics are simply not returned. Example input:
+            'CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H'
+        """
+        if not vector_string:
+            raise ValueError('Empty vector string.')
+        parts = [p.strip() for p in vector_string.strip().split('/') if p.strip()]
+        if not parts or not parts[0].upper().startswith('CVSS:3'):
+            raise ValueError('Vector must start with CVSS:3.x')
+        out = {}
+        for part in parts[1:]:
+            if ':' not in part:
+                raise ValueError(f'Malformed metric: "{part}"')
+            key, value = part.split(':', 1)
+            mapping = cls.CVSS_VECTOR_MAP.get(key.upper())
+            if not mapping:
+                continue
+            field, allowed = mapping
+            if value.upper() not in allowed:
+                raise ValueError(f'Invalid value "{value}" for {key}')
+            out[field] = value.upper()
+        return out
 
     @property
     def cvss_vector_string(self):

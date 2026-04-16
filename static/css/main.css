@@ -219,6 +219,39 @@ a:hover { color: var(--accent); }
     min-height: 100vh;
 }
 
+/* ── Global search bar ── */
+.global-search {
+    position: relative;
+    margin-bottom: 20px;
+    max-width: 520px;
+}
+.global-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.global-search-input {
+    width: 100%;
+    padding: 9px 12px 9px 36px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.global-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: var(--bg-secondary);
+}
+.global-search-input::placeholder {
+    color: var(--text-muted);
+}
+
 /* ── Typography ── */
 .page-header {
     display: flex;
@@ -383,6 +416,11 @@ td a { transition: color 0.15s; }
 .badge-remediated { background: rgba(63, 185, 80, 0.15); color: var(--success); }
 .badge-false_positive { background: rgba(139, 148, 158, 0.15); color: var(--info); }
 .badge-accepted { background: rgba(227, 179, 65, 0.15); color: var(--warning); }
+
+.badge-not_retested { background: rgba(139, 148, 158, 0.15); color: var(--info); }
+.badge-fixed { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+.badge-partial { background: rgba(227, 179, 65, 0.15); color: var(--warning); }
+.badge-still_present { background: rgba(240, 88, 83, 0.15); color: var(--critical); }
 
 .badge-planning { background: rgba(139, 148, 158, 0.15); color: var(--info); }
 .badge-recon, .badge-scanning { background: rgba(88, 166, 255, 0.15); color: var(--low); }
@@ -1246,19 +1284,26 @@ code {
 }
 
 /* ── Host cards (recon) ── */
+.hosts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
 .host-card {
     display: block;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-light);
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
     color: var(--text-primary);
     text-decoration: none;
-    transition: background 0.15s;
+    transition: background 0.15s, border-color 0.15s;
 }
 .host-card:hover {
     background: var(--bg-hover);
+    border-color: var(--border);
     color: var(--text-primary);
 }
-.host-card:last-child { border-bottom: none; }
 
 .tech-tag {
     display: inline-block;

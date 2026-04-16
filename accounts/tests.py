@@ -1,6 +1,6 @@
 from django.test import TestCase, Client
 from django.urls import reverse
-from .models import User
+from .models import User, AuditLog
 
 
 class UserModelTests(TestCase):
@@ -89,3 +89,85 @@ class AccessControlTests(TestCase):
         resp = self.client.get(reverse('accounts:user_list'))
         self.assertEqual(resp.status_code, 302)
         self.assertIn('login', resp.url)
+
+
+class AuditLogTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user('admin', role='admin', password='testpass1')
+        self.pentester = User.objects.create_user('pt', role='pentester', password='testpass1')
+
+    def test_record_creates_entry(self):
+        entry = AuditLog.record(
+            actor=self.admin,
+            action=AuditLog.Action.USER_UPDATE,
+            target='alice',
+            details={'field': 'role'},
+        )
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.actor, self.admin)
+        self.assertEqual(entry.target, 'alice')
+        self.assertEqual(entry.details, {'field': 'role'})
+
+    def test_record_with_anon_actor_stores_null(self):
+        entry = AuditLog.record(actor=None, action=AuditLog.Action.LOGIN_FAILED, target='bob')
+        self.assertIsNone(entry.actor)
+
+    def test_failed_login_is_logged(self):
+        resp = self.client.post(reverse('accounts:login'), {
+            'username': 'nobody', 'password': 'wrong',
+        })
+        self.assertEqual(resp.status_code, 200)  # re-renders form with errors
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.LOGIN_FAILED, target='nobody',
+            ).exists()
+        )
+
+    def test_user_create_is_logged(self):
+        self.client.login(username='admin', password='testpass1')
+        self.client.post(reverse('accounts:user_create'), {
+            'username': 'newuser',
+            'first_name': '',
+            'last_name': '',
+            'email': '',
+            'role': 'pentester',
+            'is_active': 'on',
+            'password1': 'Str0ngPass!xyz',
+            'password2': 'Str0ngPass!xyz',
+        })
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.USER_CREATE, target='newuser',
+            ).exists()
+        )
+
+    def test_user_role_change_is_logged(self):
+        target = User.objects.create_user('victim', role='pentester', password='testpass1')
+        self.client.login(username='admin', password='testpass1')
+        self.client.post(reverse('accounts:user_edit', args=[target.pk]), {
+            'username': 'victim',
+            'first_name': '',
+            'last_name': '',
+            'email': '',
+            'role': 'admin',  # role change
+            'is_active': 'on',
+            'password1': '',
+            'password2': '',
+        })
+        log = AuditLog.objects.filter(
+            action=AuditLog.Action.USER_ROLE_CHANGE, target='victim',
+        ).first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.details.get('from'), 'pentester')
+        self.assertEqual(log.details.get('to'), 'admin')
+
+    def test_audit_log_admin_only(self):
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(reverse('accounts:audit_log'))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_audit_log_accessible_to_admin(self):
+        self.client.login(username='admin', password='testpass1')
+        resp = self.client.get(reverse('accounts:audit_log'))
+        self.assertEqual(resp.status_code, 200)

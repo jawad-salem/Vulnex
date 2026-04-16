@@ -118,10 +118,10 @@
                 {% endif %}
             </div>
 
-            {% if not is_client %}
             <div class="card">
                 <div class="card-header"><h2 class="card-title">Quick actions</h2></div>
                 <div class="quick-actions">
+                    {% if not is_client %}
                     <a href="{% url 'recon:dashboard' engagement.pk %}" class="quick-action">
                         <div class="qa-icon">&#128269;</div>
                         <div class="qa-label">Recon</div>
@@ -136,13 +136,18 @@
                         <div class="qa-label">Import vulns</div>
                     </a>
                     {% endif %}
+                    {% else %}
+                    <a href="{% url 'vulns:list' engagement.pk %}" class="quick-action">
+                        <div class="qa-icon">&#9888;</div>
+                        <div class="qa-label">View findings</div>
+                    </a>
+                    {% endif %}
                     <a href="{% url 'reports:dashboard' engagement.pk %}" class="quick-action qa-primary">
                         <div class="qa-icon">&#128196;</div>
                         <div class="qa-label">Reports</div>
                     </a>
                 </div>
             </div>
-            {% endif %}
         </div>
 
         <div class="card mt-4">

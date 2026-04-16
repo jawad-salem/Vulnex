@@ -127,6 +127,12 @@ python manage.py seed_templates
 python manage.py runserver
 ```
 
+### One-line setup
+
+```bash
+pip install -r requirements.txt && python manage.py migrate && python manage.py seed_templates && python manage.py seed_methodologies && python manage.py createsuperuser && python manage.py runserver
+```
+
 Then open http://localhost:8000 and log in with your superuser credentials.
 
 ### Docker

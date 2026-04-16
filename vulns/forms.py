@@ -98,6 +98,21 @@ class EvidenceForm(forms.ModelForm):
         return f
 
 
+class RetestForm(forms.ModelForm):
+    class Meta:
+        model = Finding
+        fields = ['retest_status', 'retest_date', 'retest_notes']
+        widgets = {
+            'retest_date': forms.DateInput(attrs={'type': 'date'}),
+            'retest_notes': forms.Textarea(attrs={'rows': 4, 'placeholder': 'What was verified, commands run, screenshots…'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')
+
+
 class ToolImportForm(forms.Form):
     TOOL_CHOICES = [
         ('nuclei', 'Nuclei JSON'),

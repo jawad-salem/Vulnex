@@ -111,6 +111,16 @@
             <h3 class="section-title">CVSS v3.1 Base Score</h3>
             <p class="section-desc">Severity and CVSS score are automatically calculated from these vectors.</p>
 
+            <div class="form-group">
+                <label for="cvssVectorPaste">Paste CVSS vector string (optional)</label>
+                <div class="flex gap-2">
+                    <input type="text" id="cvssVectorPaste" class="form-input text-mono"
+                           placeholder="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" autocomplete="off">
+                    <button type="button" id="cvssParseBtn" class="btn">Apply</button>
+                </div>
+                <span class="form-help" id="cvssParseHelp">Auto-fills the dropdowns below from a CVSS:3.1 vector string.</span>
+            </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label for="{{ form.attack_vector.id_for_label }}">Attack Vector</label>
@@ -390,6 +400,59 @@
         var el = document.getElementById(id);
         if (el) el.addEventListener('change', updateCvssPreview);
     });
+
+    // ── CVSS vector string paste ──
+    var vectorMap = {
+        'AV': {field: 'attack_vector', allowed: ['N', 'A', 'L', 'P']},
+        'AC': {field: 'attack_complexity', allowed: ['L', 'H']},
+        'PR': {field: 'privileges_required', allowed: ['N', 'L', 'H']},
+        'UI': {field: 'user_interaction', allowed: ['N', 'R']},
+        'S':  {field: 'scope', allowed: ['U', 'C']},
+        'C':  {field: 'confidentiality_impact', allowed: ['H', 'L', 'N']},
+        'I':  {field: 'integrity_impact', allowed: ['H', 'L', 'N']},
+        'A':  {field: 'availability_impact', allowed: ['H', 'L', 'N']}
+    };
+
+    function parseCvssVector(s) {
+        if (!s) throw new Error('Empty vector');
+        var parts = s.trim().split('/').filter(Boolean);
+        if (!parts.length || !/^CVSS:3/i.test(parts[0])) {
+            throw new Error('Vector must start with CVSS:3.x');
+        }
+        var out = {};
+        for (var i = 1; i < parts.length; i++) {
+            var kv = parts[i].split(':');
+            if (kv.length !== 2) throw new Error('Malformed: "' + parts[i] + '"');
+            var key = kv[0].toUpperCase();
+            var val = kv[1].toUpperCase();
+            var m = vectorMap[key];
+            if (!m) continue;
+            if (m.allowed.indexOf(val) === -1) throw new Error('Invalid value "' + val + '" for ' + key);
+            out[m.field] = val;
+        }
+        return out;
+    }
+
+    var parseBtn = document.getElementById('cvssParseBtn');
+    var pasteInput = document.getElementById('cvssVectorPaste');
+    var parseHelp = document.getElementById('cvssParseHelp');
+    if (parseBtn && pasteInput) {
+        parseBtn.addEventListener('click', function() {
+            try {
+                var parsed = parseCvssVector(pasteInput.value);
+                Object.keys(parsed).forEach(function(f) {
+                    var el = document.getElementById('id_' + f);
+                    if (el) el.value = parsed[f];
+                });
+                updateCvssPreview();
+                parseHelp.textContent = 'Applied ' + Object.keys(parsed).length + ' metric(s).';
+                parseHelp.style.color = 'var(--success)';
+            } catch (err) {
+                parseHelp.textContent = err.message;
+                parseHelp.style.color = 'var(--critical)';
+            }
+        });
+    }
 
     // Show preview on page load if editing
     updateCvssPreview();

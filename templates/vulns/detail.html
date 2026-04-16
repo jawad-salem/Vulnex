@@ -66,6 +66,7 @@
         <button class="tab-btn active" data-tab="overview" role="tab">Overview</button>
         <button class="tab-btn" data-tab="evidence" role="tab">Evidence{% if evidence %} <span class="tab-count">{{ evidence|length }}</span>{% endif %}</button>
         <button class="tab-btn" data-tab="cvss" role="tab">CVSS</button>
+        <button class="tab-btn" data-tab="retest" role="tab">Retest</button>
         <button class="tab-btn" data-tab="details" role="tab">Details</button>
     </div>
 
@@ -207,6 +208,60 @@
                     <span>{{ finding.get_availability_impact_display }}</span>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Retest tab -->
+    <div class="tab-panel" id="tab-retest" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Verification / retest</h2>
+                <span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span>
+            </div>
+            {% if finding.retest_date or finding.retest_notes or finding.retested_by %}
+            <div class="detail-list mb-3">
+                {% if finding.retest_date %}
+                <div class="detail-row">
+                    <span class="detail-label">Last retested</span>
+                    <span>{{ finding.retest_date|date:"M d, Y" }}</span>
+                </div>
+                {% endif %}
+                {% if finding.retested_by %}
+                <div class="detail-row">
+                    <span class="detail-label">Retested by</span>
+                    <span>{{ finding.retested_by }}</span>
+                </div>
+                {% endif %}
+                {% if finding.retest_notes %}
+                <div class="detail-row flex-col items-start gap-1">
+                    <span class="detail-label">Notes</span>
+                    <div class="prose text-sm">{{ finding.retest_notes|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-secondary text-sm mb-3">This finding has not been retested yet.</p>
+            {% endif %}
+
+            {% if can_edit %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="record_retest" value="1">
+                <div class="form-group">
+                    <label>Retest status</label>
+                    {{ retest_form.retest_status }}
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    {{ retest_form.retest_date }}
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    {{ retest_form.retest_notes }}
+                </div>
+                <button type="submit" class="btn btn-primary">Save retest</button>
+            </form>
+            {% endif %}
         </div>
     </div>
 

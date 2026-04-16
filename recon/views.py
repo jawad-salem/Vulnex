@@ -24,6 +24,7 @@ def recon_dashboard(request, engagement_pk):
     pipeline_form = ScanPipelineForm()
     scheduled_scans = engagement.scheduled_scans.all()
     pipelines = engagement.scan_pipelines.all()[:10]
+    pipeline_count = engagement.scan_pipelines.count()
 
     context = {
         'engagement': engagement,
@@ -35,6 +36,7 @@ def recon_dashboard(request, engagement_pk):
         'pipeline_form': pipeline_form,
         'scheduled_scans': scheduled_scans,
         'pipelines': pipelines,
+        'pipeline_count': pipeline_count,
         'pipeline_presets': ScanPipeline.PIPELINE_PRESETS,
     }
     return render(request, 'recon/dashboard.html', context)
