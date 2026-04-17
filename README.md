@@ -21,6 +21,7 @@ A full-featured penetration testing workflow platform built with Django. Manage 
 - Severity auto-assigned from CVSS vectors
 - **SLA tracking** — severity-based remediation deadlines (Critical 7d / High 14d / Medium 30d / Low 60d / Info 90d) with overdue detection and dashboard widget
 - **Finding assignment** — assign individual findings to team members; filter by assignee; personal "assigned to me" dashboard widget
+- **Review workflow** — findings move DRAFT → IN_REVIEW → APPROVED before clients see them; reviewers and leads can approve or send back with feedback (CHANGES_REQUESTED)
 
 ### Credentials vault
 - Store passwords, hashes, API tokens, SSH keys, and session cookies captured during an engagement

@@ -58,6 +58,12 @@ class Finding(models.Model):
         PARTIALLY_FIXED = 'partial', 'Partially fixed'
         STILL_PRESENT = 'still_present', 'Still present'
 
+    class ReviewState(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        IN_REVIEW = 'in_review', 'In review'
+        APPROVED = 'approved', 'Approved'
+        CHANGES_REQUESTED = 'changes_requested', 'Changes requested'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='findings')
     title = models.CharField(max_length=300)
@@ -125,6 +131,19 @@ class Finding(models.Model):
     retested_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name='retested_findings',
+    )
+
+    # Review / approval workflow
+    review_state = models.CharField(
+        max_length=20, choices=ReviewState.choices, default=ReviewState.DRAFT,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='reviewed_findings',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(
+        blank=True, help_text='Reviewer feedback — visible on "Changes requested".',
     )
 
     # SLA — remediation deadline driven by severity

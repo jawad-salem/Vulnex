@@ -56,6 +56,14 @@
             <option value="{{ m.user.pk }}" {% if assigned_filter == m.user.pk|stringformat:"s" %}selected{% endif %}>{{ m.user }}</option>
             {% endfor %}
         </select>
+        {% if not is_client %}
+        <select name="review" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+            <option value="">All review states</option>
+            {% for val, label in review_choices %}
+            <option value="{{ val }}" {% if review_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
         <button type="submit" class="btn">Filter</button>
     </form>
 </div>
@@ -71,6 +79,7 @@
                     <th>Severity</th>
                     <th>CVSS</th>
                     <th>Status</th>
+                    {% if not is_client %}<th>Review</th>{% endif %}
                     <th>Assignee</th>
                     <th>Due</th>
                     <th>Date</th>
@@ -84,6 +93,7 @@
                 <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
                 <td class="text-mono font-semibold">{{ f.cvss_score|floatformat:1 }}</td>
                 <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
+                {% if not is_client %}<td><span class="badge badge-{{ f.review_state }}">{{ f.get_review_state_display }}</span></td>{% endif %}
                 <td class="text-sm">{% if f.assigned_to %}{{ f.assigned_to }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</td>
                 <td class="text-sm">
                     {% if f.sla_status == 'closed' %}

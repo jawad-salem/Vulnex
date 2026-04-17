@@ -102,6 +102,12 @@ class Engagement(models.Model):
             return True
         return self.get_user_role(user) == 'lead'
 
+    def user_can_review(self, user):
+        """Check if user can approve / request changes on findings."""
+        if user.role == 'admin':
+            return True
+        return self.get_user_role(user) in ('lead', 'reviewer')
+
     def user_is_client(self, user):
         """Check if user has client role on this engagement."""
         return self.get_user_role(user) == 'client'

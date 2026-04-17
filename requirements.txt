@@ -10,4 +10,4 @@ celery>=5.3
 django-celery-beat>=2.5
 redis>=5.0
 cryptography>=41.0
-claude --resume c3235cd9-2642-437e-bea6-988033f7b892
+

@@ -25,6 +25,10 @@ def home(request):
             engagement_id__in=user_engagement_ids
         ).select_related('engagement', 'user')[:20]
 
+    # Clients only see approved findings in their dashboard stats
+    if request.user.is_client:
+        findings = findings.filter(review_state=Finding.ReviewState.APPROVED)
+
     # Stats
     active_engagements = engagements.exclude(
         status__in=['completed', 'cancelled']
@@ -168,9 +172,11 @@ def global_search(request):
         )[:15]
     )
 
+    finding_qs = Finding.objects.filter(engagement__in=eng_qs)
+    if is_client:
+        finding_qs = finding_qs.filter(review_state=Finding.ReviewState.APPROVED)
     results['findings'] = list(
-        Finding.objects.filter(engagement__in=eng_qs)
-        .filter(
+        finding_qs.filter(
             Q(title__icontains=query)
             | Q(description__icontains=query)
             | Q(host__icontains=query)

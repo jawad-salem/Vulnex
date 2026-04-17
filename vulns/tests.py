@@ -511,3 +511,195 @@ class FindingAssignmentTests(TestCase):
         }
         data.update({k: v for k, v in overrides.items() if v is not None})
         return data
+
+
+class ReviewWorkflowTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
+        self.pt = User.objects.create_user('pt', role='pentester', password='testpass1')
+        self.rev = User.objects.create_user('rev', role='reviewer', password='testpass1')
+        self.cli = User.objects.create_user('cli', role='client', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='T', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.pt, role='pentester')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.rev, role='reviewer')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.cli, role='client')
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='SQLi', description='x',
+            found_by=self.pt, confidentiality_impact='H',
+        )
+
+    def test_default_state_is_draft(self):
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.DRAFT)
+
+    def test_pentester_can_submit_for_review(self):
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.post(reverse('vulns:submit_review', args=[self.finding.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.IN_REVIEW)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                engagement=self.engagement,
+                action__icontains='Submitted finding for review',
+            ).exists()
+        )
+
+    def test_reviewer_cannot_submit_for_review(self):
+        """Reviewers review — they don't author. Only edit-privileged users submit."""
+        self.client.login(username='rev', password='testpass1')
+        resp = self.client.post(reverse('vulns:submit_review', args=[self.finding.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.DRAFT)
+
+    def test_submit_requires_post(self):
+        self.client.login(username='pt', password='testpass1')
+        self.client.get(reverse('vulns:submit_review', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.DRAFT)
+
+    def test_submit_rejected_from_approved(self):
+        self.finding.review_state = Finding.ReviewState.APPROVED
+        self.finding.save()
+        self.client.login(username='pt', password='testpass1')
+        self.client.post(reverse('vulns:submit_review', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.APPROVED)
+
+    def test_reviewer_can_approve(self):
+        self.finding.review_state = Finding.ReviewState.IN_REVIEW
+        self.finding.save()
+        self.client.login(username='rev', password='testpass1')
+        self.client.post(reverse('vulns:approve', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.APPROVED)
+        self.assertEqual(self.finding.reviewed_by, self.rev)
+        self.assertIsNotNone(self.finding.reviewed_at)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                engagement=self.engagement,
+                action__icontains='Approved finding',
+            ).exists()
+        )
+
+    def test_lead_can_approve(self):
+        self.finding.review_state = Finding.ReviewState.IN_REVIEW
+        self.finding.save()
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('vulns:approve', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.APPROVED)
+
+    def test_pentester_cannot_approve(self):
+        self.finding.review_state = Finding.ReviewState.IN_REVIEW
+        self.finding.save()
+        self.client.login(username='pt', password='testpass1')
+        self.client.post(reverse('vulns:approve', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.IN_REVIEW)
+
+    def test_approve_rejected_from_draft(self):
+        """Can only approve findings that are currently in review."""
+        self.client.login(username='rev', password='testpass1')
+        self.client.post(reverse('vulns:approve', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.DRAFT)
+
+    def test_request_changes_stores_notes(self):
+        self.finding.review_state = Finding.ReviewState.IN_REVIEW
+        self.finding.save()
+        self.client.login(username='rev', password='testpass1')
+        self.client.post(
+            reverse('vulns:request_changes', args=[self.finding.pk]),
+            {'review_notes': 'PoC missing — add screenshots.'},
+        )
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.CHANGES_REQUESTED)
+        self.assertEqual(self.finding.review_notes, 'PoC missing — add screenshots.')
+        self.assertEqual(self.finding.reviewed_by, self.rev)
+
+    def test_request_changes_requires_notes(self):
+        self.finding.review_state = Finding.ReviewState.IN_REVIEW
+        self.finding.save()
+        self.client.login(username='rev', password='testpass1')
+        self.client.post(
+            reverse('vulns:request_changes', args=[self.finding.pk]),
+            {'review_notes': '   '},
+        )
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.IN_REVIEW)
+
+    def test_resubmit_clears_review_notes(self):
+        """After re-submitting CHANGES_REQUESTED → IN_REVIEW, old notes clear."""
+        self.finding.review_state = Finding.ReviewState.CHANGES_REQUESTED
+        self.finding.review_notes = 'old feedback'
+        self.finding.save()
+        self.client.login(username='pt', password='testpass1')
+        self.client.post(reverse('vulns:submit_review', args=[self.finding.pk]))
+        self.finding.refresh_from_db()
+        self.assertEqual(self.finding.review_state, Finding.ReviewState.IN_REVIEW)
+        self.assertEqual(self.finding.review_notes, '')
+
+    def test_client_only_sees_approved_in_list(self):
+        draft = self.finding  # draft
+        approved = Finding.objects.create(
+            engagement=self.engagement, title='Approved-One', description='x',
+            found_by=self.pt, confidentiality_impact='H',
+            review_state=Finding.ReviewState.APPROVED,
+        )
+        self.client.login(username='cli', password='testpass1')
+        resp = self.client.get(reverse('vulns:list', args=[self.engagement.pk]))
+        self.assertContains(resp, 'Approved-One')
+        self.assertNotContains(resp, draft.title)
+
+    def test_pentester_sees_all_states_in_list(self):
+        Finding.objects.create(
+            engagement=self.engagement, title='Approved-One', description='x',
+            found_by=self.pt, confidentiality_impact='H',
+            review_state=Finding.ReviewState.APPROVED,
+        )
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(reverse('vulns:list', args=[self.engagement.pk]))
+        self.assertContains(resp, 'Approved-One')
+        self.assertContains(resp, self.finding.title)
+
+    def test_client_blocked_from_unapproved_detail(self):
+        self.client.login(username='cli', password='testpass1')
+        resp = self.client.get(reverse('vulns:detail', args=[self.finding.pk]))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_client_can_view_approved_detail(self):
+        self.finding.review_state = Finding.ReviewState.APPROVED
+        self.finding.save()
+        self.client.login(username='cli', password='testpass1')
+        resp = self.client.get(reverse('vulns:detail', args=[self.finding.pk]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_review_filter_for_pentester(self):
+        approved = Finding.objects.create(
+            engagement=self.engagement, title='Approved-One', description='x',
+            found_by=self.pt, confidentiality_impact='H',
+            review_state=Finding.ReviewState.APPROVED,
+        )
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:list', args=[self.engagement.pk]) + '?review=approved'
+        )
+        self.assertContains(resp, 'Approved-One')
+        self.assertNotContains(resp, self.finding.title)
+
+    def test_client_export_only_includes_approved(self):
+        Finding.objects.create(
+            engagement=self.engagement, title='Approved-Export', description='x',
+            found_by=self.pt, confidentiality_impact='H',
+            review_state=Finding.ReviewState.APPROVED,
+        )
+        self.client.login(username='cli', password='testpass1')
+        resp = self.client.get(reverse('vulns:export_csv', args=[self.engagement.pk]))
+        body = resp.content.decode()
+        self.assertIn('Approved-Export', body)
+        self.assertNotIn(self.finding.title, body)

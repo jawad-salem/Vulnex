@@ -29,6 +29,9 @@
     <div class="eng-hero-actions">
         <span class="badge badge-{{ finding.severity }} badge-lg">{{ finding.get_severity_display }}</span>
         <span class="badge badge-{{ finding.status }} badge-lg">{{ finding.get_status_display }}</span>
+        {% if not is_client %}
+        <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
+        {% endif %}
         {% if can_edit %}
         <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
         <a href="{% url 'vulns:delete' finding.pk %}" class="btn btn-danger">Delete</a>
@@ -88,6 +91,7 @@
         <button class="tab-btn" data-tab="evidence" role="tab">Evidence{% if evidence %} <span class="tab-count">{{ evidence|length }}</span>{% endif %}</button>
         <button class="tab-btn" data-tab="cvss" role="tab">CVSS</button>
         <button class="tab-btn" data-tab="retest" role="tab">Retest</button>
+        {% if not is_client %}<button class="tab-btn" data-tab="review" role="tab">Review</button>{% endif %}
         <button class="tab-btn" data-tab="details" role="tab">Details</button>
     </div>
 
@@ -285,6 +289,77 @@
             {% endif %}
         </div>
     </div>
+
+    {% if not is_client %}
+    <!-- Review tab -->
+    <div class="tab-panel" id="tab-review" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Review &amp; approval</h2>
+                <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
+            </div>
+
+            {% if finding.reviewed_by or finding.reviewed_at %}
+            <div class="detail-list mb-3">
+                {% if finding.reviewed_by %}
+                <div class="detail-row">
+                    <span class="detail-label">Last reviewed by</span>
+                    <span>{{ finding.reviewed_by }}</span>
+                </div>
+                {% endif %}
+                {% if finding.reviewed_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Reviewed at</span>
+                    <span>{{ finding.reviewed_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+                {% if finding.review_notes %}
+                <div class="detail-row flex-col items-start gap-1">
+                    <span class="detail-label">Reviewer notes</span>
+                    <div class="prose text-sm">{{ finding.review_notes|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if finding.review_state == 'draft' or finding.review_state == 'changes_requested' %}
+                {% if finding.review_state == 'changes_requested' %}
+                <p class="text-sm text-secondary mb-3">Address the reviewer feedback above, then re-submit for review.</p>
+                {% else %}
+                <p class="text-sm text-secondary mb-3">Drafts are not shown to clients. Submit for review once the finding is ready.</p>
+                {% endif %}
+                {% if can_edit %}
+                <form method="post" action="{% url 'vulns:submit_review' finding.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Submit for review</button>
+                </form>
+                {% else %}
+                <p class="text-sm text-muted">Only leads and pentesters can submit findings for review.</p>
+                {% endif %}
+            {% elif finding.review_state == 'in_review' %}
+                <p class="text-sm text-secondary mb-3">Waiting on a lead or reviewer to approve or request changes.</p>
+                {% if can_review %}
+                <form method="post" action="{% url 'vulns:approve' finding.pk %}" style="display:inline-block">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Approve</button>
+                </form>
+                <form method="post" action="{% url 'vulns:request_changes' finding.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>Request changes — what needs to be fixed?</label>
+                        <textarea name="review_notes" rows="3" class="form-input" required placeholder="Missing PoC, wrong CVSS, needs more evidence…"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Request changes</button>
+                </form>
+                {% else %}
+                <p class="text-sm text-muted">Only leads and reviewers can approve or request changes.</p>
+                {% endif %}
+            {% elif finding.review_state == 'approved' %}
+                <p class="text-sm" style="color:var(--success)">This finding is approved and visible to the client.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Details tab -->
     <div class="tab-panel" id="tab-details" role="tabpanel">

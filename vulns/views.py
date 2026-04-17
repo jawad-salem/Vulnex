@@ -22,11 +22,19 @@ def finding_list(request, engagement_pk):
     engagement = request.engagement
     findings = engagement.findings.all()
 
+    is_client = request.eng_role == 'client'
+    if is_client:
+        findings = findings.filter(review_state=Finding.ReviewState.APPROVED)
+
     severity_filter = request.GET.get('severity')
     status_filter = request.GET.get('status')
     sla_filter = request.GET.get('sla')
     assigned_filter = request.GET.get('assigned')
+    review_filter = request.GET.get('review')
     search = request.GET.get('q')
+
+    if review_filter and not is_client:
+        findings = findings.filter(review_state=review_filter)
 
     if severity_filter:
         findings = findings.filter(severity=severity_filter)
@@ -64,6 +72,8 @@ def finding_list(request, engagement_pk):
         qs_parts.append(f'sla={sla_filter}')
     if assigned_filter:
         qs_parts.append(f'assigned={assigned_filter}')
+    if review_filter:
+        qs_parts.append(f'review={review_filter}')
     if search:
         qs_parts.append(f'q={search}')
     query_string = '&'.join(qs_parts) + ('&' if qs_parts else '')
@@ -80,10 +90,13 @@ def finding_list(request, engagement_pk):
         'query_string': query_string,
         'severity_choices': Finding.Severity.choices,
         'status_choices': Finding.Status.choices,
+        'review_choices': Finding.ReviewState.choices,
         'sla_filter': sla_filter,
         'assigned_filter': assigned_filter,
+        'review_filter': review_filter,
         'assignable_members': assignable_members,
         'can_edit': request.eng_role in ('admin', 'lead', 'pentester'),
+        'is_client': is_client,
     }
     return render(request, 'vulns/list.html', context)
 
@@ -98,6 +111,11 @@ def finding_detail(request, pk):
     retest_form = RetestForm(instance=finding)
     is_client = finding.engagement.user_is_client(request.user)
     can_edit = finding.engagement.user_can_edit(request.user)
+    can_review = finding.engagement.user_can_review(request.user)
+
+    if is_client and finding.review_state != Finding.ReviewState.APPROVED:
+        messages.error(request, 'This finding is not yet available.')
+        return redirect('vulns:list', engagement_pk=finding.engagement.pk)
 
     if request.method == 'POST' and 'upload_evidence' in request.POST and not is_client:
         evidence_form = EvidenceForm(request.POST, request.FILES)
@@ -131,6 +149,7 @@ def finding_detail(request, pk):
         'retest_form': retest_form,
         'is_client': is_client,
         'can_edit': can_edit,
+        'can_review': can_review,
     }
     return render(request, 'vulns/detail.html', context)
 
@@ -230,6 +249,90 @@ def finding_delete(request, pk):
 
 
 @login_required
+def submit_for_review(request, pk):
+    """Pentester moves finding DRAFT (or CHANGES_REQUESTED) → IN_REVIEW."""
+    finding = get_object_or_404(Finding, pk=pk)
+    engagement = finding.engagement
+    if not engagement.user_can_edit(request.user):
+        messages.error(request, 'You do not have permission to submit findings for review.')
+        return redirect('vulns:detail', pk=pk)
+    if request.method != 'POST':
+        return redirect('vulns:detail', pk=pk)
+    if finding.review_state not in (Finding.ReviewState.DRAFT, Finding.ReviewState.CHANGES_REQUESTED):
+        messages.error(request, 'This finding is not in a state that can be submitted for review.')
+        return redirect('vulns:detail', pk=pk)
+    finding.review_state = Finding.ReviewState.IN_REVIEW
+    finding.review_notes = ''
+    finding.save(update_fields=['review_state', 'review_notes', 'updated_at'])
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Submitted finding for review: {finding.title}',
+    )
+    messages.success(request, 'Finding submitted for review.')
+    return redirect('vulns:detail', pk=pk)
+
+
+@login_required
+def approve_finding(request, pk):
+    """Lead / reviewer moves IN_REVIEW → APPROVED. Approved findings become client-visible."""
+    finding = get_object_or_404(Finding, pk=pk)
+    engagement = finding.engagement
+    if not engagement.user_can_review(request.user):
+        messages.error(request, 'Only leads and reviewers can approve findings.')
+        return redirect('vulns:detail', pk=pk)
+    if request.method != 'POST':
+        return redirect('vulns:detail', pk=pk)
+    if finding.review_state != Finding.ReviewState.IN_REVIEW:
+        messages.error(request, 'Only findings in review can be approved.')
+        return redirect('vulns:detail', pk=pk)
+    finding.review_state = Finding.ReviewState.APPROVED
+    finding.reviewed_by = request.user
+    finding.reviewed_at = timezone.now()
+    finding.review_notes = ''
+    finding.save(update_fields=[
+        'review_state', 'reviewed_by', 'reviewed_at', 'review_notes', 'updated_at',
+    ])
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Approved finding: {finding.title}',
+    )
+    messages.success(request, 'Finding approved — now visible to clients.')
+    return redirect('vulns:detail', pk=pk)
+
+
+@login_required
+def request_changes(request, pk):
+    """Lead / reviewer moves IN_REVIEW → CHANGES_REQUESTED with feedback notes."""
+    finding = get_object_or_404(Finding, pk=pk)
+    engagement = finding.engagement
+    if not engagement.user_can_review(request.user):
+        messages.error(request, 'Only leads and reviewers can request changes.')
+        return redirect('vulns:detail', pk=pk)
+    if request.method != 'POST':
+        return redirect('vulns:detail', pk=pk)
+    if finding.review_state != Finding.ReviewState.IN_REVIEW:
+        messages.error(request, 'Only findings in review can have changes requested.')
+        return redirect('vulns:detail', pk=pk)
+    notes = (request.POST.get('review_notes') or '').strip()
+    if not notes:
+        messages.error(request, 'Please explain what needs to change.')
+        return redirect('vulns:detail', pk=pk)
+    finding.review_state = Finding.ReviewState.CHANGES_REQUESTED
+    finding.reviewed_by = request.user
+    finding.reviewed_at = timezone.now()
+    finding.review_notes = notes
+    finding.save(update_fields=[
+        'review_state', 'reviewed_by', 'reviewed_at', 'review_notes', 'updated_at',
+    ])
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Requested changes on finding: {finding.title}',
+    )
+    messages.success(request, 'Changes requested — author has been notified.')
+    return redirect('vulns:detail', pk=pk)
+
+
+@login_required
 @engagement_edit_required
 def tool_import(request, engagement_pk):
     engagement = request.engagement
@@ -297,6 +400,8 @@ EXPORT_FIELDS = [
 def export_csv(request, engagement_pk):
     engagement = request.engagement
     findings = engagement.findings.all()
+    if request.eng_role == 'client':
+        findings = findings.filter(review_state=Finding.ReviewState.APPROVED)
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.csv"'
@@ -317,6 +422,8 @@ def export_csv(request, engagement_pk):
 def export_json(request, engagement_pk):
     engagement = request.engagement
     findings = engagement.findings.all()
+    if request.eng_role == 'client':
+        findings = findings.filter(review_state=Finding.ReviewState.APPROVED)
 
     data = []
     for f in findings:

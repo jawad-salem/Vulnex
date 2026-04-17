@@ -96,8 +96,11 @@ def engagement_detail(request, pk):
     members = engagement.members.select_related('user').all()
     pending_invitations = engagement.invitations.filter(status='pending')
 
-    # Risk score
+    # Risk score — clients only see approved findings everywhere
     all_findings = engagement.findings.all()
+    if is_client:
+        from vulns.models import Finding
+        all_findings = all_findings.filter(review_state=Finding.ReviewState.APPROVED)
     risk_score = calculate_engagement_risk_score(all_findings)
     risk_label_text, risk_color = _risk_label(risk_score)
 
