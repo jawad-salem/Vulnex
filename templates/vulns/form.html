@@ -60,9 +60,16 @@
             {{ form.description }}
         </div>
 
-        <div class="form-group">
-            <label for="{{ form.status.id_for_label }}">Status</label>
-            {{ form.status }}
+        <div class="form-row" style="grid-template-columns:1fr 1fr">
+            <div class="form-group">
+                <label for="{{ form.status.id_for_label }}">Status</label>
+                {{ form.status }}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.assigned_to.id_for_label }}">Assigned to</label>
+                {{ form.assigned_to }}
+                <span class="form-help">Who owns driving this finding to remediation.</span>
+            </div>
         </div>
 
         <!-- Location with recon host link -->

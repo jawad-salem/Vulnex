@@ -50,6 +50,7 @@
                 <a href="{% url 'vulns:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'vulns' %}active{% endif %}">Findings</a>
                 {% if not is_client_role %}
                 <a href="{% url 'recon:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'recon' %}active{% endif %}">Recon</a>
+                <a href="{% url 'credentials:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'credentials' %}active{% endif %}">Credentials</a>
                 <a href="{% url 'methodology:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'methodology' %}active{% endif %}">Methodology</a>
                 {% endif %}
                 <a href="{% url 'reports:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">Reports</a>

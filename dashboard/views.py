@@ -1,7 +1,9 @@
+from datetime import timedelta
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
+from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from vulns.models import Finding
 from recon.models import DiscoveredHost
@@ -71,6 +73,24 @@ def home(request):
         severity__in=['critical', 'high'], status__in=['open', 'confirmed']
     ).select_related('engagement')[:10]
 
+    # SLA tracking — overdue + due-soon findings
+    today = timezone.now().date()
+    open_findings = findings.exclude(status__in=Finding.SLA_CLOSED_STATUSES)
+    overdue_findings = list(
+        open_findings.filter(due_date__lt=today)
+        .select_related('engagement')
+        .order_by('due_date')[:10]
+    )
+    overdue_count = open_findings.filter(due_date__lt=today).count()
+    due_soon_count = open_findings.filter(
+        due_date__gte=today, due_date__lte=today + timedelta(days=3),
+    ).count()
+
+    # Findings currently assigned to the logged-in user
+    my_open_findings = open_findings.filter(assigned_to=request.user)
+    my_assigned_count = my_open_findings.count()
+    my_assigned_overdue = my_open_findings.filter(due_date__lt=today).count()
+
     # Overall risk score
     overall_risk_score = calculate_engagement_risk_score(findings)
     risk_label, risk_color = _risk_label(overall_risk_score)
@@ -107,6 +127,12 @@ def home(request):
         'risk_label': risk_label,
         'risk_color': risk_color,
         'engagement_risks': engagement_risks,
+        'overdue_findings': overdue_findings,
+        'overdue_count': overdue_count,
+        'due_soon_count': due_soon_count,
+        'my_assigned_count': my_assigned_count,
+        'my_assigned_overdue': my_assigned_overdue,
+        'today': today,
     }
     return render(request, 'dashboard/home.html', context)
 

@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'recon',
     'methodology',
     'reports',
+    'credentials',
 ]
 
 MIDDLEWARE = [

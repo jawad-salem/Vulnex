@@ -49,6 +49,22 @@
         <div class="kpi-sub">{{ finding.updated_at|date:"M d" }}</div>
     </div>
     <div class="kpi-item">
+        <div class="kpi-label">SLA</div>
+        {% if finding.sla_status == 'closed' %}
+        <div class="kpi-value" style="font-size:16px;color:var(--success)">Closed</div>
+        <div class="kpi-sub">No SLA</div>
+        {% elif finding.sla_status == 'overdue' %}
+        <div class="kpi-value" style="font-size:18px;color:var(--critical)">Overdue</div>
+        <div class="kpi-sub" style="color:var(--critical)">{{ finding.overdue_days }} day{{ finding.overdue_days|pluralize }} past due</div>
+        {% elif finding.sla_status == 'due_soon' %}
+        <div class="kpi-value" style="font-size:18px;color:var(--warning)">{{ finding.days_until_due }} day{{ finding.days_until_due|pluralize }}</div>
+        <div class="kpi-sub">Due {{ finding.due_date|date:"M d" }}</div>
+        {% else %}
+        <div class="kpi-value" style="font-size:18px">{{ finding.days_until_due }} days</div>
+        <div class="kpi-sub">Due {{ finding.due_date|date:"M d" }}</div>
+        {% endif %}
+    </div>
+    <div class="kpi-item">
         <div class="kpi-label">Evidence</div>
         <div class="kpi-value">{{ evidence|length }}</div>
         <div class="kpi-sub">item{{ evidence|length|pluralize }}</div>
@@ -57,6 +73,11 @@
         <div class="kpi-label">Found by</div>
         <div class="kpi-value" style="font-size:16px">{{ finding.found_by|default:"—" }}</div>
         <div class="kpi-sub">{{ finding.tool_source|default:"manual" }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Assigned to</div>
+        <div class="kpi-value" style="font-size:16px">{% if finding.assigned_to %}{{ finding.assigned_to }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</div>
+        <div class="kpi-sub">{% if finding.assigned_to %}Owner{% else %}No owner yet{% endif %}</div>
     </div>
 </div>
 

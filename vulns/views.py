@@ -1,11 +1,13 @@
 import csv
 import json
+from datetime import timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.db.models import Q
+from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence, FindingTemplate
 from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm
@@ -22,12 +24,31 @@ def finding_list(request, engagement_pk):
 
     severity_filter = request.GET.get('severity')
     status_filter = request.GET.get('status')
+    sla_filter = request.GET.get('sla')
+    assigned_filter = request.GET.get('assigned')
     search = request.GET.get('q')
 
     if severity_filter:
         findings = findings.filter(severity=severity_filter)
     if status_filter:
         findings = findings.filter(status=status_filter)
+    if assigned_filter == 'me':
+        findings = findings.filter(assigned_to=request.user)
+    elif assigned_filter == 'unassigned':
+        findings = findings.filter(assigned_to__isnull=True)
+    elif assigned_filter:
+        findings = findings.filter(assigned_to_id=assigned_filter)
+    if sla_filter:
+        today = timezone.now().date()
+        open_statuses = ~Q(status__in=Finding.SLA_CLOSED_STATUSES)
+        if sla_filter == 'overdue':
+            findings = findings.filter(open_statuses, due_date__lt=today)
+        elif sla_filter == 'due_soon':
+            findings = findings.filter(
+                open_statuses, due_date__gte=today, due_date__lte=today + timedelta(days=3),
+            )
+        elif sla_filter == 'on_track':
+            findings = findings.filter(open_statuses, due_date__gt=today + timedelta(days=3))
     if search:
         findings = findings.filter(Q(title__icontains=search) | Q(description__icontains=search))
 
@@ -39,9 +60,18 @@ def finding_list(request, engagement_pk):
         qs_parts.append(f'severity={severity_filter}')
     if status_filter:
         qs_parts.append(f'status={status_filter}')
+    if sla_filter:
+        qs_parts.append(f'sla={sla_filter}')
+    if assigned_filter:
+        qs_parts.append(f'assigned={assigned_filter}')
     if search:
         qs_parts.append(f'q={search}')
     query_string = '&'.join(qs_parts) + ('&' if qs_parts else '')
+
+    # Assignable members for the filter dropdown — non-clients only
+    assignable_members = [
+        m for m in engagement.members.exclude(role='client').select_related('user')
+    ]
 
     context = {
         'engagement': engagement,
@@ -50,6 +80,9 @@ def finding_list(request, engagement_pk):
         'query_string': query_string,
         'severity_choices': Finding.Severity.choices,
         'status_choices': Finding.Status.choices,
+        'sla_filter': sla_filter,
+        'assigned_filter': assigned_filter,
+        'assignable_members': assignable_members,
         'can_edit': request.eng_role in ('admin', 'lead', 'pentester'),
     }
     return render(request, 'vulns/list.html', context)
@@ -125,6 +158,11 @@ def finding_create(request, engagement_pk):
                 engagement=engagement, user=request.user,
                 action=f'Added finding: {finding.title}'
             )
+            if finding.assigned_to:
+                ActivityLog.objects.create(
+                    engagement=engagement, user=request.user,
+                    action=f'Assigned finding "{finding.title}" to {finding.assigned_to}',
+                )
             messages.success(request, 'Finding created.')
             return redirect('vulns:detail', pk=finding.pk)
     else:
@@ -144,9 +182,19 @@ def finding_edit(request, pk):
         messages.error(request, 'You do not have edit permissions.')
         return redirect('vulns:detail', pk=pk)
     if request.method == 'POST':
+        previous_assignee = finding.assigned_to
         form = FindingForm(request.POST, instance=finding, engagement=engagement)
         if form.is_valid():
-            form.save()
+            updated = form.save()
+            if updated.assigned_to != previous_assignee:
+                ActivityLog.objects.create(
+                    engagement=engagement, user=request.user,
+                    action=(
+                        f'Reassigned finding "{updated.title}" '
+                        f'from {previous_assignee or "unassigned"} '
+                        f'to {updated.assigned_to or "unassigned"}'
+                    ),
+                )
             messages.success(request, 'Finding updated.')
             return redirect('vulns:detail', pk=pk)
     else:
@@ -240,6 +288,7 @@ EXPORT_FIELDS = [
     'endpoint', 'http_method', 'parameter', 'description',
     'proof_of_concept', 'remediation', 'cwe_id', 'tool_source',
     'affected_hosts', 'references', 'cvss_vector_string', 'created_at',
+    'due_date', 'sla_status',
 ]
 
 

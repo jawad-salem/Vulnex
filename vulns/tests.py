@@ -1,7 +1,9 @@
+from datetime import timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember
+from engagements.models import Engagement, EngagementMember, ActivityLog
 from .models import Finding
 
 
@@ -250,3 +252,262 @@ class RetestWorkflowTests(TestCase):
         })
         self.finding.refresh_from_db()
         self.assertEqual(self.finding.retest_status, 'not_retested')
+
+
+class SLATrackingTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user('pt', role='pentester', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='T', client_name='ACME', created_by=self.user,
+        )
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=self.user, role='lead',
+        )
+
+    def _make_finding(self, **kwargs):
+        defaults = {
+            'engagement': self.engagement,
+            'title': 'f',
+            'description': 'd',
+            'confidentiality_impact': 'H',
+            'integrity_impact': 'H',
+            'availability_impact': 'H',
+        }
+        defaults.update(kwargs)
+        return Finding.objects.create(**defaults)
+
+    def test_due_date_auto_set_from_severity(self):
+        """Critical findings get a 7-day SLA from creation."""
+        f = self._make_finding()
+        self.assertEqual(f.severity, 'critical')
+        expected = f.created_at.date() + timedelta(days=7)
+        self.assertEqual(f.due_date, expected)
+
+    def test_due_date_scales_with_severity(self):
+        """Lower severity = longer SLA window."""
+        low = self._make_finding(
+            attack_vector='P', attack_complexity='H',
+            privileges_required='H', user_interaction='R',
+            confidentiality_impact='L', integrity_impact='N', availability_impact='N',
+        )
+        self.assertEqual(low.severity, 'low')
+        self.assertEqual(low.due_date, low.created_at.date() + timedelta(days=60))
+
+    def test_due_date_recomputed_when_severity_changes(self):
+        """Reclassifying a critical as low should extend the SLA window."""
+        f = self._make_finding()
+        original_due = f.due_date
+        f.attack_vector = 'P'
+        f.attack_complexity = 'H'
+        f.privileges_required = 'H'
+        f.user_interaction = 'R'
+        f.confidentiality_impact = 'L'
+        f.integrity_impact = 'N'
+        f.availability_impact = 'N'
+        f.save()
+        self.assertEqual(f.severity, 'low')
+        self.assertEqual(f.due_date, f.created_at.date() + timedelta(days=60))
+        self.assertGreater(f.due_date, original_due)
+
+    def test_is_overdue_true_for_past_due_date(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() - timedelta(days=1)
+        f.save()
+        self.assertTrue(f.is_overdue)
+        self.assertEqual(f.sla_status, 'overdue')
+
+    def test_is_overdue_false_when_remediated(self):
+        """Closed findings are never overdue, even if past due date."""
+        f = self._make_finding()
+        f.due_date = timezone.now().date() - timedelta(days=10)
+        f.status = Finding.Status.REMEDIATED
+        f.save()
+        self.assertFalse(f.is_overdue)
+        self.assertEqual(f.sla_status, 'closed')
+
+    def test_is_overdue_false_for_accepted_risk(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() - timedelta(days=5)
+        f.status = Finding.Status.ACCEPTED
+        f.save()
+        self.assertFalse(f.is_overdue)
+
+    def test_sla_status_due_soon_within_3_days(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() + timedelta(days=2)
+        f.save()
+        self.assertEqual(f.sla_status, 'due_soon')
+
+    def test_sla_status_on_track_beyond_3_days(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() + timedelta(days=10)
+        f.save()
+        self.assertEqual(f.sla_status, 'on_track')
+
+    def test_overdue_days_positive_for_overdue(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() - timedelta(days=5)
+        f.save()
+        self.assertEqual(f.overdue_days, 5)
+
+    def test_overdue_days_zero_when_not_overdue(self):
+        f = self._make_finding()
+        f.due_date = timezone.now().date() + timedelta(days=5)
+        f.save()
+        self.assertEqual(f.overdue_days, 0)
+
+    def test_finding_list_overdue_filter(self):
+        """?sla=overdue should only show open findings past due date."""
+        overdue = self._make_finding(title='Overdue one')
+        overdue.due_date = timezone.now().date() - timedelta(days=1)
+        overdue.save()
+        on_track = self._make_finding(title='On track one')
+        on_track.due_date = timezone.now().date() + timedelta(days=20)
+        on_track.save()
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:list', args=[self.engagement.pk]) + '?sla=overdue'
+        )
+        self.assertContains(resp, 'Overdue one')
+        self.assertNotContains(resp, 'On track one')
+
+    def test_overdue_filter_excludes_closed(self):
+        """Remediated findings should not appear in overdue filter."""
+        f = self._make_finding(title='Was overdue')
+        f.due_date = timezone.now().date() - timedelta(days=10)
+        f.status = Finding.Status.REMEDIATED
+        f.save()
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:list', args=[self.engagement.pk]) + '?sla=overdue'
+        )
+        self.assertNotContains(resp, 'Was overdue')
+
+
+class FindingAssignmentTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
+        self.alice = User.objects.create_user('alice', role='pentester', password='testpass1')
+        self.bob = User.objects.create_user('bob', role='pentester', password='testpass1')
+        self.cli = User.objects.create_user('cli', role='client', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='T', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.alice, role='pentester')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.bob, role='pentester')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.cli, role='client')
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='SQLi in login',
+            description='x', found_by=self.lead, confidentiality_impact='H',
+        )
+
+    def test_default_assignee_is_none(self):
+        self.assertIsNone(self.finding.assigned_to)
+
+    def test_assigned_findings_reverse_relation(self):
+        self.finding.assigned_to = self.alice
+        self.finding.save()
+        self.assertIn(self.finding, self.alice.assigned_findings.all())
+
+    def test_assign_logs_activity_on_create(self):
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.post(
+            reverse('vulns:create', args=[self.engagement.pk]),
+            self._form_data(title='New one', assigned_to=self.alice.pk),
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                engagement=self.engagement,
+                action__icontains=f'Assigned finding "New one" to {self.alice}',
+            ).exists()
+        )
+
+    def test_reassignment_logs_activity_on_edit(self):
+        self.finding.assigned_to = self.alice
+        self.finding.save()
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.post(
+            reverse('vulns:edit', args=[self.finding.pk]),
+            self._form_data(title=self.finding.title, assigned_to=self.bob.pk),
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(
+            ActivityLog.objects.filter(
+                engagement=self.engagement, action__icontains='Reassigned finding',
+            ).exists()
+        )
+
+    def test_no_log_when_assignee_unchanged(self):
+        self.finding.assigned_to = self.alice
+        self.finding.save()
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(
+            reverse('vulns:edit', args=[self.finding.pk]),
+            self._form_data(title=self.finding.title, assigned_to=self.alice.pk),
+        )
+        self.assertFalse(
+            ActivityLog.objects.filter(action__icontains='Reassigned').exists()
+        )
+
+    def test_assigned_to_me_filter(self):
+        other = Finding.objects.create(
+            engagement=self.engagement, title='Other',
+            description='x', found_by=self.lead,
+            assigned_to=self.bob, confidentiality_impact='H',
+        )
+        self.finding.assigned_to = self.alice
+        self.finding.save()
+        self.client.login(username='alice', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:list', args=[self.engagement.pk]) + '?assigned=me'
+        )
+        self.assertContains(resp, 'SQLi in login')
+        self.assertNotContains(resp, 'Other')
+
+    def test_unassigned_filter(self):
+        """?assigned=unassigned shows only findings with no owner."""
+        self.finding.assigned_to = self.alice
+        self.finding.save()
+        Finding.objects.create(
+            engagement=self.engagement, title='Orphan',
+            description='x', found_by=self.lead, confidentiality_impact='H',
+        )
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:list', args=[self.engagement.pk]) + '?assigned=unassigned'
+        )
+        self.assertContains(resp, 'Orphan')
+        self.assertNotContains(resp, 'SQLi in login')
+
+    def test_client_not_in_assignable_list(self):
+        """Form should not offer clients as assignable members."""
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.get(reverse('vulns:create', args=[self.engagement.pk]))
+        # The form's assigned_to dropdown queryset excludes clients
+        form = resp.context['form']
+        assignable = list(form.fields['assigned_to'].queryset)
+        self.assertIn(self.alice, assignable)
+        self.assertIn(self.bob, assignable)
+        self.assertNotIn(self.cli, assignable)
+
+    def _form_data(self, **overrides):
+        """Minimum valid form payload for a Finding."""
+        data = {
+            'title': 'Finding title',
+            'description': 'desc',
+            'status': 'open',
+            'attack_vector': 'N',
+            'attack_complexity': 'L',
+            'privileges_required': 'N',
+            'user_interaction': 'N',
+            'scope': 'U',
+            'confidentiality_impact': 'H',
+            'integrity_impact': 'H',
+            'availability_impact': 'H',
+        }
+        data.update({k: v for k, v in overrides.items() if v is not None})
+        return data

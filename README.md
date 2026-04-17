@@ -19,6 +19,15 @@ A full-featured penetration testing workflow platform built with Django. Manage 
 - Evidence upload (images and files) per finding
 - Export findings to **CSV** or **JSON**
 - Severity auto-assigned from CVSS vectors
+- **SLA tracking** — severity-based remediation deadlines (Critical 7d / High 14d / Medium 30d / Low 60d / Info 90d) with overdue detection and dashboard widget
+- **Finding assignment** — assign individual findings to team members; filter by assignee; personal "assigned to me" dashboard widget
+
+### Credentials vault
+- Store passwords, hashes, API tokens, SSH keys, and session cookies captured during an engagement
+- Encrypted at rest with Fernet (AES-128-CBC + HMAC); only ciphertext hits the database
+- Masked by default in the UI; one-click reveal is recorded to the engagement activity log
+- Hidden from clients — only lead / pentester / reviewer roles can see the vault
+- Link credentials to discovered hosts and track validation status (untested / valid / invalid / expired)
 
 ### Reconnaissance
 - Built-in Python scanners (no external tools required):

@@ -17,6 +17,7 @@ urlpatterns = [
     path('recon/', include('recon.urls')),
     path('methodology/', include('methodology.urls')),
     path('reports/', include('reports.urls')),
+    path('credentials/', include('credentials.urls')),
     path('', RedirectView.as_view(url='/dashboard/', permanent=False)),
 ]
 

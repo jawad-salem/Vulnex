@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from .models import Finding, Evidence
 from recon.models import DiscoveredHost
 
@@ -10,6 +11,8 @@ class FindingForm(forms.ModelForm):
             'title', 'description',
             # Host link
             'discovered_host',
+            # Assignment
+            'assigned_to',
             # Location
             'host', 'port', 'url', 'endpoint', 'http_method', 'parameter',
             # Additional
@@ -44,11 +47,22 @@ class FindingForm(forms.ModelForm):
             self.fields['discovered_host'].queryset = DiscoveredHost.objects.filter(
                 engagement=engagement
             )
+            # Scope assignee to non-client members of this engagement
+            User = self.fields['assigned_to'].queryset.model
+            member_ids = engagement.members.exclude(role='client').values_list(
+                'user_id', flat=True,
+            )
+            self.fields['assigned_to'].queryset = User.objects.filter(
+                pk__in=list(member_ids)
+            )
         else:
             self.fields['discovered_host'].queryset = DiscoveredHost.objects.none()
+            self.fields['assigned_to'].queryset = self.fields['assigned_to'].queryset.none()
 
         self.fields['discovered_host'].required = False
         self.fields['discovered_host'].empty_label = '— Select from recon (optional) —'
+        self.fields['assigned_to'].required = False
+        self.fields['assigned_to'].empty_label = '— Unassigned —'
 
 
 class EvidenceForm(forms.ModelForm):

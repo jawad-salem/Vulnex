@@ -29,6 +29,16 @@
         <div class="stat-value critical">{{ severity_counts.critical }}</div>
         <div class="stat-sublabel high">{{ severity_counts.high }} high</div>
     </div>
+    <div class="stat-card">
+        <div class="stat-label">Overdue findings</div>
+        <div class="stat-value{% if overdue_count %} critical{% endif %}">{{ overdue_count }}</div>
+        <div class="stat-sublabel{% if due_soon_count %} high{% endif %}">{{ due_soon_count }} due soon</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Assigned to me</div>
+        <div class="stat-value">{{ my_assigned_count }}</div>
+        <div class="stat-sublabel{% if my_assigned_overdue %} critical{% endif %}">{{ my_assigned_overdue }} overdue</div>
+    </div>
 </div>
 
 <!-- Charts row -->
@@ -59,6 +69,31 @@
         <div class="chart-container-wide">
             <canvas id="engChart"></canvas>
         </div>
+    </div>
+</div>
+{% endif %}
+
+{% if overdue_findings %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Overdue findings</h2>
+        <span class="text-xs text-muted">{{ overdue_count }} past due</span>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>Due</th><th>Overdue</th></tr></thead>
+            <tbody>
+            {% for f in overdue_findings %}
+            <tr>
+                <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
+                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
+                <td class="text-sm text-secondary">{{ f.due_date|date:"M d, Y" }}</td>
+                <td><span class="badge badge-overdue">{{ f.overdue_days }}d</span></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}

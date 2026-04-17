@@ -1,6 +1,8 @@
+from datetime import timedelta
 from django.db import models
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from engagements.models import Engagement
 from recon.models import DiscoveredHost
 import uuid
@@ -104,6 +106,11 @@ class Finding(models.Model):
 
     # Metadata
     found_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='assigned_findings',
+        help_text='Team member responsible for this finding',
+    )
     tool_source = models.CharField(max_length=100, blank=True, help_text='e.g. Nmap, Burp, Manual')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -120,6 +127,21 @@ class Finding(models.Model):
         null=True, blank=True, related_name='retested_findings',
     )
 
+    # SLA — remediation deadline driven by severity
+    due_date = models.DateField(null=True, blank=True)
+
+    # Days allowed to remediate, per severity. Clock starts at discovery.
+    SLA_DAYS = {
+        'critical': 7,
+        'high': 14,
+        'medium': 30,
+        'low': 60,
+        'info': 90,
+    }
+
+    # Statuses where the SLA clock has stopped — they're closed, not overdue
+    SLA_CLOSED_STATUSES = frozenset(('remediated', 'false_positive', 'accepted'))
+
     class Meta:
         ordering = ['-created_at']
 
@@ -128,6 +150,39 @@ class Finding(models.Model):
 
     def get_absolute_url(self):
         return reverse('vulns:detail', kwargs={'pk': self.pk})
+
+    @property
+    def is_overdue(self):
+        if not self.due_date or self.status in self.SLA_CLOSED_STATUSES:
+            return False
+        return self.due_date < timezone.now().date()
+
+    @property
+    def days_until_due(self):
+        if not self.due_date:
+            return None
+        return (self.due_date - timezone.now().date()).days
+
+    @property
+    def overdue_days(self):
+        """Positive number of days overdue, or 0 if on track."""
+        if not self.is_overdue:
+            return 0
+        return (timezone.now().date() - self.due_date).days
+
+    @property
+    def sla_status(self):
+        """Return 'closed', 'overdue', 'due_soon' (≤3 days), or 'on_track'."""
+        if self.status in self.SLA_CLOSED_STATUSES:
+            return 'closed'
+        if not self.due_date:
+            return 'on_track'
+        days = self.days_until_due
+        if days < 0:
+            return 'overdue'
+        if days <= 3:
+            return 'due_soon'
+        return 'on_track'
 
     @property
     def severity_color(self):
@@ -261,6 +316,9 @@ class Finding(models.Model):
             self.severity = 'low'
         else:
             self.severity = 'info'
+        # SLA due date — clock starts at discovery (created_at), scales with severity
+        base_date = self.created_at.date() if self.created_at else timezone.now().date()
+        self.due_date = base_date + timedelta(days=self.SLA_DAYS.get(self.severity, 90))
         super().save(*args, **kwargs)
 
 

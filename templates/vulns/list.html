@@ -42,6 +42,20 @@
             <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
             {% endfor %}
         </select>
+        <select name="sla" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+            <option value="">All SLA</option>
+            <option value="overdue" {% if sla_filter == 'overdue' %}selected{% endif %}>Overdue</option>
+            <option value="due_soon" {% if sla_filter == 'due_soon' %}selected{% endif %}>Due soon (≤3d)</option>
+            <option value="on_track" {% if sla_filter == 'on_track' %}selected{% endif %}>On track</option>
+        </select>
+        <select name="assigned" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+            <option value="">All assignees</option>
+            <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
+            <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
+            {% for m in assignable_members %}
+            <option value="{{ m.user.pk }}" {% if assigned_filter == m.user.pk|stringformat:"s" %}selected{% endif %}>{{ m.user }}</option>
+            {% endfor %}
+        </select>
         <button type="submit" class="btn">Filter</button>
     </form>
 </div>
@@ -57,6 +71,8 @@
                     <th>Severity</th>
                     <th>CVSS</th>
                     <th>Status</th>
+                    <th>Assignee</th>
+                    <th>Due</th>
                     <th>Date</th>
                 </tr>
             </thead>
@@ -68,6 +84,18 @@
                 <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
                 <td class="text-mono font-semibold">{{ f.cvss_score|floatformat:1 }}</td>
                 <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
+                <td class="text-sm">{% if f.assigned_to %}{{ f.assigned_to }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</td>
+                <td class="text-sm">
+                    {% if f.sla_status == 'closed' %}
+                        <span class="text-muted">—</span>
+                    {% elif f.sla_status == 'overdue' %}
+                        <span class="badge badge-overdue" title="Due {{ f.due_date|date:'M d, Y' }}">Overdue {{ f.overdue_days }}d</span>
+                    {% elif f.sla_status == 'due_soon' %}
+                        <span class="badge badge-due_soon" title="Due {{ f.due_date|date:'M d, Y' }}">{{ f.days_until_due }}d left</span>
+                    {% else %}
+                        <span class="text-secondary">{{ f.due_date|date:"M d" }}</span>
+                    {% endif %}
+                </td>
                 <td class="text-sm text-secondary">{{ f.created_at|date:"M d, Y" }}</td>
             </tr>
             {% endfor %}

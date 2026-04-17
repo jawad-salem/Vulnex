@@ -422,6 +422,10 @@ td a { transition: color 0.15s; }
 .badge-partial { background: rgba(227, 179, 65, 0.15); color: var(--warning); }
 .badge-still_present { background: rgba(240, 88, 83, 0.15); color: var(--critical); }
 
+.badge-overdue { background: rgba(240, 88, 83, 0.15); color: var(--critical); }
+.badge-due_soon { background: rgba(227, 179, 65, 0.15); color: var(--warning); }
+.badge-on_track { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+
 .badge-planning { background: rgba(139, 148, 158, 0.15); color: var(--info); }
 .badge-recon, .badge-scanning { background: rgba(88, 166, 255, 0.15); color: var(--low); }
 .badge-exploitation, .badge-post_exploitation { background: rgba(240, 146, 54, 0.15); color: var(--high); }
