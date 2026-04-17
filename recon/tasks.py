@@ -137,6 +137,7 @@ def run_pipeline(self, pipeline_id):
                 # Create a ReconScan record for each step+target
                 scan = ReconScan.objects.create(
                     engagement=pipeline.engagement,
+                    pipeline=pipeline,
                     scan_type=step,
                     target=target,
                     started_by=pipeline.started_by,

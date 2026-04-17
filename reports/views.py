@@ -32,10 +32,27 @@ def _rate_limit_report(user_id: int) -> bool:
 @engagement_access(allow_client=True)
 def report_dashboard(request, engagement_pk):
     engagement = request.engagement
-    reports = engagement.reports.all()
+    reports = list(engagement.reports.all())
+
+    # Collapse adjacent same-type reports created within 60s into a single
+    # stack so long generation runs don't dominate the list. Newest of the
+    # run stays on top; the rest are nested under a "stacked" attr.
+    STACK_WINDOW = 60  # seconds
+    report_groups: list[dict] = []
+    for r in reports:
+        if report_groups:
+            prev = report_groups[-1]
+            same_type = prev['primary'].report_type == r.report_type
+            gap = (prev['primary'].created_at - r.created_at).total_seconds()
+            if same_type and 0 <= gap <= STACK_WINDOW:
+                prev['stacked'].append(r)
+                continue
+        report_groups.append({'primary': r, 'stacked': []})
+
     context = {
         'engagement': engagement,
         'reports': reports,
+        'report_groups': report_groups,
         'can_generate': request.eng_role in ('admin', 'lead', 'pentester'),
     }
     return render(request, 'reports/dashboard.html', context)

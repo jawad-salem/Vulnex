@@ -22,6 +22,11 @@ class ReconScan(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='scans')
+    pipeline = models.ForeignKey(
+        'ScanPipeline', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='scans',
+        help_text='Pipeline this scan was created by (null for ad-hoc scans).',
+    )
     scan_type = models.CharField(max_length=20, choices=ScanType.choices)
     target = models.CharField(max_length=500)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)

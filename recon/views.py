@@ -16,7 +16,7 @@ from accounts.decorators import engagement_access, engagement_edit_required
 @engagement_access(allow_client=False)
 def recon_dashboard(request, engagement_pk):
     engagement = request.engagement
-    scans = engagement.scans.all()
+    scans = engagement.scans.all().select_related('pipeline')
     hosts = engagement.discovered_hosts.all()
     scan_form = ReconScanForm()
     import_form = NmapImportForm()
@@ -26,9 +26,32 @@ def recon_dashboard(request, engagement_pk):
     pipelines = engagement.scan_pipelines.all()[:10]
     pipeline_count = engagement.scan_pipelines.count()
 
+    # Build grouped "recent scans" list — scans born from the same pipeline
+    # collapse into a single parent row; standalone scans render as-is.
+    # We walk the ordered scan list and group consecutive rows with matching
+    # pipeline to preserve the "most recent first" flow.
+    recent_scan_groups: list[dict] = []
+    for scan in scans[:30]:
+        if scan.pipeline_id:
+            last = recent_scan_groups[-1] if recent_scan_groups else None
+            if last and last.get('pipeline_id') == scan.pipeline_id:
+                last['scans'].append(scan)
+                continue
+            recent_scan_groups.append({
+                'kind': 'pipeline',
+                'pipeline': scan.pipeline,
+                'pipeline_id': scan.pipeline_id,
+                'scans': [scan],
+            })
+        else:
+            recent_scan_groups.append({'kind': 'scan', 'scan': scan})
+        if len(recent_scan_groups) >= 10:
+            break
+
     context = {
         'engagement': engagement,
         'scans': scans,
+        'recent_scan_groups': recent_scan_groups,
         'hosts': hosts,
         'scan_form': scan_form,
         'import_form': import_form,

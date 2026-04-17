@@ -25,7 +25,7 @@ class AdminUserForm(forms.ModelForm):
     """Form for admins to create/edit users."""
     password1 = forms.CharField(
         label='Password', widget=forms.PasswordInput(attrs={'class': 'form-input'}),
-        required=False, help_text='Leave blank to keep current password (edit only).',
+        required=False, help_text='Leave blank to keep the current password.',
     )
     password2 = forms.CharField(
         label='Confirm password', widget=forms.PasswordInput(attrs={'class': 'form-input'}),

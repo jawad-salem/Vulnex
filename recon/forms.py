@@ -12,6 +12,14 @@ class ReconScanForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scan_type = self.fields.get('scan_type')
+        if scan_type is not None:
+            choices = list(scan_type.choices)
+            if choices and choices[0][0] in ('', None):
+                choices[0] = ('', 'Select a scan type…')
+            else:
+                choices = [('', 'Select a scan type…')] + choices
+            scan_type.choices = choices
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
 
@@ -126,6 +134,14 @@ class ScheduledScanForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        scan_type = self.fields.get('scan_type')
+        if scan_type is not None:
+            choices = list(scan_type.choices)
+            if choices and choices[0][0] in ('', None):
+                choices[0] = ('', 'Select a scan type…')
+            else:
+                choices = [('', 'Select a scan type…')] + choices
+            scan_type.choices = choices
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
 

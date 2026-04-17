@@ -50,6 +50,12 @@ class CredentialForm(forms.ModelForm):
         self.fields['host'].required = False
         self.fields['host'].empty_label = '— No host (optional) —'
 
+        # Placeholders already illustrate examples — silence the model
+        # help_text so the hint doesn't echo the placeholder on the form.
+        for name in ('hash_type', 'service', 'source'):
+            if name in self.fields:
+                self.fields[name].help_text = ''
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         plaintext = self.cleaned_data.get('secret', '')
