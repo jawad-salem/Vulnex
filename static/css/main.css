@@ -914,23 +914,50 @@ select.form-input.form-input--compact {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
+/* ── Overview grid (Scope + Quick actions) ── */
+.overview-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 16px;
+}
+.overview-grid > .overview-card {
+    margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
+}
+.overview-grid > .overview-card > .mono-block,
+.overview-grid > .overview-card > .scope-empty {
+    flex: 1;
+    min-height: 0;
+}
+.overview-grid > .overview-card--actions .quick-actions {
+    flex: 1;
+}
+@media (max-width: 900px) {
+    .overview-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Quick actions (overview) ── */
 .quick-actions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
 }
 .quick-action {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
+    padding: 11px 14px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text-primary);
     transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
     position: relative;
+    min-height: 54px;
+    flex-shrink: 0;
 }
 .quick-action::after {
     content: '';
@@ -940,8 +967,9 @@ select.form-input.form-input--compact {
     border-right: 1.5px solid var(--text-muted);
     border-top: 1.5px solid var(--text-muted);
     transform: rotate(45deg) translateX(-2px);
-    opacity: 0;
+    opacity: 0.5;
     transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    flex-shrink: 0;
 }
 .quick-action:hover {
     background: var(--bg-hover);
@@ -962,19 +990,41 @@ select.form-input.form-input--compact {
     background: rgba(122, 96, 224, 0.18);
     color: var(--accent-light);
 }
+.quick-action.qa-primary::after {
+    opacity: 0.9;
+    border-color: var(--accent-light);
+}
 .qa-icon {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     background: var(--bg-input);
-    border-radius: 6px;
+    border-radius: 7px;
     color: var(--accent-light);
     flex-shrink: 0;
 }
 .qa-icon svg { width: 16px; height: 16px; }
-.qa-label { font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
+.qa-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+.qa-label { font-size: 13px; font-weight: 600; letter-spacing: 0.1px; line-height: 1.3; }
+.qa-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.1px;
+    font-weight: 400;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.quick-action:hover .qa-sub { color: var(--text-secondary); }
 
 /* ── Scope targets ── */
 .scope-target {
@@ -987,7 +1037,7 @@ select.form-input.form-input--compact {
     color: var(--text-primary);
 }
 .scope-empty {
-    padding: 22px 18px 20px;
+    padding: 16px 16px 16px;
     border: 1px dashed var(--border-light);
     border-radius: var(--radius);
     background:
@@ -999,12 +1049,14 @@ select.form-input.form-input--compact {
             rgba(122, 96, 224, 0.025) 8px
         );
     text-align: left;
+    display: flex;
+    flex-direction: column;
 }
 .scope-empty-prompt {
     font-family: var(--font-mono);
     font-size: 12.5px;
     color: var(--text-secondary);
-    margin-bottom: 4px;
+    margin-bottom: 10px;
     letter-spacing: 0.2px;
 }
 .scope-empty-prompt::before {
@@ -1024,11 +1076,78 @@ select.form-input.form-input--compact {
 @keyframes scope-cursor-blink {
     50% { opacity: 0; }
 }
+.scope-empty-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+.scope-empty-row {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 5px 9px;
+    background: color-mix(in srgb, var(--bg-input) 55%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--border) 55%, transparent);
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.55;
+}
+.scope-empty-row-text {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.scope-empty-row-tag {
+    font-family: var(--font-sans, inherit);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: color-mix(in srgb, var(--accent-light) 80%, var(--text-muted));
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    border-radius: 3px;
+    padding: 2px 6px;
+    flex-shrink: 0;
+}
+.scope-empty-foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
 .scope-empty-hint {
     font-size: 11.5px;
     color: var(--text-muted);
-    margin: 6px 0 14px;
+    margin: 0;
     line-height: 1.5;
+}
+.scope-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--bg-input) 60%, transparent);
+}
+.scope-tag--empty::before {
+    content: '';
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-right: 6px;
+    vertical-align: 1px;
 }
 
 /* ── Notes ── */
