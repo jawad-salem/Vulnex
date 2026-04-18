@@ -35,7 +35,6 @@
                     <th>Action</th>
                     <th>Target</th>
                     <th>Details</th>
-                    <th>IP</th>
                 </tr>
             </thead>
             <tbody>
@@ -54,7 +53,6 @@
                 <td class="text-xs text-muted">
                     {% for k, v in log.details.items %}{{ k }}: {{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}
                 </td>
-                <td class="text-mono text-sm">{{ log.ip_address|default:"—" }}</td>
             </tr>
             {% endfor %}
             </tbody>

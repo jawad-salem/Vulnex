@@ -1,6 +1,21 @@
 # Vulnex
 
+[![Tests](https://github.com/jawad-salem/Vulnex/actions/workflows/tests.yml/badge.svg)](https://github.com/jawad-salem/Vulnex/actions/workflows/tests.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Django 5.x](https://img.shields.io/badge/django-5.x-092e20.svg)](https://www.djangoproject.com/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A full-featured penetration testing workflow platform built with Django. Manage engagements, track vulnerabilities, run reconnaissance scans, follow testing methodologies, and generate professional PDF reports — all from a single dark-themed interface.
+
+## Why Vulnex?
+
+Most open-source tools in this space are one slice: reporting (Dradis, PwnDoc) or vulnerability databases (DefectDojo). Vulnex is a **pentest workbench** — the full loop, from engagement kickoff to retest closure, in one app:
+
+- **End-to-end workflow** — engagement → recon → methodology → findings → peer review → PDF → retest
+- **Integrated recon with scheduling** — Celery-backed scan pipelines, not just ingestion of scanner output
+- **First-class peer review** — findings move `DRAFT → IN_REVIEW → APPROVED` before clients see them
+- **Encrypted credentials vault** — Fernet at rest, audit-logged reveals, role-gated access
+- **Modern UI** — dark terminal aesthetic, designed rather than Bootstrap-defaulted
 
 ## Features
 

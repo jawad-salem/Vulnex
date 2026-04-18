@@ -70,7 +70,6 @@ class AuditLog(models.Model):
         help_text='Subject of the action — username, engagement name, report id, etc.',
     )
     details = models.JSONField(default=dict, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -87,18 +86,15 @@ class AuditLog(models.Model):
     @classmethod
     def record(cls, actor, action, target='', details=None, request=None):
         """Helper to create an audit entry. Silently no-ops on failure so
-        callers aren't forced to wrap every event in try/except."""
-        ip = None
-        if request is not None:
-            xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
-            ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
+        callers aren't forced to wrap every event in try/except. The `request`
+        arg is kept for API compatibility and future use (e.g. deriving actor
+        from request.user in contexts where `actor` is omitted)."""
         try:
             return cls.objects.create(
                 actor=actor if actor and getattr(actor, 'is_authenticated', False) else None,
                 action=action,
                 target=target or '',
                 details=details or {},
-                ip_address=ip,
             )
         except Exception:
             return None

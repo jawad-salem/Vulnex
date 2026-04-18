@@ -44,7 +44,7 @@ def _maybe_promote_global_role(user, engagement_role, actor, request):
     previous = user.role
     user.role = target
     user.save(update_fields=['role'])
-    AuditLog.objects.create(
+    AuditLog.record(
         actor=actor,
         action=AuditLog.Action.USER_ROLE_CHANGE,
         target=user.username,
@@ -53,7 +53,7 @@ def _maybe_promote_global_role(user, engagement_role, actor, request):
             'to': target,
             'reason': 'engagement_invitation',
         },
-        ip_address=request.META.get('REMOTE_ADDR') if request else None,
+        request=request,
     )
     return target
 
