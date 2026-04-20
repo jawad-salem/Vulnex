@@ -183,6 +183,64 @@ class InvitationFlowTests(TestCase):
         invitation.refresh_from_db()
         self.assertEqual(invitation.status, 'accepted')
 
+    def test_accept_invitation_does_not_promote_global_role(self):
+        """Step 1.4 — a Client invited as 'lead' on engagement B must keep
+        role='client' globally and only gain lead privileges on engagement B.
+        Prior behavior (_maybe_promote_global_role) leaked privilege across
+        engagements.
+        """
+        client_user = User.objects.create_user(
+            'clientuser', role='client', password='testpass1',
+            email='clientuser@test.com',
+        )
+        engagement_b = Engagement.objects.create(
+            name='Other', client_name='OtherCo', created_by=self.admin,
+        )
+        invitation = Invitation.objects.create(
+            engagement=engagement_b, email='clientuser@test.com',
+            role='lead', invited_by=self.admin,
+        )
+        self.client.login(username='clientuser', password='testpass1')
+        resp = self.client.get(
+            reverse('engagements:accept_invitation', args=[invitation.token])
+        )
+        self.assertEqual(resp.status_code, 302)
+
+        client_user.refresh_from_db()
+        self.assertEqual(client_user.role, 'client')  # global role untouched
+        self.assertTrue(
+            EngagementMember.objects.filter(
+                engagement=engagement_b, user=client_user, role='lead',
+            ).exists()
+        )
+        # No USER_ROLE_CHANGE audit entry should have been written.
+        from accounts.models import AuditLog
+        self.assertFalse(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.USER_ROLE_CHANGE,
+                target='clientuser',
+            ).exists()
+        )
+
+    def test_invite_existing_user_does_not_promote_global_role(self):
+        """Admin inviting an existing Client as 'pentester' on engagement A
+        must not change the client's global role."""
+        client_user = User.objects.create_user(
+            'cli2', role='client', password='testpass1', email='cli2@test.com',
+        )
+        self.client.login(username='admin', password='testpass1')
+        self.client.post(reverse('engagements:invite', args=[self.engagement.pk]), {
+            'email': 'cli2@test.com',
+            'role': 'pentester',
+        })
+        client_user.refresh_from_db()
+        self.assertEqual(client_user.role, 'client')
+        self.assertTrue(
+            EngagementMember.objects.filter(
+                engagement=self.engagement, user=client_user, role='pentester',
+            ).exists()
+        )
+
     def test_accept_invitation_wrong_email_blocked(self):
         """Logged-in user with wrong email should be blocked."""
         User.objects.create_user(

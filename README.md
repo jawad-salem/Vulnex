@@ -215,7 +215,7 @@ Vulnex/
 - If the email matches an existing user, they're added immediately
 - Otherwise, an invitation email is sent with a secure token link
 - New users can create their account directly from the invitation link — no admin intervention needed
-- Account role is automatically set based on the engagement role (e.g., invited as Client → Client platform role)
+- Accepting an invitation only grants access to **that engagement**; platform-wide role (Admin / Pentester / Reviewer / Client) is never changed by an invitation. Newly-created accounts default to the Client platform role and must be promoted by an admin via the Users page if they need wider access.
 
 ### Recon ↔ Findings
 - Link findings to discovered hosts from recon

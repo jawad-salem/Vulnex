@@ -15,49 +15,6 @@ from accounts.decorators import role_required, engagement_access, engagement_edi
 from accounts.models import AuditLog
 
 
-# Map engagement role to global platform role. A 'lead' on an engagement is a
-# pentester at the platform level; other engagement roles map 1:1.
-ROLE_MAP = {
-    'client': 'client',
-    'reviewer': 'reviewer',
-    'pentester': 'pentester',
-    'lead': 'pentester',
-}
-
-# Privilege ranking for global roles — higher index wins. Used to decide
-# whether an invitation should promote an existing user's global role.
-_GLOBAL_ROLE_RANK = {'client': 1, 'reviewer': 2, 'pentester': 3, 'admin': 4}
-
-
-def _maybe_promote_global_role(user, engagement_role, actor, request):
-    """If the engagement role maps to a higher global role than the user
-    currently holds, promote the user and write an AuditLog entry. Admins are
-    never downgraded. Returns the new role if promoted, else None.
-    """
-    target = ROLE_MAP.get(engagement_role)
-    if not target:
-        return None
-    current_rank = _GLOBAL_ROLE_RANK.get(user.role, 0)
-    target_rank = _GLOBAL_ROLE_RANK.get(target, 0)
-    if target_rank <= current_rank:
-        return None
-    previous = user.role
-    user.role = target
-    user.save(update_fields=['role'])
-    AuditLog.record(
-        actor=actor,
-        action=AuditLog.Action.USER_ROLE_CHANGE,
-        target=user.username,
-        details={
-            'from': previous,
-            'to': target,
-            'reason': 'engagement_invitation',
-        },
-        request=request,
-    )
-    return target
-
-
 @login_required
 def engagement_list(request):
     if request.user.role == 'admin':
@@ -308,21 +265,11 @@ def invite_member(request, pk):
                 )
                 invitation.status = 'accepted'
                 invitation.save()
-                promoted = _maybe_promote_global_role(
-                    existing_user, role, actor=request.user, request=request,
-                )
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
                 action=f'Added {existing_user} as {invitation.get_role_display()}'
             )
-            if promoted:
-                messages.success(
-                    request,
-                    f'{email} added as {invitation.get_role_display()} '
-                    f'(global role promoted to {promoted}).',
-                )
-            else:
-                messages.success(request, f'{email} added as {invitation.get_role_display()}.')
+            messages.success(request, f'{email} added as {invitation.get_role_display()}.')
         else:
             # Send invitation email
             invite_url = f'{settings.SITE_URL}/engagements/join/{invitation.token}/'
@@ -430,7 +377,9 @@ def accept_invitation(request, token):
             messages.error(request, f'This invitation was sent to {invitation.email}. Please log in with that account.')
             return redirect('dashboard:home')
 
-        # Accept: create membership (atomic to prevent race conditions)
+        # Accept: create membership (atomic to prevent race conditions). The
+        # global role on request.user is intentionally left alone — only an
+        # admin can change that via accounts.views.user_edit.
         with transaction.atomic():
             EngagementMember.objects.get_or_create(
                 engagement=invitation.engagement,
@@ -439,23 +388,12 @@ def accept_invitation(request, token):
             )
             invitation.status = 'accepted'
             invitation.save()
-            promoted = _maybe_promote_global_role(
-                request.user, invitation.role,
-                actor=invitation.invited_by, request=request,
-            )
 
         ActivityLog.objects.create(
             engagement=invitation.engagement, user=request.user,
             action=f'Joined as {invitation.get_role_display()}'
         )
-        if promoted:
-            messages.success(
-                request,
-                f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()} '
-                f'(your platform role was upgraded to {promoted}).',
-            )
-        else:
-            messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
+        messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
         return redirect('engagements:detail', pk=invitation.engagement.pk)
 
     # ── Case 3: Anonymous, but account already exists ──
@@ -475,13 +413,16 @@ def accept_invitation(request, token):
         if form.is_valid():
             # Atomic: create user + membership + accept invitation together
             with transaction.atomic():
+                # New accounts created via invite always start with the
+                # lowest-privilege global role. An admin must promote them via
+                # accounts.views.user_edit if platform-wide access is needed.
                 user = User.objects.create_user(
                     username=form.cleaned_data['username'],
                     email=invitation.email,
                     password=form.cleaned_data['password1'],
                     first_name=form.cleaned_data.get('first_name', ''),
                     last_name=form.cleaned_data.get('last_name', ''),
-                    role=ROLE_MAP.get(invitation.role, 'client'),
+                    role='client',
                 )
 
                 EngagementMember.objects.create(
