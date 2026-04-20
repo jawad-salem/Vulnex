@@ -11,6 +11,13 @@ from .crypto import encrypt_secret, decrypt_secret
 from .models import Credential
 
 
+# A valid Fernet key so tests pass regardless of the developer's .env state,
+# and MFA disabled so logged-in test users don't get bounced to /accounts/mfa/.
+_TEST_VAULT_KEY = Fernet.generate_key().decode()
+_TEST_SETTINGS = dict(VAULT_MASTER_KEY=_TEST_VAULT_KEY, MFA_REQUIRED_ROLES=[])
+
+
+@override_settings(**_TEST_SETTINGS)
 class CryptoRoundTripTests(TestCase):
     def test_roundtrip_non_empty(self):
         self.assertEqual(decrypt_secret(encrypt_secret('hunter2')), 'hunter2')
@@ -42,6 +49,7 @@ class CryptoRoundTripTests(TestCase):
                 encrypt_secret('anything')
 
 
+@override_settings(**_TEST_SETTINGS)
 class RotateVaultKeyCommandTests(TestCase):
     def setUp(self):
         user = User.objects.create_user('pt', role='pentester', password='testpass1')
@@ -92,6 +100,7 @@ class RotateVaultKeyCommandTests(TestCase):
         self.assertEqual(cred.secret_encrypted, original_ct)
 
 
+@override_settings(**_TEST_SETTINGS)
 class CredentialModelTests(TestCase):
     def setUp(self):
         user = User.objects.create_user('pt', role='pentester', password='testpass1')
@@ -123,6 +132,7 @@ class CredentialModelTests(TestCase):
         self.assertEqual(c.masked_secret, '')
 
 
+@override_settings(**_TEST_SETTINGS)
 class CredentialAccessTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -171,6 +181,7 @@ class CredentialAccessTests(TestCase):
         self.assertEqual(resp.status_code, 302)
 
 
+@override_settings(**_TEST_SETTINGS)
 class CredentialWorkflowTests(TestCase):
     def setUp(self):
         self.client = Client()
