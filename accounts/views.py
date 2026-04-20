@@ -4,7 +4,7 @@ import io
 import qrcode
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import login as auth_login
+from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,7 +13,13 @@ from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
 from .decorators import role_required
-from .forms import AdminUserForm, CustomAuthenticationForm, MFACodeForm, UserProfileForm
+from .forms import (
+    AdminUserForm,
+    CustomAuthenticationForm,
+    MFACodeForm,
+    UserPasswordChangeForm,
+    UserProfileForm,
+)
 from .models import AuditLog, User
 
 
@@ -50,16 +56,34 @@ class CustomLogoutView(LogoutView):
 
 @login_required
 def profile(request):
+    form = UserProfileForm(instance=request.user)
+    password_form = UserPasswordChangeForm(request.user)
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Profile updated.')
-            return redirect('accounts:profile')
-    else:
-        form = UserProfileForm(instance=request.user)
+        # Which form was submitted? The password card's button carries
+        # `name="change_password"`; the profile card's does not.
+        if 'change_password' in request.POST:
+            password_form = UserPasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                # Keep the current session alive despite the hash rotation.
+                update_session_auth_hash(request, user)
+                AuditLog.record(
+                    actor=request.user,
+                    action=AuditLog.Action.PASSWORD_CHANGE,
+                    target=request.user.username,
+                    request=request,
+                )
+                messages.success(request, 'Password changed.')
+                return redirect('accounts:profile')
+        else:
+            form = UserProfileForm(request.POST, instance=request.user)
+            if form.is_valid():
+                form.save()
+                messages.success(request, 'Profile updated.')
+                return redirect('accounts:profile')
     return render(request, 'accounts/profile.html', {
         'form': form,
+        'password_form': password_form,
         'mfa_enabled': user_has_device(request.user, confirmed=True),
         'mfa_required': request.user.role in getattr(settings, 'MFA_REQUIRED_ROLES', []),
     })

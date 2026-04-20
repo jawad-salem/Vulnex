@@ -1,9 +1,10 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
 from .models import Engagement, EngagementMember, Invitation
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class EngagementAccessTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -119,6 +120,7 @@ class EngagementModelTests(TestCase):
         self.assertTrue(self.engagement.user_is_lead(self.pentester))
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class InvitationFlowTests(TestCase):
     def setUp(self):
         self.client = Client()

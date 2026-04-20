@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.password_validation import validate_password
 from accounts.models import User
 from .models import Engagement, EngagementNote
 
@@ -38,8 +39,19 @@ class InviteRegistrationForm(forms.Form):
         p2 = cleaned_data.get('password2')
         if p1 and p2 and p1 != p2:
             raise forms.ValidationError('Passwords do not match.')
-        if p1 and len(p1) < 8:
-            raise forms.ValidationError('Password must be at least 8 characters.')
+        if p1:
+            # Build an unsaved User so UserAttributeSimilarityValidator can
+            # compare the password against the username/first/last values
+            # being submitted right now.
+            candidate = User(
+                username=cleaned_data.get('username', '') or '',
+                first_name=cleaned_data.get('first_name', '') or '',
+                last_name=cleaned_data.get('last_name', '') or '',
+            )
+            try:
+                validate_password(p1, candidate)
+            except forms.ValidationError as e:
+                self.add_error('password1', e)
         return cleaned_data
 
 

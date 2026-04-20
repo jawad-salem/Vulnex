@@ -61,6 +61,7 @@ class AuditLog(models.Model):
         MFA_ENABLED = 'mfa_enabled', 'MFA enabled'
         MFA_DISABLED = 'mfa_disabled', 'MFA disabled'
         MFA_CHALLENGE_FAILED = 'mfa_challenge_failed', 'MFA challenge failed'
+        PASSWORD_CHANGE = 'password_change', 'Password changed'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

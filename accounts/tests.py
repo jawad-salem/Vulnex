@@ -96,6 +96,91 @@ class AccessControlTests(TestCase):
 
 
 @override_settings(MFA_REQUIRED_ROLES=[])
+class PasswordValidationTests(TestCase):
+    """Step 1.3 — AUTH_PASSWORD_VALIDATORS must run on every password-setting
+    form (admin user CRUD, invitation registration, self-service change)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user('admin', role='admin', password='Str0ngPass!xyz')
+
+    def test_admin_create_rejects_common_password(self):
+        self.client.login(username='admin', password='Str0ngPass!xyz')
+        resp = self.client.post(reverse('accounts:user_create'), {
+            'username': 'newuser',
+            'first_name': '',
+            'last_name': '',
+            'email': '',
+            'role': 'pentester',
+            'is_active': 'on',
+            'password1': 'password1',
+            'password2': 'password1',
+        })
+        # Form re-rendered with errors (no redirect)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username='newuser').exists())
+
+    def test_admin_create_rejects_too_short(self):
+        self.client.login(username='admin', password='Str0ngPass!xyz')
+        resp = self.client.post(reverse('accounts:user_create'), {
+            'username': 'shorty',
+            'first_name': '',
+            'last_name': '',
+            'email': '',
+            'role': 'pentester',
+            'is_active': 'on',
+            'password1': 'abc',
+            'password2': 'abc',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(User.objects.filter(username='shorty').exists())
+
+    def test_profile_password_change_succeeds(self):
+        self.client.login(username='admin', password='Str0ngPass!xyz')
+        resp = self.client.post(reverse('accounts:profile'), {
+            'change_password': '1',
+            'old_password': 'Str0ngPass!xyz',
+            'new_password1': 'An0therStr0ngPass!',
+            'new_password2': 'An0therStr0ngPass!',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password('An0therStr0ngPass!'))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.PASSWORD_CHANGE, target='admin',
+            ).exists()
+        )
+
+    def test_profile_password_change_rejects_common(self):
+        self.client.login(username='admin', password='Str0ngPass!xyz')
+        resp = self.client.post(reverse('accounts:profile'), {
+            'change_password': '1',
+            'old_password': 'Str0ngPass!xyz',
+            'new_password1': 'password1',
+            'new_password2': 'password1',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password('Str0ngPass!xyz'))
+        self.assertFalse(
+            AuditLog.objects.filter(action=AuditLog.Action.PASSWORD_CHANGE).exists()
+        )
+
+    def test_profile_password_change_wrong_old_password(self):
+        self.client.login(username='admin', password='Str0ngPass!xyz')
+        resp = self.client.post(reverse('accounts:profile'), {
+            'change_password': '1',
+            'old_password': 'not-the-real-password',
+            'new_password1': 'An0therStr0ngPass!',
+            'new_password2': 'An0therStr0ngPass!',
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.check_password('Str0ngPass!xyz'))
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
 class AuditLogTests(TestCase):
     def setUp(self):
         self.client = Client()
