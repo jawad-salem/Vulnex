@@ -160,6 +160,15 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
+# ── Credentials vault ──
+# VAULT_MASTER_KEY must be a Fernet key (32 bytes, base64url-encoded).
+# Generate one with:
+#   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Optional in DEBUG (falls back to a SECRET_KEY-derived key with a warning).
+# Required when DEBUG=False — credentials/checks.py surfaces the error via
+# `manage.py check --deploy` and _fernet() raises ImproperlyConfigured on use.
+VAULT_MASTER_KEY = os.environ.get('VAULT_MASTER_KEY', '').strip()
+
 # ── MFA ──
 # Roles that must complete TOTP setup before accessing the app. Clients can
 # opt in via the profile page but aren't forced.

@@ -1,4 +1,7 @@
-from django.test import TestCase, Client
+from cryptography.fernet import Fernet
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management import call_command
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -22,6 +25,71 @@ class CryptoRoundTripTests(TestCase):
 
     def test_invalid_token_returns_empty(self):
         self.assertEqual(decrypt_secret('not-a-fernet-token'), '')
+
+    def test_explicit_vault_master_key_is_used(self):
+        key = Fernet.generate_key().decode()
+        with override_settings(VAULT_MASTER_KEY=key):
+            ct = encrypt_secret('hunter2')
+            self.assertEqual(decrypt_secret(ct), 'hunter2')
+            # Raw Fernet with the same key must decrypt the ciphertext
+            self.assertEqual(Fernet(key.encode()).decrypt(ct.encode()).decode(), 'hunter2')
+
+    def test_missing_key_in_production_raises(self):
+        import credentials.crypto as crypto_mod
+        crypto_mod._dev_warning_emitted = False
+        with override_settings(DEBUG=False, VAULT_MASTER_KEY=''):
+            with self.assertRaises(ImproperlyConfigured):
+                encrypt_secret('anything')
+
+
+class RotateVaultKeyCommandTests(TestCase):
+    def setUp(self):
+        user = User.objects.create_user('pt', role='pentester', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='Rotate', client_name='ACME', created_by=user,
+        )
+
+    def test_rotation_preserves_plaintext(self):
+        key_a = Fernet.generate_key().decode()
+        key_b = Fernet.generate_key().decode()
+
+        # Encrypt under key_a
+        with override_settings(VAULT_MASTER_KEY=key_a):
+            cred = Credential.objects.create(
+                engagement=self.engagement,
+                username='admin',
+                secret_encrypted=encrypt_secret('hunter2'),
+            )
+            ciphertext_a = cred.secret_encrypted
+
+        # Rotate to key_b
+        with override_settings(VAULT_MASTER_KEY=key_b):
+            call_command('rotate_vault_key', '--old-key', key_a, '--new-key', key_b)
+            cred.refresh_from_db()
+            self.assertNotEqual(cred.secret_encrypted, ciphertext_a)
+            # Plaintext survives the rotation when read under the new key
+            self.assertEqual(decrypt_secret(cred.secret_encrypted), 'hunter2')
+
+    def test_rotation_aborts_when_old_key_cannot_decrypt(self):
+        from django.core.management.base import CommandError
+        key_a = Fernet.generate_key().decode()
+        key_b = Fernet.generate_key().decode()
+        wrong_key = Fernet.generate_key().decode()
+
+        with override_settings(VAULT_MASTER_KEY=key_a):
+            cred = Credential.objects.create(
+                engagement=self.engagement,
+                username='admin',
+                secret_encrypted=encrypt_secret('hunter2'),
+            )
+            original_ct = cred.secret_encrypted
+
+        with self.assertRaises(CommandError):
+            call_command('rotate_vault_key', '--old-key', wrong_key, '--new-key', key_b)
+
+        # Ciphertext unchanged — rotation was atomic
+        cred.refresh_from_db()
+        self.assertEqual(cred.secret_encrypted, original_ct)
 
 
 class CredentialModelTests(TestCase):
