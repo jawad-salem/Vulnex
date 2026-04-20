@@ -7,6 +7,10 @@ urlpatterns = [
     path('login/', views.CustomLoginView.as_view(), name='login'),
     path('logout/', views.CustomLogoutView.as_view(), name='logout'),
     path('profile/', views.profile, name='profile'),
+    # MFA
+    path('mfa/setup/', views.mfa_setup, name='mfa_setup'),
+    path('mfa/verify/', views.mfa_verify, name='mfa_verify'),
+    path('mfa/disable/', views.mfa_disable, name='mfa_disable'),
     # Admin user management
     path('users/', views.user_list, name='user_list'),
     path('users/create/', views.user_create, name='user_create'),

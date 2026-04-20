@@ -23,6 +23,9 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     # Third-party
     'django_celery_beat',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
+    'django_otp.plugins.otp_static',
     # Local apps
     'accounts',
     'dashboard',
@@ -41,6 +44,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
+    'accounts.middleware.MFARequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -154,6 +159,11 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# ── MFA ──
+# Roles that must complete TOTP setup before accessing the app. Clients can
+# opt in via the profile page but aren't forced.
+MFA_REQUIRED_ROLES = ['admin', 'pentester', 'reviewer']
 
 # CVSS severity thresholds
 SEVERITY_THRESHOLDS = {

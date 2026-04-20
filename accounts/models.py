@@ -58,6 +58,9 @@ class AuditLog(models.Model):
         REPORT_DOWNLOAD = 'report_download', 'Report downloaded'
         REPORT_GENERATE = 'report_generate', 'Report generated'
         LOGIN_FAILED = 'login_failed', 'Login failed'
+        MFA_ENABLED = 'mfa_enabled', 'MFA enabled'
+        MFA_DISABLED = 'mfa_disabled', 'MFA disabled'
+        MFA_CHALLENGE_FAILED = 'mfa_challenge_failed', 'MFA challenge failed'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

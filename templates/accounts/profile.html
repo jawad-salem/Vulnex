@@ -58,6 +58,30 @@
                 </div>
             </div>
         </div>
+
+        <div class="card" style="margin-top:16px">
+            <h2 class="card-title mb-3">Multi-factor authentication</h2>
+            {% if mfa_enabled %}
+                <div class="detail-list">
+                    <div class="detail-row">
+                        <span class="detail-label">Status</span>
+                        <span class="badge badge-completed">Enabled</span>
+                    </div>
+                </div>
+                {% if not mfa_required %}
+                <div class="form-actions" style="margin-top:14px">
+                    <a href="{% url 'accounts:mfa_disable' %}" class="btn btn-ghost btn-sm">Disable</a>
+                </div>
+                {% else %}
+                <p class="muted" style="margin-top:12px; font-size:13px">Required by your role — cannot be disabled.</p>
+                {% endif %}
+            {% else %}
+                <p class="muted" style="margin-bottom:12px">
+                    {% if mfa_required %}Your role requires MFA. Complete setup to continue.{% else %}Add a second factor (TOTP) for stronger account security.{% endif %}
+                </p>
+                <a href="{% url 'accounts:mfa_setup' %}" class="btn btn-primary btn-sm">Enable MFA</a>
+            {% endif %}
+        </div>
     </div>
 </div>
 {% endblock %}

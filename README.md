@@ -78,6 +78,7 @@ Most open-source tools in this space are one slice: reporting (Dradis, PwnDoc) o
 - Reviewer role: read-only access to all sections including Recon
 - Admin user management (create, edit, deactivate, delete users)
 - Self-registration via invitation links — no public signup
+- **TOTP multi-factor auth** — required for Admin, Pentester, and Reviewer roles; optional for Clients. Backup tokens issued on enrolment.
 
 ## Screenshots
 

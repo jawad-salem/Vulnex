@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Disable MFA — Vulnex{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px">
+    <h2 class="card-title mb-3">Disable multi-factor authentication?</h2>
+    <p>Your account will log in with password only after this.</p>
+    <form method="post" style="margin-top:16px">
+        {% csrf_token %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Disable MFA</button>
+            <a href="{% url 'accounts:profile' %}" class="btn btn-ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

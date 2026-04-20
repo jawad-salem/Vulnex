@@ -3,6 +3,20 @@ from django.contrib.auth.forms import AuthenticationForm
 from .models import User
 
 
+class MFACodeForm(forms.Form):
+    code = forms.CharField(
+        label='Verification code',
+        max_length=20,
+        widget=forms.TextInput(attrs={
+            'class': 'form-input',
+            'autocomplete': 'one-time-code',
+            'inputmode': 'numeric',
+            'autofocus': 'autofocus',
+            'placeholder': '123456',
+        }),
+    )
+
+
 class CustomAuthenticationForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

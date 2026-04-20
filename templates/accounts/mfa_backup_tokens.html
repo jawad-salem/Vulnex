@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Backup tokens — Vulnex{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Save your backup tokens</h1>
+        <p class="page-subtitle">MFA is enabled. Each token is single-use.</p>
+    </div>
+</div>
+
+<div class="card" style="max-width:640px">
+    <div class="alert alert-warning" style="margin-bottom:20px">
+        <strong>Shown only once.</strong> Copy or print these now — we can't show them again.
+    </div>
+    <ul class="text-mono" style="line-height:2; font-size:15px; padding-left:20px">
+        {% for t in tokens %}<li style="user-select:all">{{ t }}</li>{% endfor %}
+    </ul>
+    <div class="form-actions" style="margin-top:20px">
+        <a href="{% url 'accounts:profile' %}" class="btn btn-primary">I've saved them</a>
+    </div>
+</div>
+{% endblock %}
