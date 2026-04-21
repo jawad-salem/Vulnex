@@ -38,3 +38,32 @@ class MFARequiredMiddleware:
             if not any(path.startswith(p) for p in ALLOWED_PATH_PREFIXES):
                 return redirect('accounts:mfa_setup')
         return self.get_response(request)
+
+
+class PermissionsPolicyMiddleware:
+    """Emit `Permissions-Policy` from settings.PERMISSIONS_POLICY.
+
+    Django's SecurityMiddleware doesn't support this header natively. The
+    setting is a dict of feature -> allowlist (empty list = disabled), e.g.
+    `{'camera': [], 'microphone': [], 'geolocation': []}`.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        policy = getattr(settings, 'PERMISSIONS_POLICY', {}) or {}
+        parts = []
+        for feature, allowlist in policy.items():
+            if not allowlist:
+                parts.append(f'{feature}=()')
+            else:
+                rendered = ' '.join(
+                    'self' if v == 'self' else f'"{v}"' for v in allowlist
+                )
+                parts.append(f'{feature}=({rendered})')
+        self._header = ', '.join(parts)
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if self._header:
+            response.headers['Permissions-Policy'] = self._header
+        return response

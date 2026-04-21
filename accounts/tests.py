@@ -610,6 +610,69 @@ class AuditLogCoverageTests(TestCase):
         self.assertEqual(row.target, 'inv@x.test')
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
+class SecurityHeadersTests(TestCase):
+    """Hit /dashboard/ as an authenticated user and assert every security
+    header is present with the expected value."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            'pt', role='pentester', password='testpass1',
+        )
+        self.client.force_login(self.user)
+
+    def _response(self):
+        return self.client.get(reverse('dashboard:home'))
+
+    def test_csp_header(self):
+        csp = self._response()['Content-Security-Policy']
+        self.assertIn("default-src 'self'", csp)
+        self.assertIn("script-src 'self' https://cdn.jsdelivr.net", csp)
+        self.assertIn("style-src 'self' 'unsafe-inline'", csp)
+        self.assertIn("img-src 'self' data:", csp)
+        self.assertIn("connect-src 'self'", csp)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn("base-uri 'self'", csp)
+        self.assertIn("form-action 'self'", csp)
+
+    def test_referrer_policy(self):
+        self.assertEqual(
+            self._response()['Referrer-Policy'],
+            'strict-origin-when-cross-origin',
+        )
+
+    def test_permissions_policy(self):
+        value = self._response()['Permissions-Policy']
+        self.assertIn('camera=()', value)
+        self.assertIn('microphone=()', value)
+        self.assertIn('geolocation=()', value)
+
+    def test_coop_header(self):
+        self.assertEqual(
+            self._response()['Cross-Origin-Opener-Policy'], 'same-origin',
+        )
+
+    def test_x_frame_options(self):
+        self.assertEqual(self._response()['X-Frame-Options'], 'DENY')
+
+    def test_nosniff(self):
+        self.assertEqual(
+            self._response()['X-Content-Type-Options'], 'nosniff',
+        )
+
+    def test_samesite_cookies(self):
+        # Trigger a response that sets the CSRF cookie.
+        resp = self.client.get(reverse('dashboard:home'))
+        csrf = resp.cookies.get('csrftoken')
+        if csrf is not None:
+            self.assertEqual(csrf['samesite'], 'Strict')
+
+    def test_samesite_session_setting(self):
+        from django.conf import settings
+        self.assertEqual(settings.SESSION_COOKIE_SAMESITE, 'Strict')
+        self.assertEqual(settings.CSRF_COOKIE_SAMESITE, 'Strict')
+
+
 @override_settings(
     MFA_REQUIRED_ROLES=[],
     AXES_ENABLED=True,

@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_totp',
     'django_otp.plugins.otp_static',
     'axes',
+    'csp',
     # Local apps
     'accounts',
     'dashboard',
@@ -51,6 +52,8 @@ MIDDLEWARE = [
     'accounts.middleware.MFARequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'accounts.middleware.PermissionsPolicyMiddleware',
+    'csp.middleware.CSPMiddleware',
     # django-axes: must come last so failed logins from earlier middleware
     # are still observed.
     'axes.middleware.AxesMiddleware',
@@ -153,6 +156,38 @@ SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
 X_FRAME_OPTIONS = 'DENY'
 # Prevent MIME type sniffing
 SECURE_CONTENT_TYPE_NOSNIFF = True
+# Leak as little URL info as possible to third parties.
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+# Disable browser APIs we never use.
+PERMISSIONS_POLICY = {
+    'camera': [],
+    'microphone': [],
+    'geolocation': [],
+}
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+
+# Cookies stay on-site only — blocks CSRF-via-top-level-nav and cross-site
+# session reuse. SameSite=Strict is safe here because Vulnex has no
+# third-party embed / cross-site flows.
+SESSION_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_SAMESITE = 'Strict'
+
+# ── Content-Security-Policy (django-csp 4.x dict format) ──
+# Lock scripts to self + the jsdelivr CDN Chart.js is loaded from; everything
+# else is same-origin. Inline styles are permitted because templates still
+# carry style="..." attributes.
+CONTENT_SECURITY_POLICY = {
+    'DIRECTIVES': {
+        'default-src': ("'self'",),
+        'script-src': ("'self'", 'https://cdn.jsdelivr.net'),
+        'style-src': ("'self'", "'unsafe-inline'"),
+        'img-src': ("'self'", 'data:'),
+        'connect-src': ("'self'",),
+        'frame-ancestors': ("'none'",),
+        'base-uri': ("'self'",),
+        'form-action': ("'self'",),
+    },
+}
 
 # HTTPS hardening — opt-in via env var so local/native runs don't force TLS.
 # Set DJANGO_USE_HTTPS=True only when deploying behind a TLS-terminating proxy.
