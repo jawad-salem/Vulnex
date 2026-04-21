@@ -1,6 +1,10 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 
 class User(AbstractUser):
@@ -55,8 +59,8 @@ class AuditLog(models.Model):
         USER_ROLE_CHANGE = 'user_role_change', 'User role changed'
         ENGAGEMENT_CREATE = 'engagement_create', 'Engagement created'
         ENGAGEMENT_DELETE = 'engagement_delete', 'Engagement deleted'
-        REPORT_DOWNLOAD = 'report_download', 'Report downloaded'
-        REPORT_GENERATE = 'report_generate', 'Report generated'
+        REPORT_DOWNLOADED = 'report_downloaded', 'Report downloaded'
+        REPORT_GENERATED = 'report_generated', 'Report generated'
         LOGIN_FAILED = 'login_failed', 'Login failed'
         LOGIN_SUCCESS = 'login_success', 'Login succeeded'
         LOGIN_LOCKED = 'login_locked', 'Login locked out'
@@ -65,6 +69,12 @@ class AuditLog(models.Model):
         MFA_DISABLED = 'mfa_disabled', 'MFA disabled'
         MFA_CHALLENGE_FAILED = 'mfa_challenge_failed', 'MFA challenge failed'
         PASSWORD_CHANGE = 'password_change', 'Password changed'
+        CREDENTIAL_CREATE = 'credential_create', 'Credential created'
+        CREDENTIAL_DELETE = 'credential_delete', 'Credential deleted'
+        CREDENTIAL_REVEAL = 'credential_reveal', 'Credential revealed'
+        EVIDENCE_DOWNLOAD = 'evidence_download', 'Evidence downloaded'
+        INVITATION_SENT = 'invitation_sent', 'Invitation sent'
+        INVITATION_ACCEPTED = 'invitation_accepted', 'Invitation accepted'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -92,9 +102,9 @@ class AuditLog(models.Model):
 
     @classmethod
     def record(cls, actor, action, target='', details=None, request=None):
-        """Helper to create an audit entry. Silently no-ops on failure so
-        callers aren't forced to wrap every event in try/except. The `request`
-        arg is kept for API compatibility and future use (e.g. deriving actor
+        """Helper to create an audit entry. Failures are logged but not
+        re-raised — an unreachable DB shouldn't break the user-facing action.
+        The `request` arg is kept for API compatibility (e.g. deriving actor
         from request.user in contexts where `actor` is omitted)."""
         try:
             return cls.objects.create(
@@ -104,5 +114,6 @@ class AuditLog(models.Model):
                 details=details or {},
             )
         except Exception:
+            logger.exception('AuditLog.record failed (action=%s, target=%s)', action, target)
             return None
 

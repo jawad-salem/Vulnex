@@ -89,7 +89,7 @@ def generate_report(request, engagement_pk):
     )
     AuditLog.record(
         actor=request.user,
-        action=AuditLog.Action.REPORT_GENERATE,
+        action=AuditLog.Action.REPORT_GENERATED,
         target=str(report.pk),
         details={'engagement': engagement.name, 'type': report_type},
         request=request,
@@ -108,7 +108,7 @@ def download_report(request, pk):
     response['Content-Disposition'] = f'attachment; filename="{report.file.name.split("/")[-1]}"'
     AuditLog.record(
         actor=request.user,
-        action=AuditLog.Action.REPORT_DOWNLOAD,
+        action=AuditLog.Action.REPORT_DOWNLOADED,
         target=str(report.pk),
         details={'engagement': report.engagement.name, 'type': report.report_type},
         request=request,

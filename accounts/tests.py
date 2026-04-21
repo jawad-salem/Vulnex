@@ -377,6 +377,239 @@ class MFATests(TestCase):
         )
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
+class AuditLogCoverageTests(TestCase):
+    """Each security-relevant action writes exactly one AuditLog row with
+    the expected actor/target/details. Narrower than the per-view tests —
+    these focus on audit-trail completeness."""
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user(
+            'lead', role='pentester', password='testpass1', email='lead@x.test',
+        )
+
+    def _only(self, action):
+        rows = AuditLog.objects.filter(action=action)
+        self.assertEqual(rows.count(), 1, f'expected exactly one {action} row')
+        return rows.get()
+
+    def test_login_success_logged(self):
+        self.client.post(reverse('accounts:login'),
+                         {'username': 'lead', 'password': 'testpass1'})
+        row = self._only(AuditLog.Action.LOGIN_SUCCESS)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'lead')
+
+    def test_logout_logged(self):
+        self.client.force_login(self.lead)
+        self.client.post(reverse('accounts:logout'))
+        row = self._only(AuditLog.Action.LOGOUT)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'lead')
+
+    def test_password_change_logged(self):
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('accounts:profile'), {
+            'change_password': '1',
+            'old_password': 'testpass1',
+            'new_password1': 'Z7kqP!nc9Lm2',
+            'new_password2': 'Z7kqP!nc9Lm2',
+        })
+        row = self._only(AuditLog.Action.PASSWORD_CHANGE)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'lead')
+
+    def test_mfa_enabled_logged(self):
+        self.client.login(username='lead', password='testpass1')
+        # Create unconfirmed device then POST a valid TOTP code.
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+        device = TOTPDevice.objects.create(
+            user=self.lead, name='default', confirmed=False,
+        )
+        code = totp(device.bin_key, step=device.step, t0=device.t0, digits=device.digits)
+        self.client.post(reverse('accounts:mfa_setup'), {'code': str(code).zfill(6)})
+        row = self._only(AuditLog.Action.MFA_ENABLED)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'lead')
+
+    def test_mfa_disabled_logged(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+        TOTPDevice.objects.create(user=self.lead, name='default', confirmed=True)
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('accounts:mfa_disable'))
+        row = self._only(AuditLog.Action.MFA_DISABLED)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'lead')
+
+    def test_credential_create_logged(self):
+        from engagements.models import Engagement, EngagementMember
+        engagement = Engagement.objects.create(
+            name='E1', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(
+            reverse('credentials:create', args=[engagement.pk]),
+            {
+                'credential_type': 'password',
+                'username': 'admin',
+                'secret': 'hunter2',
+                'hash_type': '',
+                'host': '',
+                'service': 'SSH',
+                'source': 'bruteforce',
+                'status': 'valid',
+                'notes': '',
+            },
+        )
+        row = self._only(AuditLog.Action.CREDENTIAL_CREATE)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.details['engagement'], 'E1')
+        self.assertEqual(row.details['username'], 'admin')
+
+    def test_credential_delete_logged(self):
+        from engagements.models import Engagement, EngagementMember
+        from credentials.models import Credential
+        engagement = Engagement.objects.create(
+            name='E2', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        cred = Credential(
+            engagement=engagement, credential_type='password',
+            username='root', found_by=self.lead,
+        )
+        cred.set_secret('p')
+        cred.save()
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('credentials:delete', args=[engagement.pk, cred.pk]))
+        row = self._only(AuditLog.Action.CREDENTIAL_DELETE)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, str(cred.pk))
+
+    def test_credential_reveal_logged(self):
+        from engagements.models import Engagement, EngagementMember
+        from credentials.models import Credential
+        engagement = Engagement.objects.create(
+            name='E3', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        cred = Credential(
+            engagement=engagement, credential_type='password',
+            username='admin', found_by=self.lead,
+        )
+        cred.set_secret('hunter2')
+        cred.save()
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('credentials:reveal', args=[engagement.pk, cred.pk]))
+        row = self._only(AuditLog.Action.CREDENTIAL_REVEAL)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, str(cred.pk))
+        self.assertEqual(row.details['username'], 'admin')
+
+    def test_evidence_download_logged(self):
+        import shutil
+        import tempfile
+        from django.core.files.storage import FileSystemStorage
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from engagements.models import Engagement, EngagementMember
+        from vulns.models import Finding, Evidence
+
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir, ignore_errors=True)
+        field = Evidence._meta.get_field('file')
+        orig = field.storage
+        field.storage = FileSystemStorage(location=tmpdir)
+        self.addCleanup(lambda: setattr(field, 'storage', orig))
+
+        engagement = Engagement.objects.create(
+            name='E4', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        finding = Finding.objects.create(
+            engagement=engagement, title='X', found_by=self.lead,
+            confidentiality_impact='H',
+        )
+        ev = Evidence.objects.create(
+            finding=finding,
+            file=SimpleUploadedFile('p.png', b'data', content_type='image/png'),
+            uploaded_by=self.lead,
+        )
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.get(reverse('vulns:evidence_download', args=[ev.pk]))
+        b''.join(resp.streaming_content)  # close the handle
+        row = self._only(AuditLog.Action.EVIDENCE_DOWNLOAD)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, str(ev.pk))
+
+    def test_report_generated_and_downloaded_logged(self):
+        from engagements.models import Engagement, EngagementMember
+        engagement = Engagement.objects.create(
+            name='E5', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('reports:generate', args=[engagement.pk]),
+                         {'report_type': 'full'})
+        gen = self._only(AuditLog.Action.REPORT_GENERATED)
+        self.assertEqual(gen.actor, self.lead)
+
+        from reports.models import Report
+        report = Report.objects.get(engagement=engagement)
+        self.client.get(reverse('reports:download', args=[report.pk]))
+        dl = self._only(AuditLog.Action.REPORT_DOWNLOADED)
+        self.assertEqual(dl.actor, self.lead)
+        self.assertEqual(dl.target, str(report.pk))
+
+    def test_invitation_sent_logged(self):
+        from engagements.models import Engagement, EngagementMember
+        engagement = Engagement.objects.create(
+            name='E6', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        self.client.login(username='lead', password='testpass1')
+        self.client.post(reverse('engagements:invite', args=[engagement.pk]), {
+            'email': 'new@x.test', 'role': 'pentester',
+        })
+        row = self._only(AuditLog.Action.INVITATION_SENT)
+        self.assertEqual(row.actor, self.lead)
+        self.assertEqual(row.target, 'new@x.test')
+        self.assertEqual(row.details['role'], 'pentester')
+
+    def test_invitation_accepted_logged(self):
+        from engagements.models import Engagement, EngagementMember, Invitation
+        engagement = Engagement.objects.create(
+            name='E7', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=engagement, user=self.lead, role='lead',
+        )
+        invitee = User.objects.create_user(
+            'newbie', role='client', password='testpass1', email='inv@x.test',
+        )
+        invitation = Invitation.objects.create(
+            engagement=engagement, email='inv@x.test', role='pentester',
+            invited_by=self.lead,
+        )
+        self.client.login(username='newbie', password='testpass1')
+        self.client.get(reverse('engagements:accept_invitation', args=[invitation.token]))
+        row = self._only(AuditLog.Action.INVITATION_ACCEPTED)
+        self.assertEqual(row.actor, invitee)
+        self.assertEqual(row.target, 'inv@x.test')
+
+
 @override_settings(
     MFA_REQUIRED_ROLES=[],
     AXES_ENABLED=True,

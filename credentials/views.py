@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.http import JsonResponse, HttpResponseBadRequest
 
 from accounts.decorators import engagement_access, engagement_edit_required
+from accounts.models import AuditLog
 from engagements.models import ActivityLog
 from recon.models import DiscoveredHost
 from .models import Credential
@@ -84,6 +85,17 @@ def credential_create(request, engagement_pk):
                        f'for {credential.username or "(no user)"}'
                        f'{" on " + credential.host.hostname if credential.host else ""}',
             )
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.CREDENTIAL_CREATE,
+                target=str(credential.pk),
+                details={
+                    'engagement': engagement.name,
+                    'type': credential.credential_type,
+                    'username': credential.username or '',
+                },
+                request=request,
+            )
             messages.success(request, 'Credential added.')
             return redirect('credentials:list', engagement_pk=engagement.pk)
     else:
@@ -125,10 +137,18 @@ def credential_delete(request, engagement_pk, pk):
     credential = get_object_or_404(Credential, pk=pk, engagement=engagement)
     if request.method == 'POST':
         label = credential.username or credential.get_credential_type_display()
+        credential_pk = credential.pk
         credential.delete()
         ActivityLog.objects.create(
             engagement=engagement, user=request.user,
             action=f'Deleted credential: {label}',
+        )
+        AuditLog.record(
+            actor=request.user,
+            action=AuditLog.Action.CREDENTIAL_DELETE,
+            target=str(credential_pk),
+            details={'engagement': engagement.name, 'label': label},
+            request=request,
         )
         messages.success(request, 'Credential deleted.')
         return redirect('credentials:list', engagement_pk=engagement.pk)
@@ -154,6 +174,16 @@ def credential_reveal(request, engagement_pk, pk):
     ActivityLog.objects.create(
         engagement=engagement, user=request.user,
         action=f'Revealed credential for {credential.username or "(no user)"}',
+    )
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.CREDENTIAL_REVEAL,
+        target=str(credential.pk),
+        details={
+            'engagement': engagement.name,
+            'username': credential.username or '',
+        },
+        request=request,
     )
 
     return JsonResponse({'secret': credential.secret})

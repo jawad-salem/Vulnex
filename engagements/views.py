@@ -269,6 +269,17 @@ def invite_member(request, pk):
                 engagement=engagement, user=request.user,
                 action=f'Added {existing_user} as {invitation.get_role_display()}'
             )
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.INVITATION_ACCEPTED,
+                target=email,
+                details={
+                    'engagement': engagement.name,
+                    'role': role,
+                    'auto_accepted': True,
+                },
+                request=request,
+            )
             messages.success(request, f'{email} added as {invitation.get_role_display()}.')
         else:
             # Send invitation email
@@ -295,6 +306,13 @@ def invite_member(request, pk):
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
                 action=f'Invited {email} as {invitation.get_role_display()}'
+            )
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.INVITATION_SENT,
+                target=email,
+                details={'engagement': engagement.name, 'role': role},
+                request=request,
             )
             messages.success(request, f'Invitation sent to {email}.')
 
@@ -393,6 +411,16 @@ def accept_invitation(request, token):
             engagement=invitation.engagement, user=request.user,
             action=f'Joined as {invitation.get_role_display()}'
         )
+        AuditLog.record(
+            actor=request.user,
+            action=AuditLog.Action.INVITATION_ACCEPTED,
+            target=invitation.email,
+            details={
+                'engagement': invitation.engagement.name,
+                'role': invitation.role,
+            },
+            request=request,
+        )
         messages.success(request, f'You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
         return redirect('engagements:detail', pk=invitation.engagement.pk)
 
@@ -436,6 +464,17 @@ def accept_invitation(request, token):
             ActivityLog.objects.create(
                 engagement=invitation.engagement, user=user,
                 action=f'Joined as {invitation.get_role_display()}'
+            )
+            AuditLog.record(
+                actor=user,
+                action=AuditLog.Action.INVITATION_ACCEPTED,
+                target=invitation.email,
+                details={
+                    'engagement': invitation.engagement.name,
+                    'role': invitation.role,
+                    'new_account': True,
+                },
+                request=request,
             )
 
             # Log them in. Specify the backend explicitly because we have
