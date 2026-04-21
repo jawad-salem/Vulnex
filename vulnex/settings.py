@@ -2,6 +2,7 @@ import os
 import sys
 from datetime import timedelta
 from pathlib import Path
+from csp.constants import NONCE
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -178,11 +179,11 @@ CSRF_COOKIE_SAMESITE = 'Strict'
 # carry style="..." attributes.
 CONTENT_SECURITY_POLICY = {
     # Inline <script> blocks in templates are allowed via a per-request nonce
-    # (django-csp 4.x sets request.csp_nonce automatically); no 'unsafe-inline'.
-    'include_nonce_in': ['script-src'],
+    # (django-csp 4.x substitutes NONCE for 'nonce-<random>' and sets
+    # request.csp_nonce for template use). No 'unsafe-inline' needed.
     'DIRECTIVES': {
         'default-src': ("'self'",),
-        'script-src': ("'self'", 'https://cdn.jsdelivr.net'),
+        'script-src': ("'self'", NONCE, 'https://cdn.jsdelivr.net'),
         'style-src': ("'self'", "'unsafe-inline'"),
         'img-src': ("'self'", 'data:'),
         'connect-src': ("'self'",),
