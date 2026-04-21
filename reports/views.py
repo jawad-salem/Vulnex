@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -8,6 +10,26 @@ from .models import Report
 from .generator import generate_report_pdf
 from accounts.decorators import engagement_access, engagement_edit_required
 from accounts.models import AuditLog
+
+
+_UNSAFE_FILENAME_CHARS = str.maketrans({
+    '\r': '', '\n': '', '"': '', '/': '_', '\\': '_',
+})
+
+
+def _safe_content_disposition(raw_filename: str, fallback: str = 'report.pdf') -> str:
+    """Build a Content-Disposition header value that can't be broken by
+    injected quotes or CRLF. Uses RFC 5987's `filename*` for Unicode and an
+    ASCII-safe `filename=` fallback for older clients."""
+    cleaned = (raw_filename or fallback).translate(_UNSAFE_FILENAME_CHARS).strip()
+    if not cleaned:
+        cleaned = fallback
+    ascii_fallback = cleaned.encode('ascii', 'replace').decode('ascii').replace('?', '_')
+    encoded = quote(cleaned, safe='')
+    return (
+        f'attachment; filename="{ascii_fallback}"; '
+        f"filename*=UTF-8''{encoded}"
+    )
 
 
 REPORT_RATE_LIMIT_WINDOW = 60  # seconds
@@ -105,7 +127,9 @@ def download_report(request, pk):
         messages.error(request, 'You are not a member of this engagement.')
         return redirect('engagements:list')
     response = HttpResponse(report.file.read(), content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{report.file.name.split("/")[-1]}"'
+    response['Content-Disposition'] = _safe_content_disposition(
+        report.file.name.split('/')[-1],
+    )
     AuditLog.record(
         actor=request.user,
         action=AuditLog.Action.REPORT_DOWNLOADED,
