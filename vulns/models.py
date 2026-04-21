@@ -322,6 +322,18 @@ class Finding(models.Model):
             self.cvss_score = (math.floor(int_input / 10000) + 1) / 10.0
         return self.cvss_score
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Snapshot severity so save() can tell whether it actually changed
+        # before overwriting a manually-adjusted due_date.
+        self._loaded_severity = self.severity
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        instance = super().from_db(db, field_names, values)
+        instance._loaded_severity = instance.severity
+        return instance
+
     def save(self, *args, **kwargs):
         self.calculate_cvss()
         # Auto-set severity from CVSS
@@ -335,10 +347,14 @@ class Finding(models.Model):
             self.severity = 'low'
         else:
             self.severity = 'info'
-        # SLA due date — clock starts at discovery (created_at), scales with severity
-        base_date = self.created_at.date() if self.created_at else timezone.now().date()
-        self.due_date = base_date + timedelta(days=self.SLA_DAYS.get(self.severity, 90))
+        # SLA due date — (re)compute on create or when severity changes.
+        # Don't clobber a manually-set due_date when severity is unchanged.
+        severity_changed = self.severity != getattr(self, '_loaded_severity', None)
+        if self._state.adding or severity_changed or self.due_date is None:
+            base_date = self.created_at.date() if self.created_at else timezone.now().date()
+            self.due_date = base_date + timedelta(days=self.SLA_DAYS.get(self.severity, 90))
         super().save(*args, **kwargs)
+        self._loaded_severity = self.severity
 
 
 class FindingTemplate(models.Model):

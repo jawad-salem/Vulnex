@@ -1,4 +1,6 @@
 import os
+import sys
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -26,6 +28,7 @@ INSTALLED_APPS = [
     'django_otp',
     'django_otp.plugins.otp_totp',
     'django_otp.plugins.otp_static',
+    'axes',
     # Local apps
     'accounts',
     'dashboard',
@@ -48,6 +51,16 @@ MIDDLEWARE = [
     'accounts.middleware.MFARequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # django-axes: must come last so failed logins from earlier middleware
+    # are still observed.
+    'axes.middleware.AxesMiddleware',
+]
+
+AUTHENTICATION_BACKENDS = [
+    # Axes runs first — it short-circuits locked-out credentials before
+    # the underlying ModelBackend performs the hash check.
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
 ROOT_URLCONF = 'vulnex.urls'
@@ -173,6 +186,20 @@ VAULT_MASTER_KEY = os.environ.get('VAULT_MASTER_KEY', '').strip()
 # Roles that must complete TOTP setup before accessing the app. Clients can
 # opt in via the profile page but aren't forced.
 MFA_REQUIRED_ROLES = ['admin', 'pentester', 'reviewer']
+
+# ── django-axes: login rate limit & lockout ──
+# 5 failed attempts per (username, IP) combination trigger a 30-minute
+# lockout. Successful logins reset the counter for that pair.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = timedelta(minutes=30)
+AXES_LOCKOUT_PARAMETERS = [['username', 'ip_address']]
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = 'axes/locked_out.html'
+# Disable axes during the test runner — Django's `client.login()` calls
+# `authenticate()` without a request, which the axes backend rejects. The
+# dedicated lockout test re-enables axes via `@override_settings`.
+if 'test' in sys.argv:
+    AXES_ENABLED = False
 
 # CVSS severity thresholds
 SEVERITY_THRESHOLDS = {

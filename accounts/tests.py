@@ -375,3 +375,55 @@ class MFATests(TestCase):
                 action=AuditLog.Action.MFA_DISABLED, target='cli',
             ).exists()
         )
+
+
+@override_settings(
+    MFA_REQUIRED_ROLES=[],
+    AXES_ENABLED=True,
+    AXES_FAILURE_LIMIT=5,
+    AXES_RESET_ON_SUCCESS=True,
+    AXES_LOCKOUT_PARAMETERS=[['username', 'ip_address']],
+)
+class LoginLockoutTests(TestCase):
+    def setUp(self):
+        from axes.utils import reset
+        reset()
+        self.client = Client()
+        self.user = User.objects.create_user('victim', role='pentester', password='testpass1')
+
+    def tearDown(self):
+        from axes.utils import reset
+        reset()
+
+    def test_sixth_attempt_is_locked_out(self):
+        url = reverse('accounts:login')
+        # 5 failed attempts hit AXES_FAILURE_LIMIT and trigger lockout.
+        for _ in range(5):
+            self.client.post(url, {'username': 'victim', 'password': 'wrong'})
+        # Subsequent attempt is blocked with the axes lockout response.
+        resp = self.client.post(url, {'username': 'victim', 'password': 'wrong'})
+        self.assertIn(resp.status_code, (403, 429))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.LOGIN_LOCKED, target='victim',
+            ).exists()
+        )
+
+    def test_login_success_is_logged(self):
+        self.client.post(reverse('accounts:login'), {'username': 'victim', 'password': 'testpass1'})
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.LOGIN_SUCCESS, target='victim',
+            ).exists()
+        )
+
+    def test_logout_is_logged(self):
+        # force_login bypasses authenticate() — needed because axes is
+        # re-enabled here and rejects test client's request-less login.
+        self.client.force_login(self.user)
+        self.client.post(reverse('accounts:logout'))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.LOGOUT, target='victim',
+            ).exists()
+        )

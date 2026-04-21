@@ -1,10 +1,11 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
 from engagements.models import Engagement, EngagementMember
 from vulns.models import Finding
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class GlobalSearchTests(TestCase):
     def setUp(self):
         self.client = Client()

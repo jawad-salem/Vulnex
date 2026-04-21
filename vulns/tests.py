@@ -1,5 +1,5 @@
 from datetime import timedelta
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
@@ -181,6 +181,7 @@ class CVSSVectorParsingTests(TestCase):
         self.assertEqual(parsed, {'attack_vector': 'N'})
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class RetestWorkflowTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -254,6 +255,7 @@ class RetestWorkflowTests(TestCase):
         self.assertEqual(self.finding.retest_status, 'not_retested')
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class SLATrackingTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -385,6 +387,7 @@ class SLATrackingTests(TestCase):
         self.assertNotContains(resp, 'Was overdue')
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class FindingAssignmentTests(TestCase):
     def setUp(self):
         self.client = Client()
@@ -513,6 +516,7 @@ class FindingAssignmentTests(TestCase):
         return data
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
 class ReviewWorkflowTests(TestCase):
     def setUp(self):
         self.client = Client()

@@ -438,9 +438,10 @@ def accept_invitation(request, token):
                 action=f'Joined as {invitation.get_role_display()}'
             )
 
-            # Log them in
+            # Log them in. Specify the backend explicitly because we have
+            # multiple AUTHENTICATION_BACKENDS configured (axes + ModelBackend).
             from django.contrib.auth import login
-            login(request, user)
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, f'Account created! You joined "{invitation.engagement.name}" as {invitation.get_role_display()}.')
             return redirect('engagements:detail', pk=invitation.engagement.pk)
     else:
