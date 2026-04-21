@@ -121,6 +121,11 @@ STORAGES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Files served only through authenticated views (Evidence uploads). Never
+# exposed via MEDIA_URL or staticfiles — vulns.views.evidence_download streams
+# them after gating on engagement membership.
+PROTECTED_MEDIA_ROOT = BASE_DIR / 'protected_media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = '/accounts/login/'

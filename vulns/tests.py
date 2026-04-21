@@ -1,10 +1,14 @@
+import shutil
+import tempfile
 from datetime import timedelta
+from django.core.files.storage import FileSystemStorage
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
 from engagements.models import Engagement, EngagementMember, ActivityLog
-from .models import Finding
+from .models import Finding, Evidence
 
 
 class CVSSCalculationTests(TestCase):
@@ -707,3 +711,63 @@ class ReviewWorkflowTests(TestCase):
         body = resp.content.decode()
         self.assertIn('Approved-Export', body)
         self.assertNotIn(self.finding.title, body)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class EvidenceDownloadTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._tmpdir = tempfile.mkdtemp()
+        cls._field = Evidence._meta.get_field('file')
+        cls._orig_storage = cls._field.storage
+        cls._field.storage = FileSystemStorage(location=cls._tmpdir)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._field.storage = cls._orig_storage
+        shutil.rmtree(cls._tmpdir, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
+        self.outsider = User.objects.create_user('out', role='pentester', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='X', client_name='ACME', created_by=self.lead,
+        )
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=self.lead, role='lead',
+        )
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='SQLi',
+            found_by=self.lead, confidentiality_impact='H',
+        )
+        self.evidence = Evidence.objects.create(
+            finding=self.finding,
+            file=SimpleUploadedFile('proof.png', b'fake-bytes', content_type='image/png'),
+            uploaded_by=self.lead,
+        )
+
+    def test_unauthenticated_redirects_to_login(self):
+        resp = self.client.get(
+            reverse('vulns:evidence_download', args=[self.evidence.pk])
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp.url)
+
+    def test_non_member_gets_403(self):
+        self.client.login(username='out', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:evidence_download', args=[self.evidence.pk])
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_member_gets_200(self):
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.get(
+            reverse('vulns:evidence_download', args=[self.evidence.pk])
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = b''.join(resp.streaming_content)
+        self.assertEqual(body, b'fake-bytes')

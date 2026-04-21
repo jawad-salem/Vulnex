@@ -5,7 +5,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse, HttpResponseForbidden
 from django.db.models import Q
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
@@ -13,6 +13,7 @@ from .models import Finding, Evidence, FindingTemplate
 from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm
 from .parsers import parse_nuclei_json, parse_nikto_json
 from accounts.decorators import engagement_access, engagement_edit_required
+from accounts.models import AuditLog
 from recon.models import DiscoveredHost
 
 
@@ -441,6 +442,36 @@ def export_json(request, engagement_pk):
     )
     response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.json"'
     return response
+
+
+@login_required
+def evidence_download(request, pk):
+    """Stream an evidence file after verifying the user can access its
+    engagement. Files live under PROTECTED_MEDIA_ROOT so this view is the
+    only path to them."""
+    evidence = get_object_or_404(
+        Evidence.objects.select_related('finding__engagement'),
+        pk=pk,
+    )
+    engagement = evidence.finding.engagement
+    if not engagement.user_can_access(request.user):
+        return HttpResponseForbidden('You do not have access to this evidence.')
+    if engagement.user_is_client(request.user) and \
+            evidence.finding.review_state != Finding.ReviewState.APPROVED:
+        return HttpResponseForbidden('This evidence is not yet available.')
+    filename = evidence.file.name.rsplit('/', 1)[-1]
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.EVIDENCE_DOWNLOAD,
+        target=str(evidence.pk),
+        details={
+            'engagement': engagement.name,
+            'finding': str(evidence.finding.pk),
+            'filename': filename,
+        },
+        request=request,
+    )
+    return FileResponse(evidence.file.open('rb'), filename=filename)
 
 
 @login_required

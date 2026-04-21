@@ -1,11 +1,19 @@
 from datetime import timedelta
 from django.db import models
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.urls import reverse
 from django.utils import timezone
 from engagements.models import Engagement
 from recon.models import DiscoveredHost
 import uuid
+
+
+def protected_storage():
+    """Storage for evidence files. Lives outside MEDIA_ROOT so it can never be
+    served by the static/media handler — only via vulns.views.evidence_download
+    after an engagement-membership check."""
+    return FileSystemStorage(location=settings.PROTECTED_MEDIA_ROOT)
 
 
 class Finding(models.Model):
@@ -385,7 +393,7 @@ class FindingTemplate(models.Model):
 
 class Evidence(models.Model):
     finding = models.ForeignKey(Finding, on_delete=models.CASCADE, related_name='evidence')
-    file = models.FileField(upload_to='evidence/%Y/%m/')
+    file = models.FileField(upload_to='evidence/%Y/%m/', storage=protected_storage)
     caption = models.CharField(max_length=300, blank=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)

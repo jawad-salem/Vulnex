@@ -1,20 +1,53 @@
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+
+# Django
 *.sqlite3
 db.sqlite3
-.env
-.venv/
-venv/
 media/
+protected_media/
 staticfiles/
 *.log
-.DS_Store
-.claude/
-resutls.json
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Virtualenvs
+.venv/
+venv/
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Celery runtime
+celerybeat-schedule*
+celerybeat.pid
+
+# Editors / OS
 .vscode/
 .idea/
 *.swp
-staticfiles/
-.git
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backup junk
+*.bak
+*.orig
+*.rej
+
+# Local / project-specific
+.claude/
 data/
-/scripts/
+.git
