@@ -161,7 +161,7 @@
 {{ top_eng_labels|json_script:"chart-eng-labels" }}
 {{ top_eng_data|json_script:"chart-eng-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var fontColor = '#8b949e';
     var gridColor = 'rgba(48, 54, 61, 0.6)';

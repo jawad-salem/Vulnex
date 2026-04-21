@@ -31,13 +31,13 @@
     <form method="get" class="finding-filters__form">
         <div class="finding-filters__row finding-filters__row--primary">
             <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search findings..." class="form-input search-input finding-filters__search">
-            <select name="severity" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+            <select name="severity" class="form-input" data-autosubmit-loading>
                 <option value="">All severities</option>
                 {% for val, label in severity_choices %}
                 <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
-            <select name="status" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+            <select name="status" class="form-input" data-autosubmit-loading>
                 <option value="">All statuses</option>
                 {% for val, label in status_choices %}
                 <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
@@ -55,7 +55,7 @@
         <div class="finding-filters__row finding-filters__row--advanced" data-filter-panel>
             <label class="finding-filters__field">
                 <span class="finding-filters__field-label">SLA</span>
-                <select name="sla" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+                <select name="sla" class="form-input" data-autosubmit-loading>
                     <option value="">All SLA</option>
                     <option value="overdue" {% if sla_filter == 'overdue' %}selected{% endif %}>Overdue</option>
                     <option value="due_soon" {% if sla_filter == 'due_soon' %}selected{% endif %}>Due soon (≤3d)</option>
@@ -64,7 +64,7 @@
             </label>
             <label class="finding-filters__field">
                 <span class="finding-filters__field-label">Assignee</span>
-                <select name="assigned" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+                <select name="assigned" class="form-input" data-autosubmit-loading>
                     <option value="">All assignees</option>
                     <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
                     <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
@@ -76,7 +76,7 @@
             {% if not is_client %}
             <label class="finding-filters__field">
                 <span class="finding-filters__field-label">Review</span>
-                <select name="review" class="form-input" onchange="this.form.classList.add('form-loading'); this.form.submit()">
+                <select name="review" class="form-input" data-autosubmit-loading>
                     <option value="">All review states</option>
                     {% for val, label in review_choices %}
                     <option value="{{ val }}" {% if review_filter == val %}selected{% endif %}>{{ label }}</option>
@@ -87,7 +87,7 @@
         </div>
     </form>
 </div>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var bar = document.querySelector('.finding-filters');
     if (!bar) return;

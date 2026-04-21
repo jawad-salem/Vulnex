@@ -177,6 +177,9 @@ CSRF_COOKIE_SAMESITE = 'Strict'
 # else is same-origin. Inline styles are permitted because templates still
 # carry style="..." attributes.
 CONTENT_SECURITY_POLICY = {
+    # Inline <script> blocks in templates are allowed via a per-request nonce
+    # (django-csp 4.x sets request.csp_nonce automatically); no 'unsafe-inline'.
+    'include_nonce_in': ['script-src'],
     'DIRECTIVES': {
         'default-src': ("'self'",),
         'script-src': ("'self'", 'https://cdn.jsdelivr.net'),

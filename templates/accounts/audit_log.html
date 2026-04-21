@@ -12,7 +12,7 @@
 <form method="get" class="card mb-4 audit-filter-bar">
     <label class="audit-filter-bar__label text-xs text-muted" for="action-filter">Filter by action</label>
     <div class="audit-filter-bar__controls">
-        <select name="action" id="action-filter" class="form-input audit-filter-bar__select" onchange="this.form.submit()">
+        <select name="action" id="action-filter" class="form-input audit-filter-bar__select" data-autosubmit>
             <option value="">All actions</option>
             {% for val, label in action_choices %}
             <option value="{{ val }}" {% if val == action_filter %}selected{% endif %}>{{ label }}</option>

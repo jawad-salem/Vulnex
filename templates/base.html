@@ -83,7 +83,7 @@
                 {% for message in messages %}
                 <div class="alert alert-{{ message.tags }}">
                     {{ message }}
-                    <button class="alert-close" onclick="this.parentElement.remove()">&times;</button>
+                    <button type="button" class="alert-close" data-dismiss-parent>&times;</button>
                 </div>
                 {% endfor %}
             </div>
@@ -97,7 +97,7 @@
         {% block auth_content %}{% endblock %}
     {% endif %}
 
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
     // Toast auto-dismiss
     document.querySelectorAll('.alert').forEach(function(el) {
         setTimeout(function() {
@@ -132,9 +132,35 @@
             }
         });
     });
+
+    // CSP-friendly replacements for former inline on* handlers.
+    document.addEventListener('change', function(e) {
+        var el = e.target;
+        if (!el || !el.form) { return; }
+        if (el.hasAttribute('data-autosubmit-loading')) {
+            el.form.classList.add('form-loading');
+            el.form.submit();
+        } else if (el.hasAttribute('data-autosubmit')) {
+            el.form.submit();
+        }
+    });
+    document.addEventListener('click', function(e) {
+        var dismiss = e.target.closest('[data-dismiss-parent]');
+        if (dismiss && dismiss.parentElement) {
+            dismiss.parentElement.remove();
+            return;
+        }
+        var confirmEl = e.target.closest('[data-confirm]');
+        if (confirmEl) {
+            if (!window.confirm(confirmEl.getAttribute('data-confirm'))) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }
+    });
     </script>
     <!-- Keyboard shortcuts -->
-    <script>
+    <script nonce="{{ request.csp_nonce }}">
     document.addEventListener('keydown', function(e) {
         // Skip if user is typing in a form field
         var tag = e.target.tagName;

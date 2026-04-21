@@ -232,7 +232,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     // ── Template picker auto-fill ──
     var tplPicker = document.getElementById('templatePicker');

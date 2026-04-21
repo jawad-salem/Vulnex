@@ -444,7 +444,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var tabs = document.querySelectorAll('.tab-btn');
     var panels = document.querySelectorAll('.tab-panel');

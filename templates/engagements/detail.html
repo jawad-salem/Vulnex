@@ -29,7 +29,7 @@
         {% if can_edit %}
         <form method="post" action="{% url 'engagements:update_status' engagement.pk %}" class="eng-status-form">
             {% csrf_token %}
-            <select name="status" class="form-input status-select" onchange="this.form.classList.add('form-loading'); this.form.submit()" aria-label="Engagement status">
+            <select name="status" class="form-input status-select" data-autosubmit-loading aria-label="Engagement status">
                 {% for val, label in engagement.Status.choices %}
                 <option value="{{ val }}" {% if engagement.status == val %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
@@ -135,7 +135,10 @@
             </div>
 
             <div class="card overview-card overview-card--actions">
-                <div class="card-header"><h2 class="card-title">Quick actions</h2></div>
+                <div class="card-header">
+                    <h2 class="card-title">Quick actions</h2>
+                    <span class="text-xs text-muted">{% if is_client %}2{% elif can_edit %}4{% else %}3{% endif %} shortcuts</span>
+                </div>
                 <div class="quick-actions">
                     {% if not is_client %}
                     <a href="{% url 'recon:dashboard' engagement.pk %}" class="quick-action">
@@ -275,7 +278,7 @@
                         {% if can_manage and m.user != request.user %}
                         <form method="post" action="{% url 'engagements:remove_member' engagement.pk m.pk %}" style="margin:0">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-danger icon-btn" onclick="return confirm('Remove {{ m.user }}?')" aria-label="Remove">&times;</button>
+                            <button type="submit" class="btn btn-sm btn-danger icon-btn" data-confirm="Remove {{ m.user }}?" aria-label="Remove">&times;</button>
                         </form>
                         {% endif %}
                     </div>
@@ -404,7 +407,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var tabs = document.querySelectorAll('.tab-btn');
     var panels = document.querySelectorAll('.tab-panel');

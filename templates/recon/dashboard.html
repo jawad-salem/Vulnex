@@ -378,7 +378,7 @@
 
 {% block extra_js %}
 {{ pipeline_presets|json_script:"pipeline-presets" }}
-<script>
+<script nonce="{{ request.csp_nonce }}">
 (function() {
     var presets = JSON.parse(document.getElementById('pipeline-presets').textContent);
     var select = document.querySelector('[name="preset"]');

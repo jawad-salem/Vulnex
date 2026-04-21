@@ -60,7 +60,7 @@
             </div>
             <form method="post" action="{% url 'methodology:update_item' engagement.pk item.pk %}" class="flex gap-1 items-center" style="flex-shrink:0">
                 {% csrf_token %}
-                <select name="status" class="form-input form-input--compact methodology-status-select" onchange="this.form.submit()">
+                <select name="status" class="form-input form-input--compact methodology-status-select" data-autosubmit>
                     <option value="not_started" {% if not ec or ec.status == "not_started" %}selected{% endif %}>Not Started</option>
                     <option value="in_progress" {% if ec and ec.status == "in_progress" %}selected{% endif %}>In Progress</option>
                     <option value="completed" {% if ec and ec.status == "completed" %}selected{% endif %}>Completed</option>
