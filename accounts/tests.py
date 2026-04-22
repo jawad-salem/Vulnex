@@ -627,7 +627,7 @@ class SecurityHeadersTests(TestCase):
     def test_csp_header(self):
         csp = self._response()['Content-Security-Policy']
         self.assertIn("default-src 'self'", csp)
-        self.assertIn("script-src 'self' https://cdn.jsdelivr.net", csp)
+        self.assertRegex(csp, r"script-src 'self' 'nonce-[^']+' https://cdn\.jsdelivr\.net")
         self.assertIn("style-src 'self' 'unsafe-inline'", csp)
         self.assertIn("img-src 'self' data:", csp)
         self.assertIn("connect-src 'self'", csp)

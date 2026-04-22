@@ -18,6 +18,9 @@ ALLOWED_PATH_PREFIXES = (
     '/accounts/logout/',
     '/accounts/login/',
     '/accounts/mfa/',
+    # REST API authenticates per-request (API key or JWT); the browser-session
+    # MFA gate doesn't apply. Authenticated viewsets still enforce role checks.
+    '/api/',
 )
 
 

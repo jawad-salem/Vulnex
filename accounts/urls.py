@@ -17,4 +17,8 @@ urlpatterns = [
     path('users/<int:pk>/edit/', views.user_edit, name='user_edit'),
     path('users/<int:pk>/delete/', views.user_delete, name='user_delete'),
     path('audit/', views.audit_log, name='audit_log'),
+    # API keys (per-user, self-managed)
+    path('api-keys/', views.api_key_list, name='api_key_list'),
+    path('api-keys/create/', views.api_key_create, name='api_key_create'),
+    path('api-keys/<uuid:pk>/revoke/', views.api_key_revoke, name='api_key_revoke'),
 ]

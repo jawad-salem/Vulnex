@@ -31,6 +31,8 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_static',
     'axes',
     'csp',
+    'rest_framework',
+    'drf_spectacular',
     # Local apps
     'accounts',
     'dashboard',
@@ -40,6 +42,7 @@ INSTALLED_APPS = [
     'methodology',
     'reports',
     'credentials',
+    'api',
 ]
 
 MIDDLEWARE = [
@@ -244,6 +247,43 @@ AXES_LOCKOUT_TEMPLATE = 'axes/locked_out.html'
 # dedicated lockout test re-enables axes via `@override_settings`.
 if 'test' in sys.argv:
     AXES_ENABLED = False
+
+# ── REST API (DRF + SimpleJWT + drf-spectacular) ──
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.APIKeyAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '1000/hour',
+    },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 50,
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Vulnex API',
+    'DESCRIPTION': 'Read/write REST API for Vulnex engagements, findings, hosts, credentials, and reports.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+}
 
 # CVSS severity thresholds
 SEVERITY_THRESHOLDS = {

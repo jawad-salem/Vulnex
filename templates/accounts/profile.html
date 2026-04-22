@@ -90,6 +90,14 @@
         </div>
 
         <div class="card" style="margin-top:16px">
+            <h2 class="card-title mb-3">API keys</h2>
+            <p class="muted" style="margin-bottom:12px; font-size:13px">
+                Issue long-lived keys for programmatic access to the REST API.
+            </p>
+            <a href="{% url 'accounts:api_key_list' %}" class="btn btn-ghost btn-sm">Manage API keys</a>
+        </div>
+
+        <div class="card" style="margin-top:16px">
             <h2 class="card-title mb-3">Multi-factor authentication</h2>
             {% if mfa_enabled %}
                 <div class="detail-list">

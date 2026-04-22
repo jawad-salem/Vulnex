@@ -18,6 +18,7 @@ urlpatterns = [
     path('methodology/', include('methodology.urls')),
     path('reports/', include('reports.urls')),
     path('credentials/', include('credentials.urls')),
+    path('api/', include('api.urls')),
     path('', RedirectView.as_view(url='/dashboard/', permanent=False)),
 ]
 

@@ -1,8 +1,12 @@
+import hashlib
 import logging
+import secrets
+import uuid
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +79,8 @@ class AuditLog(models.Model):
         EVIDENCE_DOWNLOAD = 'evidence_download', 'Evidence downloaded'
         INVITATION_SENT = 'invitation_sent', 'Invitation sent'
         INVITATION_ACCEPTED = 'invitation_accepted', 'Invitation accepted'
+        API_KEY_ISSUED = 'api_key_issued', 'API key issued'
+        API_KEY_REVOKED = 'api_key_revoked', 'API key revoked'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -117,3 +123,70 @@ class AuditLog(models.Model):
             logger.exception('AuditLog.record failed (action=%s, target=%s)', action, target)
             return None
 
+
+class APIKey(models.Model):
+    """Long-lived API key for programmatic access to the REST API.
+
+    Keys are issued once; only the SHA-256 hash of the raw key is stored. The
+    `key_prefix` is a short identifier shown in the UI (and sent by clients)
+    to pick the right row without scanning every row on every request.
+
+    Raw key format: ``vlnx_<prefix>_<secret>``
+      - prefix: 8 url-safe chars (identification, not a secret)
+      - secret: 32 url-safe chars (~192 bits of entropy)
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='api_keys',
+    )
+    name = models.CharField(max_length=100, help_text='Human label, e.g. "CI pipeline"')
+    key_prefix = models.CharField(max_length=16, unique=True, db_index=True)
+    hashed_key = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} ({self.key_prefix})'
+
+    @property
+    def is_active(self):
+        if self.revoked_at is not None:
+            return False
+        if self.expires_at and timezone.now() >= self.expires_at:
+            return False
+        return True
+
+    @staticmethod
+    def _hash(raw_key: str) -> str:
+        return hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def issue(cls, user, name: str, expires_at=None):
+        """Create a new API key and return ``(instance, raw_key)``.
+        The raw key is shown to the user once and never stored in plaintext."""
+        prefix = secrets.token_urlsafe(6)[:8]
+        secret = secrets.token_urlsafe(32)
+        raw = f'vlnx_{prefix}_{secret}'
+        obj = cls.objects.create(
+            user=user,
+            name=name,
+            key_prefix=prefix,
+            hashed_key=cls._hash(raw),
+            expires_at=expires_at,
+        )
+        return obj, raw
+
+    def matches(self, raw_key: str) -> bool:
+        return secrets.compare_digest(self.hashed_key, self._hash(raw_key))
+
+    def revoke(self):
+        if self.revoked_at is None:
+            self.revoked_at = timezone.now()
+            self.save(update_fields=['revoked_at'])

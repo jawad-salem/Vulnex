@@ -20,7 +20,7 @@ from .forms import (
     UserPasswordChangeForm,
     UserProfileForm,
 )
-from .models import AuditLog, User
+from .models import APIKey, AuditLog, User
 
 
 class CustomLoginView(LoginView):
@@ -314,3 +314,52 @@ def audit_log(request):
         'action_choices': AuditLog.Action.choices,
         'action_filter': action_filter,
     })
+
+
+@login_required
+def api_key_list(request):
+    keys = APIKey.objects.filter(user=request.user)
+    return render(request, 'accounts/api_key_list.html', {
+        'keys': keys,
+        'new_raw_key': request.session.pop('new_api_key', None),
+    })
+
+
+@login_required
+def api_key_create(request):
+    if request.method != 'POST':
+        return redirect('accounts:api_key_list')
+    name = (request.POST.get('name') or '').strip()
+    if not name:
+        messages.error(request, 'API key name is required.')
+        return redirect('accounts:api_key_list')
+    key, raw = APIKey.issue(user=request.user, name=name[:100])
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.API_KEY_ISSUED,
+        target=str(key.pk),
+        details={'name': key.name, 'prefix': key.key_prefix},
+        request=request,
+    )
+    # Stash the raw key in the session so it can be shown exactly once on the
+    # next page render, then deleted by the list view on pop().
+    request.session['new_api_key'] = raw
+    messages.success(request, 'API key created. Copy it now — it will not be shown again.')
+    return redirect('accounts:api_key_list')
+
+
+@login_required
+def api_key_revoke(request, pk):
+    key = get_object_or_404(APIKey, pk=pk, user=request.user)
+    if request.method != 'POST':
+        return redirect('accounts:api_key_list')
+    key.revoke()
+    AuditLog.record(
+        actor=request.user,
+        action=AuditLog.Action.API_KEY_REVOKED,
+        target=str(key.pk),
+        details={'name': key.name, 'prefix': key.key_prefix},
+        request=request,
+    )
+    messages.success(request, f'Revoked API key "{key.name}".')
+    return redirect('accounts:api_key_list')
