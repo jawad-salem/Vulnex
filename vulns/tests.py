@@ -771,3 +771,221 @@ class EvidenceDownloadTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = b''.join(resp.streaming_content)
         self.assertEqual(body, b'fake-bytes')
+
+
+# ── Scanner parsers (step 2.2) ────────────────────────────────────────────
+
+from .parsers import (  # noqa: E402
+    parse_burp_xml,
+    parse_nessus_xml,
+    parse_semgrep_json,
+    parse_zap_json,
+)
+
+
+BURP_SAMPLE = b"""<?xml version="1.0"?>
+<issues>
+  <issue>
+    <serialNumber>1</serialNumber>
+    <type>1048832</type>
+    <name>Cross-site scripting (reflected)</name>
+    <host ip="192.0.2.10">http://example.com</host>
+    <path><![CDATA[/search]]></path>
+    <location><![CDATA[/search [q parameter]]]></location>
+    <severity>High</severity>
+    <confidence>Certain</confidence>
+    <issueBackground><![CDATA[XSS background]]></issueBackground>
+    <issueDetail><![CDATA[The q parameter reflects user input.]]></issueDetail>
+    <remediationDetail><![CDATA[HTML-encode output.]]></remediationDetail>
+    <vulnerabilityClassifications><![CDATA[CWE-79: XSS]]></vulnerabilityClassifications>
+  </issue>
+  <issue>
+    <serialNumber>2</serialNumber>
+    <name>HTTP TRACE method is enabled</name>
+    <host ip="192.0.2.10">http://example.com</host>
+    <path><![CDATA[/]]></path>
+    <severity>Information</severity>
+    <issueDetail><![CDATA[TRACE is on.]]></issueDetail>
+  </issue>
+</issues>
+"""
+
+
+NESSUS_SAMPLE = b"""<?xml version="1.0"?>
+<NessusClientData_v2>
+  <Report name="Scan">
+    <ReportHost name="host.example.com">
+      <HostProperties>
+        <tag name="host-ip">192.0.2.20</tag>
+        <tag name="host-fqdn">host.example.com</tag>
+      </HostProperties>
+      <ReportItem port="443" svc_name="https" protocol="tcp" severity="3" pluginID="12345" pluginName="TLS Version 1.0 Protocol Detection">
+        <risk_factor>High</risk_factor>
+        <synopsis>Legacy TLS.</synopsis>
+        <description>The service supports TLS 1.0.</description>
+        <solution>Disable TLSv1.0.</solution>
+        <cvss3_base_score>7.4</cvss3_base_score>
+        <cve>CVE-2011-3389</cve>
+        <cwe>327</cwe>
+      </ReportItem>
+      <ReportItem port="0" svc_name="general" protocol="tcp" severity="0" pluginID="19506" pluginName="Nessus Scan Information">
+        <risk_factor>None</risk_factor>
+        <description>Scan metadata.</description>
+      </ReportItem>
+    </ReportHost>
+  </Report>
+</NessusClientData_v2>
+"""
+
+
+ZAP_SAMPLE = b"""{
+  "site": [{
+    "@name": "http://example.com",
+    "@host": "example.com",
+    "@port": "80",
+    "alerts": [
+      {
+        "pluginid": "40012",
+        "alert": "Cross Site Scripting (Reflected)",
+        "riskdesc": "High (Medium)",
+        "riskcode": "3",
+        "desc": "Reflected XSS in q parameter.",
+        "solution": "Encode output.",
+        "reference": "https://owasp.org/xss",
+        "cweid": "79",
+        "instances": [
+          {"uri": "http://example.com/search?q=1", "method": "GET", "param": "q"}
+        ]
+      },
+      {
+        "pluginid": "10020",
+        "alert": "X-Frame-Options Header Missing",
+        "riskdesc": "Medium (Medium)",
+        "riskcode": "2",
+        "desc": "Missing XFO header.",
+        "instances": [{"uri": "http://example.com/", "method": "GET"}]
+      }
+    ]
+  }]
+}
+"""
+
+
+SEMGREP_SAMPLE = b"""{
+  "results": [
+    {
+      "check_id": "python.django.security.injection.sql.sql-injection",
+      "path": "app/views.py",
+      "start": {"line": 42, "col": 8},
+      "end": {"line": 42, "col": 80},
+      "extra": {
+        "message": "Potential SQL injection via string concatenation.",
+        "severity": "ERROR",
+        "metadata": {"cwe": ["CWE-89: SQL Injection"], "owasp": ["A03:2021"]},
+        "lines": "query = 'SELECT * FROM users WHERE id=' + user_id"
+      }
+    },
+    {
+      "check_id": "generic.secrets.security.detected-aws-key",
+      "path": "config/prod.py",
+      "start": {"line": 3, "col": 1},
+      "end": {"line": 3, "col": 40},
+      "extra": {
+        "message": "AWS key detected",
+        "severity": "WARNING",
+        "metadata": {}
+      }
+    }
+  ]
+}
+"""
+
+
+class BurpParserTests(TestCase):
+    def test_parses_issues_and_maps_severity(self):
+        results = parse_burp_xml(BURP_SAMPLE)
+        self.assertEqual(len(results), 2)
+        xss, trace = results
+        self.assertEqual(xss['title'], 'Cross-site scripting (reflected)')
+        self.assertEqual(xss['severity'], 'high')
+        self.assertEqual(xss['parameter'], 'q')
+        self.assertEqual(xss['endpoint'], '/search')
+        self.assertEqual(xss['port'], 80)
+        self.assertEqual(xss['cwe_id'], 'CWE-79')
+        self.assertEqual(trace['severity'], 'info')
+
+
+class NessusParserTests(TestCase):
+    def test_parses_report_items(self):
+        results = parse_nessus_xml(NESSUS_SAMPLE)
+        self.assertEqual(len(results), 2)
+        tls, meta = results
+        self.assertEqual(tls['severity'], 'high')
+        self.assertEqual(tls['port'], 443)
+        self.assertEqual(tls['host'], 'host.example.com')
+        self.assertAlmostEqual(tls['cvss_score'], 7.4)
+        self.assertEqual(tls['cwe_id'], 'CWE-327')
+        self.assertIn('CVE-2011-3389', tls['references'])
+        self.assertEqual(meta['severity'], 'info')
+        self.assertNotIn('port', meta)  # port 0 is dropped
+
+
+class ZapParserTests(TestCase):
+    def test_parses_alerts_and_instances(self):
+        results = parse_zap_json(ZAP_SAMPLE)
+        self.assertEqual(len(results), 2)
+        xss, xfo = results
+        self.assertEqual(xss['severity'], 'high')
+        self.assertEqual(xss['parameter'], 'q')
+        self.assertEqual(xss['endpoint'], '/search')
+        self.assertEqual(xss['http_method'], 'GET')
+        self.assertEqual(xss['cwe_id'], 'CWE-79')
+        self.assertEqual(xfo['severity'], 'medium')
+
+
+class SemgrepParserTests(TestCase):
+    def test_parses_results_and_maps_severity(self):
+        results = parse_semgrep_json(SEMGREP_SAMPLE)
+        self.assertEqual(len(results), 2)
+        sqli, aws = results
+        self.assertEqual(sqli['severity'], 'high')
+        self.assertEqual(sqli['cwe_id'], 'CWE-89')
+        self.assertIn('app/views.py:42', sqli['endpoint'])
+        self.assertEqual(aws['severity'], 'medium')
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class ToolImportDedupTests(TestCase):
+    """Dedup uses (title, host, port, endpoint, parameter) — a second import
+    of the same Burp report must not create duplicate findings."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user('pt', role='pentester', password='pw')
+        self.engagement = Engagement.objects.create(
+            name='E', client_name='C', created_by=self.user,
+        )
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=self.user, role='lead',
+        )
+        self.client.force_login(self.user)
+
+    def _import(self, payload, filename, tool):
+        return self.client.post(
+            reverse('vulns:import', args=[self.engagement.pk]),
+            {
+                'tool': tool,
+                'file': SimpleUploadedFile(filename, payload, content_type='application/octet-stream'),
+            },
+            follow=True,
+        )
+
+    def test_burp_import_then_reimport_skips_duplicates(self):
+        self._import(BURP_SAMPLE, 'burp.xml', 'burp')
+        self.assertEqual(Finding.objects.filter(engagement=self.engagement).count(), 2)
+        self._import(BURP_SAMPLE, 'burp.xml', 'burp')
+        self.assertEqual(Finding.objects.filter(engagement=self.engagement).count(), 2)
+
+    def test_zap_import_creates_one_finding_per_instance(self):
+        self._import(ZAP_SAMPLE, 'zap.json', 'zap')
+        self.assertEqual(Finding.objects.filter(engagement=self.engagement).count(), 2)

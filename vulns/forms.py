@@ -131,6 +131,10 @@ class ToolImportForm(forms.Form):
     TOOL_CHOICES = [
         ('nuclei', 'Nuclei JSON'),
         ('nikto', 'Nikto JSON'),
+        ('burp', 'Burp Suite XML (issues export)'),
+        ('nessus', 'Nessus XML (.nessus v2)'),
+        ('zap', 'OWASP ZAP JSON'),
+        ('semgrep', 'Semgrep JSON (SAST)'),
     ]
     tool = forms.ChoiceField(choices=TOOL_CHOICES)
     file = forms.FileField()

@@ -50,6 +50,22 @@
                     <span class="detail-label">Nikto</span>
                     <span>JSON output (<code>-Format json</code>)</span>
                 </div>
+                <div class="detail-row">
+                    <span class="detail-label">Burp Suite</span>
+                    <span>XML issues export (<code>Report → XML</code>)</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Nessus</span>
+                    <span><code>.nessus</code> v2 export</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">OWASP ZAP</span>
+                    <span>JSON report (<code>Report → JSON</code>)</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Semgrep</span>
+                    <span>JSON output (<code>semgrep --json</code>)</span>
+                </div>
             </div>
         </div>
 
@@ -58,7 +74,7 @@
             <ul class="text-sm text-secondary" style="padding-left:18px">
                 <li class="mb-2">Imported vulnerabilities are assigned severity based on the tool's output</li>
                 <li class="mb-2">CVSS scores are calculated automatically where possible</li>
-                <li class="mb-2">Duplicate findings are not automatically deduplicated — review after import</li>
+                <li class="mb-2">Duplicates are detected on (<em>title, host, port, endpoint, parameter</em>) and skipped on re-import</li>
                 <li class="mb-2">You can edit any imported finding after import</li>
                 <li>Looking for Nmap import? It's in the <a href="{% url 'recon:dashboard' engagement.pk %}">Recon</a> section</li>
             </ul>

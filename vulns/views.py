@@ -11,7 +11,14 @@ from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence, FindingTemplate
 from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm
-from .parsers import parse_nuclei_json, parse_nikto_json
+from .parsers import (
+    parse_burp_xml,
+    parse_nessus_xml,
+    parse_nikto_json,
+    parse_nuclei_json,
+    parse_semgrep_json,
+    parse_zap_json,
+)
 from accounts.decorators import engagement_access, engagement_edit_required
 from accounts.models import AuditLog
 from recon.models import DiscoveredHost
@@ -347,26 +354,43 @@ def tool_import(request, engagement_pk):
             parsers = {
                 'nuclei': parse_nuclei_json,
                 'nikto': parse_nikto_json,
+                'burp': parse_burp_xml,
+                'nessus': parse_nessus_xml,
+                'zap': parse_zap_json,
+                'semgrep': parse_semgrep_json,
             }
             try:
                 findings_data = parsers[tool](content)
                 created = 0
                 skipped = 0
-                # Build set of (title, host, endpoint) from existing findings
+                # Dedup on (title, host, port, endpoint, parameter) — the same
+                # bug rediscovered on the same surface should not double-file.
                 existing_keys = set(
-                    engagement.findings.values_list('title', 'host', 'endpoint')
+                    engagement.findings.values_list(
+                        'title', 'host', 'port', 'endpoint', 'parameter',
+                    )
                 )
+                model_fields = {f.name for f in Finding._meta.get_fields()}
                 for fd in findings_data:
-                    dedup_key = (fd.get('title', ''), fd.get('host', ''), fd.get('endpoint', ''))
+                    dedup_key = (
+                        fd.get('title', ''),
+                        fd.get('host', ''),
+                        fd.get('port'),
+                        fd.get('endpoint', ''),
+                        fd.get('parameter', ''),
+                    )
                     if dedup_key in existing_keys:
                         skipped += 1
                         continue
                     existing_keys.add(dedup_key)
+                    # Parsers may emit keys the Finding model doesn't define
+                    # (e.g. Burp's `confidence`). Drop them before create().
+                    clean = {k: v for k, v in fd.items() if k in model_fields}
                     Finding.objects.create(
                         engagement=engagement,
                         found_by=request.user,
                         tool_source=tool.capitalize(),
-                        **fd
+                        **clean
                     )
                     created += 1
                 ActivityLog.objects.create(
