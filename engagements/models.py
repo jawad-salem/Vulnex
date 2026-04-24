@@ -15,6 +15,11 @@ class Client(models.Model):
     logo = models.ImageField(upload_to=client_logo_path, blank=True, null=True)
     primary_contact_email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
+    default_report_template = models.ForeignKey(
+        'reports.ReportTemplate', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='clients',
+        help_text='Report template used when generating reports for this client.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,7 +1,7 @@
 """
 PDF report generator for pentest engagements using ReportLab.
 Generates professional penetration testing reports with:
-- Cover page
+- Cover page (branded via ReportTemplate)
 - Executive summary with risk score
 - Findings summary table (grouped by host)
 - Detailed findings with CVSS vectors
@@ -10,6 +10,7 @@ Generates professional penetration testing reports with:
 import io
 import math
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 from xml.sax.saxutils import escape as xml_escape
 
@@ -19,7 +20,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch, mm
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, HRFlowable
+    PageBreak, HRFlowable, Image,
 )
 from reportlab.lib.enums import TA_CENTER
 
@@ -31,6 +32,9 @@ def _esc(text):
     return xml_escape(str(text))
 
 
+# Severity colors are intentionally fixed — red means critical in every
+# pentest report, and shouldn't be themeable. Brand (cover, headers, rules)
+# comes from the ReportTemplate instead.
 SEVERITY_COLORS = {
     'critical': colors.HexColor('#E24B4A'),
     'high': colors.HexColor('#D85A30'),
@@ -40,8 +44,112 @@ SEVERITY_COLORS = {
 }
 
 
-def generate_report_pdf(engagement, report_type='full'):
-    """Generate a PDF report for the given engagement. Returns bytes."""
+@dataclass
+class _Brand:
+    """Resolved brand kit used by the generator — colors, logos, boilerplate.
+
+    Populated from a ReportTemplate if one is picked (explicitly, via the
+    engagement's client, or the global default); otherwise a hard-coded
+    fallback matching the original look.
+    """
+    primary: colors.Color
+    accent: colors.Color
+    template_logo_path: str | None
+    client_logo_path: str | None
+    preamble: str
+    disclaimer: str
+    footer_text: str
+
+
+def _resolve_template(engagement, template=None):
+    """Pick a ReportTemplate. Explicit arg > client default > global default.
+    Returns None if nothing is configured — caller falls back to built-in.
+    """
+    if template is not None:
+        return template
+    from engagements.models import Client  # avoid circular import
+    client = getattr(engagement, 'client', None)
+    if client and client.default_report_template_id:
+        return client.default_report_template
+    from .models import ReportTemplate
+    return ReportTemplate.objects.filter(is_default=True).first()
+
+
+def _build_brand(engagement, template):
+    """Materialize a _Brand from the template (or defaults)."""
+    if template:
+        primary = colors.HexColor(template.primary_color)
+        accent = colors.HexColor(template.accent_color)
+        tpl_logo = template.cover_logo.path if template.cover_logo else None
+        preamble = template.preamble_markdown
+        disclaimer = template.disclaimer_markdown
+        footer = template.footer_text
+    else:
+        primary = colors.HexColor('#534AB7')
+        accent = colors.HexColor('#378ADD')
+        tpl_logo = None
+        preamble = ''
+        disclaimer = ''
+        footer = ''
+
+    client = getattr(engagement, 'client', None)
+    client_logo = None
+    if client and getattr(client, 'logo', None):
+        try:
+            client_logo = client.logo.path
+        except (ValueError, FileNotFoundError):
+            client_logo = None
+
+    return _Brand(
+        primary=primary, accent=accent,
+        template_logo_path=tpl_logo, client_logo_path=client_logo,
+        preamble=preamble, disclaimer=disclaimer, footer_text=footer,
+    )
+
+
+def _footer_drawer(footer_text: str, accent: colors.Color):
+    """Return an onPage callback that paints `footer_text` + page # on every page."""
+    def _draw(canvas, doc):
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        canvas.setFillColor(colors.HexColor('#666666'))
+        if footer_text:
+            canvas.drawString(20 * mm, 12 * mm, footer_text[:200])
+        page_str = f'Page {doc.page}'
+        canvas.drawRightString(A4[0] - 20 * mm, 12 * mm, page_str)
+        canvas.setStrokeColor(accent)
+        canvas.setLineWidth(0.5)
+        canvas.line(20 * mm, 15 * mm, A4[0] - 20 * mm, 15 * mm)
+        canvas.restoreState()
+    return _draw
+
+
+def _logo_flowable(path: str, max_width=2.2 * inch, max_height=1.1 * inch):
+    """Scale a logo to fit within the given box without distortion."""
+    try:
+        img = Image(path)
+    except Exception:
+        return None
+    if img.imageWidth <= 0 or img.imageHeight <= 0:
+        return None
+    ratio = min(max_width / img.imageWidth, max_height / img.imageHeight, 1.0)
+    img.drawWidth = img.imageWidth * ratio
+    img.drawHeight = img.imageHeight * ratio
+    img.hAlign = 'CENTER'
+    return img
+
+
+def generate_report_pdf(engagement, report_type='full', template=None, cover_only=False):
+    """Generate a PDF report for the given engagement. Returns bytes.
+
+    ``template`` overrides the resolved ReportTemplate; when absent, the
+    engagement's client default is used, else the library's default, else
+    a hard-coded brand. ``cover_only=True`` renders just the cover page as
+    a preview for the template picker.
+    """
+    template = _resolve_template(engagement, template)
+    brand = _build_brand(engagement, template)
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -75,15 +183,23 @@ def generate_report_pdf(engagement, report_type='full'):
     ))
 
     elements = []
-    findings = engagement.findings.all().order_by(
-        models_severity_order(), '-cvss_score'
-    )
 
     # ── Cover page ──
-    elements.append(Spacer(1, 2 * inch))
+    for logo_path in (brand.client_logo_path, brand.template_logo_path):
+        if not logo_path:
+            continue
+        img = _logo_flowable(logo_path)
+        if img is not None:
+            elements.append(Spacer(1, 1 * inch))
+            elements.append(img)
+            elements.append(Spacer(1, 0.3 * inch))
+            break
+    else:
+        elements.append(Spacer(1, 2 * inch))
+
     elements.append(Paragraph('PENETRATION TEST REPORT', styles['CoverTitle']))
     elements.append(Spacer(1, 0.3 * inch))
-    elements.append(HRFlowable(width='60%', color=colors.HexColor('#534AB7'), thickness=2))
+    elements.append(HRFlowable(width='60%', color=brand.primary, thickness=2))
     elements.append(Spacer(1, 0.3 * inch))
     elements.append(Paragraph(_esc(engagement.name), styles['CoverSubtitle']))
     elements.append(Paragraph(f'Client: {_esc(engagement.client_name)}', styles['CoverSubtitle']))
@@ -105,7 +221,23 @@ def generate_report_pdf(engagement, report_type='full'):
         'Conf', parent=styles['Normal'], fontSize=12, alignment=TA_CENTER,
         textColor=colors.HexColor('#E24B4A'), fontName='Helvetica-Bold',
     )))
+
+    if cover_only:
+        doc.build(
+            elements,
+            onFirstPage=_footer_drawer(brand.footer_text, brand.accent),
+            onLaterPages=_footer_drawer(brand.footer_text, brand.accent),
+        )
+        buffer.seek(0)
+        return buffer.getvalue()
+
     elements.append(PageBreak())
+
+    # Findings query — deferred until past the cover-only bailout so the
+    # template preview endpoint can render with an unsaved engagement stub.
+    findings = engagement.findings.all().order_by(
+        models_severity_order(), '-cvss_score'
+    )
 
     # ── Table of contents placeholder ──
     elements.append(Paragraph('Table of contents', styles['SectionHeading']))
@@ -117,6 +249,13 @@ def generate_report_pdf(engagement, report_type='full'):
 
     # ── 1. Executive summary ──
     elements.append(Paragraph('1. Executive summary', styles['SectionHeading']))
+
+    if brand.preamble:
+        for line in brand.preamble.splitlines():
+            if line.strip():
+                elements.append(Paragraph(_esc(line.strip()), styles['BodyText2']))
+        elements.append(Spacer(1, 8))
+
     total = findings.count()
     crit = findings.filter(severity='critical').count()
     high = findings.filter(severity='high').count()
@@ -154,7 +293,7 @@ def generate_report_pdf(engagement, report_type='full'):
     ]
     summary_table = Table(summary_data, colWidths=[120, 60])
     summary_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#534AB7')),
+        ('BACKGROUND', (0, 0), (-1, 0), brand.primary),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, -1), 9),
@@ -221,7 +360,7 @@ def generate_report_pdf(engagement, report_type='full'):
 
         host_summary_table = Table(host_summary_data, colWidths=[200, 55, 65, 65])
         host_summary_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#534AB7')),
+            ('BACKGROUND', (0, 0), (-1, 0), brand.primary),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
@@ -250,7 +389,7 @@ def generate_report_pdf(engagement, report_type='full'):
         col_widths = [25, 250, 65, 45, 75]
         findings_table = Table(findings_table_data, colWidths=col_widths)
         table_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#534AB7')),
+            ('BACKGROUND', (0, 0), (-1, 0), brand.primary),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
@@ -292,7 +431,7 @@ def generate_report_pdf(engagement, report_type='full'):
                     styles['SubHeading'],
                 ))
                 elements.append(HRFlowable(
-                    width='100%', color=colors.HexColor('#534AB7'), thickness=1,
+                    width='100%', color=brand.primary, thickness=1,
                 ))
                 elements.append(Spacer(1, 6))
 
@@ -369,8 +508,16 @@ def generate_report_pdf(engagement, report_type='full'):
 
                 elements.append(PageBreak())
 
+    # ── Disclaimer ──
+    if brand.disclaimer:
+        elements.append(Paragraph('Disclaimer', styles['SectionHeading']))
+        for line in brand.disclaimer.splitlines():
+            if line.strip():
+                elements.append(Paragraph(_esc(line.strip()), styles['BodyText2']))
+
     # Build
-    doc.build(elements)
+    footer_cb = _footer_drawer(brand.footer_text, brand.accent)
+    doc.build(elements, onFirstPage=footer_cb, onLaterPages=footer_cb)
     buffer.seek(0)
     return buffer.getvalue()
 
@@ -466,4 +613,3 @@ def _risk_label(score):
     elif score >= 0.1:
         return 'Low', '#378ADD'
     return 'Info', '#888780'
-

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Report templates — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'dashboard:home' %}">Dashboard</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Report templates</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Report templates</h1>
+        <p class="page-subtitle">Brand kits for generated PDFs — logo, colors, boilerplate.</p>
+    </div>
+    <div>
+        <a href="{% url 'reports:template_create' %}" class="btn btn-primary">+ New template</a>
+    </div>
+</div>
+
+<div class="card">
+    {% if templates %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Primary</th>
+                <th>Accent</th>
+                <th>Default</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in templates %}
+            <tr>
+                <td><strong>{{ t.name }}</strong></td>
+                <td>
+                    <span class="color-swatch" style="background: {{ t.primary_color }};"></span>
+                    <code class="text-xs">{{ t.primary_color }}</code>
+                </td>
+                <td>
+                    <span class="color-swatch" style="background: {{ t.accent_color }};"></span>
+                    <code class="text-xs">{{ t.accent_color }}</code>
+                </td>
+                <td>
+                    {% if t.is_default %}<span class="badge badge-success">default</span>{% else %}<span class="text-xs text-secondary">—</span>{% endif %}
+                </td>
+                <td class="text-xs text-secondary">{{ t.created_at|date:"M d, Y" }}</td>
+                <td class="text-right">
+                    <a href="{% url 'reports:template_preview' t.pk %}" target="_blank" class="btn btn-sm">Preview</a>
+                    <a href="{% url 'reports:template_edit' t.pk %}" class="btn btn-sm">Edit</a>
+                    <a href="{% url 'reports:template_delete' t.pk %}" class="btn btn-sm btn-danger">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <p>No report templates yet.</p>
+        <p class="text-xs">Create one to brand the PDFs for a client.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}{% if template %}Edit{% else %}New{% endif %} report template — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'dashboard:home' %}">Dashboard</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'reports:template_list' %}">Report templates</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{% if template %}{{ template.name }}{% else %}New{% endif %}</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{% if template %}Edit template{% else %}New template{% endif %}</h1>
+        <p class="page-subtitle">Colors, logo, and boilerplate for generated report PDFs.</p>
+    </div>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-error">{{ form.non_field_errors }}</div>
+        {% endif %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} *{% endif %}</label>
+            {{ field }}
+            {% if field.help_text %}<span class="form-help">{{ field.help_text }}</span>{% endif %}
+            {% if field.errors %}<span class="form-error">{{ field.errors|join:", " }}</span>{% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if template %}Save changes{% else %}Create template{% endif %}</button>
+            <a href="{% url 'reports:template_list' %}" class="btn">Cancel</a>
+            {% if template %}
+            <a href="{% url 'reports:template_preview' template.pk %}" target="_blank" class="btn">Preview cover</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+{% endblock %}

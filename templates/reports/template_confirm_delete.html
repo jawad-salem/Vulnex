@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ template.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'dashboard:home' %}">Dashboard</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'reports:template_list' %}">Report templates</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Delete {{ template.name }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete template</h1>
+        <p class="page-subtitle">This cannot be undone.</p>
+    </div>
+</div>
+
+<div class="card">
+    <p>Delete <strong>{{ template.name }}</strong>?</p>
+    <p class="text-xs text-secondary">
+        Any client currently pinned to this template will fall back to the global default.
+        Reports already generated are not affected.
+    </p>
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Delete template</button>
+        <a href="{% url 'reports:template_list' %}" class="btn">Cancel</a>
+    </form>
+</div>
+{% endblock %}

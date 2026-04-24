@@ -79,13 +79,16 @@
             <form method="post" action="{% url 'reports:generate' engagement.pk %}">
                 {% csrf_token %}
                 <div class="form-group">
-                    <label for="report_type">Report type</label>
-                    <select name="report_type" id="report_type" class="form-input">
-                        <option value="full">Full Report</option>
-                        <option value="executive">Executive Summary</option>
-                        <option value="technical">Technical Detail</option>
-                    </select>
+                    <label for="id_report_type">Report type</label>
+                    {{ generate_form.report_type }}
                 </div>
+                {% if templates %}
+                <div class="form-group">
+                    <label for="id_template">Template</label>
+                    {{ generate_form.template }}
+                    <span class="form-help">{{ generate_form.template.help_text }}</span>
+                </div>
+                {% endif %}
                 <button type="submit" class="btn btn-primary btn-full">Generate PDF</button>
             </form>
         </div>

@@ -45,6 +45,10 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
                     Audit log
                 </a>
+                <a href="{% url 'reports:template_list' %}" class="nav-item {% if request.resolver_match.app_name == 'reports' and 'template' in request.resolver_match.url_name %}active{% endif %}">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M7 8h10M7 12h6"/></svg>
+                    Report templates
+                </a>
                 {% endif %}
             </nav>
 
