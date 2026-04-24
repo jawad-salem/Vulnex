@@ -7,7 +7,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember, ActivityLog
+from engagements.models import Engagement, EngagementMember, ActivityLog, Client as EngagementClient
 from .models import Finding, Evidence
 
 
@@ -16,7 +16,7 @@ class CVSSCalculationTests(TestCase):
         self.user = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
             name='Test Engagement',
-            client_name='Test Client',
+            client=EngagementClient.objects.get_or_create(name='Test Client')[0],
             created_by=self.user,
         )
 
@@ -191,7 +191,7 @@ class RetestWorkflowTests(TestCase):
         self.client = Client()
         self.pentester = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=self.pentester,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.pentester,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.pentester, role='lead',
@@ -265,7 +265,7 @@ class SLATrackingTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='T', client_name='ACME', created_by=self.user,
+            name='T', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.user,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.user, role='lead',
@@ -400,7 +400,7 @@ class FindingAssignmentTests(TestCase):
         self.bob = User.objects.create_user('bob', role='pentester', password='testpass1')
         self.cli = User.objects.create_user('cli', role='client', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='T', client_name='ACME', created_by=self.lead,
+            name='T', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
         EngagementMember.objects.create(engagement=self.engagement, user=self.alice, role='pentester')
@@ -529,7 +529,7 @@ class ReviewWorkflowTests(TestCase):
         self.rev = User.objects.create_user('rev', role='reviewer', password='testpass1')
         self.cli = User.objects.create_user('cli', role='client', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='T', client_name='ACME', created_by=self.lead,
+            name='T', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
         EngagementMember.objects.create(engagement=self.engagement, user=self.pt, role='pentester')
@@ -734,7 +734,7 @@ class EvidenceDownloadTests(TestCase):
         self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
         self.outsider = User.objects.create_user('out', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='X', client_name='ACME', created_by=self.lead,
+            name='X', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.lead, role='lead',
@@ -963,7 +963,7 @@ class ToolImportDedupTests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user('pt', role='pentester', password='pw')
         self.engagement = Engagement.objects.create(
-            name='E', client_name='C', created_by=self.user,
+            name='E', client=EngagementClient.objects.get_or_create(name='C')[0], created_by=self.user,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.user, role='lead',

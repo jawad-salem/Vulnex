@@ -6,9 +6,10 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
-from django.http import HttpResponse
-from .models import Engagement, EngagementMember, Invitation, ActivityLog
+from django.db.models import Count, Q
+from django.http import Http404, HttpResponse
+from django.utils import timezone
+from .models import Engagement, EngagementMember, Invitation, ActivityLog, Client
 from .forms import EngagementForm, EngagementNoteForm
 from reports.generator import calculate_engagement_risk_score, _risk_label
 from accounts.decorators import role_required, engagement_access, engagement_edit_required
@@ -40,7 +41,7 @@ def engagement_list(request):
         engagements = engagements.filter(engagement_type=type_filter)
     if search:
         engagements = engagements.filter(
-            Q(name__icontains=search) | Q(client_name__icontains=search)
+            Q(name__icontains=search) | Q(client__name__icontains=search)
         )
 
     paginator = Paginator(engagements, 15)
@@ -152,7 +153,10 @@ def engagement_create(request):
             return redirect('engagements:detail', pk=engagement.pk)
     else:
         form = EngagementForm()
-    return render(request, 'engagements/form.html', {'form': form, 'title': 'New engagement'})
+    return render(request, 'engagements/form.html', {
+        'form': form, 'title': 'New engagement',
+        'existing_clients': Client.objects.all(),
+    })
 
 
 @login_required
@@ -171,7 +175,10 @@ def engagement_edit(request, pk):
             return redirect('engagements:detail', pk=pk)
     else:
         form = EngagementForm(instance=engagement)
-    return render(request, 'engagements/form.html', {'form': form, 'title': 'Edit engagement', 'engagement': engagement})
+    return render(request, 'engagements/form.html', {
+        'form': form, 'title': 'Edit engagement', 'engagement': engagement,
+        'existing_clients': Client.objects.all(),
+    })
 
 
 @login_required
@@ -490,3 +497,100 @@ def accept_invitation(request, token):
         'form': form,
         'invitation': invitation,
     })
+
+
+# ── Clients (admin + engagement leads only) ──
+
+def _clients_visible_to(user):
+    """Clients the user is allowed to see. Admins see all; otherwise a lead on
+    at least one engagement for that client."""
+    if user.role == 'admin':
+        return Client.objects.all()
+    lead_client_ids = (
+        Engagement.objects
+        .filter(members__user=user, members__role=EngagementMember.Role.LEAD)
+        .values_list('client_id', flat=True)
+    )
+    return Client.objects.filter(pk__in=lead_client_ids)
+
+
+@login_required
+def client_list(request):
+    clients_qs = _clients_visible_to(request.user)
+    if not clients_qs.exists() and request.user.role != 'admin':
+        messages.error(request, 'You do not have access to the clients directory.')
+        return redirect('engagements:list')
+
+    search = (request.GET.get('q') or '').strip()
+    if search:
+        clients_qs = clients_qs.filter(name__icontains=search)
+
+    clients = list(
+        clients_qs.annotate(eng_count=Count('engagements', distinct=True))
+        .order_by('name')
+    )
+    return render(request, 'engagements/client_list.html', {
+        'clients': clients,
+        'search_query': search,
+        'total_count': len(clients),
+    })
+
+
+@login_required
+def client_detail(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+
+    is_admin = request.user.role == 'admin'
+    if is_admin:
+        engagements_qs = client.engagements.all()
+    else:
+        engagements_qs = client.engagements.filter(
+            members__user=request.user,
+            members__role=EngagementMember.Role.LEAD,
+        ).distinct()
+        if not engagements_qs.exists():
+            raise Http404('Client not found.')
+
+    from vulns.models import Finding
+
+    findings_qs = Finding.objects.filter(engagement__in=engagements_qs)
+    severity_counts = {
+        sev: findings_qs.filter(severity=sev).count()
+        for sev, _ in Finding.Severity.choices
+    }
+
+    from datetime import timedelta
+    today = timezone.now().date()
+    open_findings = findings_qs.exclude(status__in=Finding.SLA_CLOSED_STATUSES)
+    sla_counts = {
+        'overdue': open_findings.filter(due_date__lt=today).count(),
+        'due_soon': open_findings.filter(
+            due_date__gte=today, due_date__lte=today + timedelta(days=3),
+        ).count(),
+        'on_track': open_findings.filter(
+            Q(due_date__gt=today + timedelta(days=3)) | Q(due_date__isnull=True)
+        ).count(),
+        'closed': findings_qs.filter(status__in=Finding.SLA_CLOSED_STATUSES).count(),
+    }
+
+    engagements = list(
+        engagements_qs
+        .annotate(fcount=Count('findings', distinct=True))
+        .order_by('-created_at')
+    )
+
+    active_count = sum(
+        1 for e in engagements
+        if e.status not in (Engagement.Status.COMPLETED, Engagement.Status.CANCELLED)
+    )
+
+    context = {
+        'client': client,
+        'engagements': engagements,
+        'engagement_count': len(engagements),
+        'active_count': active_count,
+        'total_findings': findings_qs.count(),
+        'severity_counts': severity_counts,
+        'sla_counts': sla_counts,
+    }
+    return render(request, 'engagements/client_detail.html', context)

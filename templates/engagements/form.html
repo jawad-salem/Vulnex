@@ -26,6 +26,10 @@
             <div class="form-group">
                 <label for="{{ form.client_name.id_for_label }}">Client</label>
                 {{ form.client_name }}
+                <datalist id="client-suggestions">
+                    {% for c in existing_clients %}<option value="{{ c.name }}"></option>{% endfor %}
+                </datalist>
+                {% if form.client_name.help_text %}<span class="form-help">{{ form.client_name.help_text }}</span>{% endif %}
                 {% if form.client_name.errors %}<span class="field-error">{{ form.client_name.errors.0 }}</span>{% endif %}
             </div>
         </div>

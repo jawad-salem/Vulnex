@@ -5,7 +5,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember, ActivityLog
+from engagements.models import Engagement, EngagementMember, ActivityLog, Client as EngagementClient
 from recon.models import DiscoveredHost
 from .crypto import encrypt_secret, decrypt_secret
 from .models import Credential
@@ -54,7 +54,7 @@ class RotateVaultKeyCommandTests(TestCase):
     def setUp(self):
         user = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Rotate', client_name='ACME', created_by=user,
+            name='Rotate', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=user,
         )
 
     def test_rotation_preserves_plaintext(self):
@@ -105,7 +105,7 @@ class CredentialModelTests(TestCase):
     def setUp(self):
         user = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=user,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=user,
         )
 
     def test_set_secret_stores_ciphertext(self):
@@ -141,7 +141,7 @@ class CredentialAccessTests(TestCase):
         self.rev = User.objects.create_user('rev', role='pentester', password='testpass1')
         self.cli = User.objects.create_user('cli', role='client', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=self.lead,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
         EngagementMember.objects.create(engagement=self.engagement, user=self.pt, role='pentester')
@@ -187,7 +187,7 @@ class CredentialWorkflowTests(TestCase):
         self.client = Client()
         self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=self.lead,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
         self.host = DiscoveredHost.objects.create(
@@ -318,7 +318,7 @@ class CredentialWorkflowTests(TestCase):
     def test_host_queryset_scoped_to_engagement(self):
         """Form host field only lists hosts from this engagement."""
         other_eng = Engagement.objects.create(
-            name='Other', client_name='X', created_by=self.lead,
+            name='Other', client=EngagementClient.objects.get_or_create(name='X')[0], created_by=self.lead,
         )
         DiscoveredHost.objects.create(engagement=other_eng, hostname='leak.example.com')
         self.client.login(username='lead', password='testpass1')

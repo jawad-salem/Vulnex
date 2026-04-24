@@ -12,16 +12,45 @@ class EngagementSerializer(serializers.ModelSerializer):
     finding_count = serializers.ReadOnlyField()
     critical_count = serializers.ReadOnlyField()
     high_count = serializers.ReadOnlyField()
+    client_name = serializers.CharField(
+        required=False, allow_blank=True, write_only=False,
+        help_text='Client name — writing this gets-or-creates a Client record.',
+    )
 
     class Meta:
         model = Engagement
         fields = [
-            'id', 'name', 'client_name', 'engagement_type', 'status',
+            'id', 'name', 'client', 'client_name', 'engagement_type', 'status',
             'description', 'in_scope', 'out_of_scope', 'rules_of_engagement',
             'start_date', 'end_date', 'created_at', 'updated_at',
             'scope_targets', 'finding_count', 'critical_count', 'high_count',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'client', 'created_at', 'updated_at']
+
+    def _resolve_client(self, validated_data):
+        name = (validated_data.pop('client_name', '') or '').strip()
+        if not name:
+            return None
+        from engagements.models import Client
+        client = Client.objects.filter(name__iexact=name).first()
+        return client or Client.objects.create(name=name)
+
+    def create(self, validated_data):
+        client = self._resolve_client(validated_data)
+        if client:
+            validated_data['client'] = client
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        client = self._resolve_client(validated_data)
+        if client:
+            validated_data['client'] = client
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['client_name'] = instance.client_name
+        return data
 
 
 class FindingSerializer(serializers.ModelSerializer):

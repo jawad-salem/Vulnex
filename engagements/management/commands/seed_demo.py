@@ -10,7 +10,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember
+from engagements.models import Engagement, EngagementMember, Client
 
 
 DEMO_ENGAGEMENT_NAME = 'Acme Corp — Q2 External Pentest'
@@ -70,9 +70,13 @@ class Command(BaseCommand):
 
     def _create_engagement(self, owner):
         today = timezone.now().date()
+        client, _ = Client.objects.get_or_create(
+            name=DEMO_CLIENT,
+            defaults={'primary_contact_email': 'security@acme.example'},
+        )
         return Engagement.objects.create(
             name=DEMO_ENGAGEMENT_NAME,
-            client_name=DEMO_CLIENT,
+            client=client,
             engagement_type=Engagement.EngagementType.EXTERNAL,
             status=Engagement.Status.EXPLOITATION,
             description=(

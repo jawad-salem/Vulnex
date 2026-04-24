@@ -167,7 +167,7 @@ def global_search(request):
     results['engagements'] = list(
         eng_qs.filter(
             Q(name__icontains=query)
-            | Q(client_name__icontains=query)
+            | Q(client__name__icontains=query)
             | Q(description__icontains=query)
         )[:15]
     )

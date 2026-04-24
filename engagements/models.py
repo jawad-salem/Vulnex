@@ -5,6 +5,28 @@ from django.utils import timezone
 import uuid
 
 
+def client_logo_path(instance, filename):
+    return f'client_logos/{instance.pk}/{filename}'
+
+
+class Client(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=200, unique=True)
+    logo = models.ImageField(upload_to=client_logo_path, blank=True, null=True)
+    primary_contact_email = models.EmailField(blank=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse('engagements:client_detail', kwargs={'pk': self.pk})
+
+
 class Engagement(models.Model):
     class Status(models.TextChoices):
         PLANNING = 'planning', 'Planning'
@@ -28,7 +50,10 @@ class Engagement(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200)
-    client_name = models.CharField(max_length=200)
+    client = models.ForeignKey(
+        Client, on_delete=models.PROTECT,
+        related_name='engagements', null=True, blank=True,
+    )
     engagement_type = models.CharField(max_length=30, choices=EngagementType.choices)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNING)
     description = models.TextField(blank=True)
@@ -58,6 +83,10 @@ class Engagement(models.Model):
 
     def get_absolute_url(self):
         return reverse('engagements:detail', kwargs={'pk': self.pk})
+
+    @property
+    def client_name(self):
+        return self.client.name if self.client_id else ''
 
     @property
     def scope_targets(self):

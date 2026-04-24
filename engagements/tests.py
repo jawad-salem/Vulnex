@@ -1,7 +1,7 @@
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
-from .models import Engagement, EngagementMember, Invitation
+from .models import Engagement, EngagementMember, Invitation, Client as EngagementClient
 
 
 @override_settings(MFA_REQUIRED_ROLES=[])
@@ -16,7 +16,7 @@ class EngagementAccessTests(TestCase):
 
         self.engagement = Engagement.objects.create(
             name='Test Engagement',
-            client_name='ACME',
+            client=EngagementClient.objects.get_or_create(name='ACME')[0],
             created_by=self.admin,
         )
         # Add members
@@ -80,7 +80,7 @@ class EngagementModelTests(TestCase):
         self.admin = User.objects.create_user('admin', role='admin', password='testpass1')
         self.pentester = User.objects.create_user('pt', role='pentester', password='testpass1')
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=self.admin,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.admin,
         )
         self.membership = EngagementMember.objects.create(
             engagement=self.engagement, user=self.pentester, role='lead',
@@ -128,7 +128,7 @@ class InvitationFlowTests(TestCase):
             'admin', role='admin', password='testpass1', email='admin@test.com',
         )
         self.engagement = Engagement.objects.create(
-            name='Test', client_name='ACME', created_by=self.admin,
+            name='Test', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.admin,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.admin, role='lead',
@@ -194,7 +194,7 @@ class InvitationFlowTests(TestCase):
             email='clientuser@test.com',
         )
         engagement_b = Engagement.objects.create(
-            name='Other', client_name='OtherCo', created_by=self.admin,
+            name='Other', client=EngagementClient.objects.get_or_create(name='OtherCo')[0], created_by=self.admin,
         )
         invitation = Invitation.objects.create(
             engagement=engagement_b, email='clientuser@test.com',

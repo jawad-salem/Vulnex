@@ -3,7 +3,7 @@ from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember
+from engagements.models import Engagement, EngagementMember, Client as EngagementClient
 from .models import Report
 
 
@@ -20,7 +20,7 @@ class DownloadReportContentDispositionTests(TestCase):
 
     def _make_report(self, engagement_name: str, filename: str = 'pentest.pdf') -> Report:
         engagement = Engagement.objects.create(
-            name=engagement_name, client_name='ACME', created_by=self.lead,
+            name=engagement_name, client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',

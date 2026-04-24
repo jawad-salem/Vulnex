@@ -4,6 +4,7 @@ from django_otp.oath import totp
 from django_otp.plugins.otp_static.models import StaticDevice
 from django_otp.plugins.otp_totp.models import TOTPDevice
 from .models import User, AuditLog
+from engagements.models import Client as EngagementClient
 
 
 class UserModelTests(TestCase):
@@ -445,7 +446,7 @@ class AuditLogCoverageTests(TestCase):
     def test_credential_create_logged(self):
         from engagements.models import Engagement, EngagementMember
         engagement = Engagement.objects.create(
-            name='E1', client_name='ACME', created_by=self.lead,
+            name='E1', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -474,7 +475,7 @@ class AuditLogCoverageTests(TestCase):
         from engagements.models import Engagement, EngagementMember
         from credentials.models import Credential
         engagement = Engagement.objects.create(
-            name='E2', client_name='ACME', created_by=self.lead,
+            name='E2', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -495,7 +496,7 @@ class AuditLogCoverageTests(TestCase):
         from engagements.models import Engagement, EngagementMember
         from credentials.models import Credential
         engagement = Engagement.objects.create(
-            name='E3', client_name='ACME', created_by=self.lead,
+            name='E3', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -529,7 +530,7 @@ class AuditLogCoverageTests(TestCase):
         self.addCleanup(lambda: setattr(field, 'storage', orig))
 
         engagement = Engagement.objects.create(
-            name='E4', client_name='ACME', created_by=self.lead,
+            name='E4', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -553,7 +554,7 @@ class AuditLogCoverageTests(TestCase):
     def test_report_generated_and_downloaded_logged(self):
         from engagements.models import Engagement, EngagementMember
         engagement = Engagement.objects.create(
-            name='E5', client_name='ACME', created_by=self.lead,
+            name='E5', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -574,7 +575,7 @@ class AuditLogCoverageTests(TestCase):
     def test_invitation_sent_logged(self):
         from engagements.models import Engagement, EngagementMember
         engagement = Engagement.objects.create(
-            name='E6', client_name='ACME', created_by=self.lead,
+            name='E6', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',
@@ -591,7 +592,7 @@ class AuditLogCoverageTests(TestCase):
     def test_invitation_accepted_logged(self):
         from engagements.models import Engagement, EngagementMember, Invitation
         engagement = Engagement.objects.create(
-            name='E7', client_name='ACME', created_by=self.lead,
+            name='E7', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
         )
         EngagementMember.objects.create(
             engagement=engagement, user=self.lead, role='lead',

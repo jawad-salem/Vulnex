@@ -44,6 +44,11 @@ class User(AbstractUser):
     def is_client(self):
         return self.role == self.Role.CLIENT
 
+    @property
+    def is_engagement_lead(self):
+        """True if this user is a Lead on at least one engagement."""
+        return self.memberships.filter(role='lead').exists()
+
     def __str__(self):
         return self.get_full_name() or self.username
 

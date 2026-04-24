@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — Clients — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:client_list' %}">Clients</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ client.name|truncatechars:40 }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        {% if client.logo %}<img src="{{ client.logo.url }}" alt="{{ client.name }}" style="max-height:48px;margin-bottom:8px">{% endif %}
+        <h1 class="eng-hero-title">{{ client.name }}</h1>
+        <div class="eng-hero-meta">
+            {% if client.primary_contact_email %}
+            <span class="eng-meta-item">{{ client.primary_contact_email }}</span>
+            {% endif %}
+            <span class="eng-meta-item">{{ engagement_count }} engagement{{ engagement_count|pluralize }}</span>
+            <span class="eng-meta-item">{{ active_count }} active</span>
+        </div>
+    </div>
+</div>
+
+<!-- ── KPI strip ── -->
+<div class="kpi-strip">
+    <div class="kpi-item">
+        <div class="kpi-label">Findings</div>
+        <div class="kpi-value">{{ total_findings }}</div>
+        <div class="kpi-sub">across all engagements</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Critical</div>
+        <div class="kpi-value" style="color:var(--critical)">{{ severity_counts.critical }}</div>
+        <div class="kpi-sub" style="color:var(--high)">{{ severity_counts.high }} high</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Overdue</div>
+        <div class="kpi-value" style="color:var(--critical)">{{ sla_counts.overdue }}</div>
+        <div class="kpi-sub">{{ sla_counts.due_soon }} due soon</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Closed</div>
+        <div class="kpi-value">{{ sla_counts.closed }}</div>
+        <div class="kpi-sub">remediated / accepted</div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- ── Severity breakdown ── -->
+    <div class="card">
+        <h3 class="card-title">Findings by severity</h3>
+        <table class="simple-table">
+            <tbody>
+                <tr>
+                    <td><span class="badge badge-critical">Critical</span></td>
+                    <td class="text-mono text-right">{{ severity_counts.critical }}</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-high">High</span></td>
+                    <td class="text-mono text-right">{{ severity_counts.high }}</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-medium">Medium</span></td>
+                    <td class="text-mono text-right">{{ severity_counts.medium }}</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-low">Low</span></td>
+                    <td class="text-mono text-right">{{ severity_counts.low }}</td>
+                </tr>
+                <tr>
+                    <td><span class="badge badge-info">Info</span></td>
+                    <td class="text-mono text-right">{{ severity_counts.info }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── SLA status ── -->
+    <div class="card">
+        <h3 class="card-title">SLA status</h3>
+        <table class="simple-table">
+            <tbody>
+                <tr>
+                    <td>Overdue</td>
+                    <td class="text-mono text-right" style="color:var(--critical)">{{ sla_counts.overdue }}</td>
+                </tr>
+                <tr>
+                    <td>Due in ≤3 days</td>
+                    <td class="text-mono text-right" style="color:var(--high)">{{ sla_counts.due_soon }}</td>
+                </tr>
+                <tr>
+                    <td>On track</td>
+                    <td class="text-mono text-right">{{ sla_counts.on_track }}</td>
+                </tr>
+                <tr>
+                    <td>Closed</td>
+                    <td class="text-mono text-right text-secondary">{{ sla_counts.closed }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ── Engagements ── -->
+<div class="card">
+    <h3 class="card-title">Engagements</h3>
+    {% if engagements %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Name</th><th>Type</th><th>Status</th><th>Findings</th><th>Dates</th></tr>
+            </thead>
+            <tbody>
+            {% for e in engagements %}
+            <tr>
+                <td><a href="{{ e.get_absolute_url }}"><strong>{{ e.name }}</strong></a></td>
+                <td class="text-sm">{{ e.get_engagement_type_display }}</td>
+                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+                <td class="text-mono">{{ e.fcount }}</td>
+                <td class="text-sm text-secondary">
+                    {% if e.start_date %}{{ e.start_date|date:"M d" }}{% endif %}
+                    {% if e.end_date %} — {{ e.end_date|date:"M d, Y" }}{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-secondary">No engagements for this client yet.</p>
+    {% endif %}
+</div>
+
+{% if client.notes %}
+<div class="card">
+    <h3 class="card-title">Notes</h3>
+    <p style="white-space:pre-wrap">{{ client.notes }}</p>
+</div>
+{% endif %}
+{% endblock %}

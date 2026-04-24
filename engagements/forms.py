@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from accounts.models import User
-from .models import Engagement, EngagementNote
+from .models import Engagement, EngagementNote, Client
 
 
 class InviteRegistrationForm(forms.Form):
@@ -56,10 +56,16 @@ class InviteRegistrationForm(forms.Form):
 
 
 class EngagementForm(forms.ModelForm):
+    client_name = forms.CharField(
+        max_length=200, label='Client',
+        help_text='Pick an existing client or type a new name to create one.',
+        widget=forms.TextInput(attrs={'list': 'client-suggestions', 'autocomplete': 'off'}),
+    )
+
     class Meta:
         model = Engagement
         fields = [
-            'name', 'client_name', 'engagement_type', 'status',
+            'name', 'engagement_type', 'status',
             'description', 'in_scope', 'out_of_scope',
             'rules_of_engagement', 'start_date', 'end_date',
         ]
@@ -74,6 +80,8 @@ class EngagementForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.client_id:
+            self.fields['client_name'].initial = self.instance.client.name
         for field in self.fields.values():
             if not isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect)):
                 field.widget.attrs.setdefault('class', 'form-input')
@@ -86,6 +94,20 @@ class EngagementForm(forms.ModelForm):
         if qs.exists():
             raise forms.ValidationError('An engagement with this name already exists.')
         return name
+
+    def clean_client_name(self):
+        name = (self.cleaned_data.get('client_name') or '').strip()
+        if not name:
+            raise forms.ValidationError('Client is required.')
+        return name
+
+    def save(self, commit=True):
+        name = self.cleaned_data['client_name']
+        client = Client.objects.filter(name__iexact=name).first()
+        if client is None:
+            client = Client.objects.create(name=name)
+        self.instance.client = client
+        return super().save(commit=commit)
 
 
 class EngagementNoteForm(forms.ModelForm):

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Clients — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Clients</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        <h1 class="eng-hero-title">Clients</h1>
+        <div class="eng-hero-meta">
+            <span class="eng-meta-item">{{ total_count }} client{{ total_count|pluralize }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <form method="get" class="flex gap-2 flex-wrap" style="width:100%">
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search clients..." class="form-input search-input">
+        <button type="submit" class="btn">Filter</button>
+    </form>
+</div>
+
+<div class="card">
+    {% if clients %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr><th>Client</th><th>Engagements</th><th>Primary contact</th><th>Added</th></tr>
+            </thead>
+            <tbody>
+            {% for c in clients %}
+            <tr>
+                <td><a href="{{ c.get_absolute_url }}"><strong>{{ c.name }}</strong></a></td>
+                <td class="text-mono">{{ c.eng_count }}</td>
+                <td class="text-sm">{{ c.primary_contact_email|default:"—" }}</td>
+                <td class="text-sm text-secondary">{{ c.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No clients found.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

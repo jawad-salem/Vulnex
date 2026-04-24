@@ -6,6 +6,9 @@ app_name = 'engagements'
 urlpatterns = [
     path('', views.engagement_list, name='list'),
     path('new/', views.engagement_create, name='create'),
+    # Clients directory — must come before <uuid:pk>/ so "clients" isn't parsed as one
+    path('clients/', views.client_list, name='client_list'),
+    path('clients/<uuid:pk>/', views.client_detail, name='client_detail'),
     path('<uuid:pk>/', views.engagement_detail, name='detail'),
     path('<uuid:pk>/edit/', views.engagement_edit, name='edit'),
     path('<uuid:pk>/delete/', views.engagement_delete, name='delete'),

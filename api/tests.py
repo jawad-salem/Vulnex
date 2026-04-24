@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import APIKey, User
 from credentials.models import Credential
-from engagements.models import Engagement, EngagementMember
+from engagements.models import Engagement, EngagementMember, Client
 from vulns.models import Finding
 
 
@@ -28,7 +28,7 @@ class APIRoleMatrixTests(TestCase):
         self.outsider = User.objects.create_user('out', role='pentester', password='pw')
 
         self.engagement = Engagement.objects.create(
-            name='E1', client_name='ACME', created_by=self.admin,
+            name='E1', client=Client.objects.get_or_create(name='ACME')[0], created_by=self.admin,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.pentester, role='lead')
         EngagementMember.objects.create(engagement=self.engagement, user=self.client_user, role='client')
@@ -143,7 +143,7 @@ class APIKeyAuthTests(TestCase):
         self.api = APIClient()
         self.user = User.objects.create_user('pt', role='pentester', password='pw')
         self.engagement = Engagement.objects.create(
-            name='E1', client_name='ACME', created_by=self.user,
+            name='E1', client=Client.objects.get_or_create(name='ACME')[0], created_by=self.user,
         )
         EngagementMember.objects.create(engagement=self.engagement, user=self.user, role='lead')
         self.key, self.raw = APIKey.issue(user=self.user, name='test')

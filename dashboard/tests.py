@@ -1,7 +1,7 @@
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
-from engagements.models import Engagement, EngagementMember
+from engagements.models import Engagement, EngagementMember, Client as EngagementClient
 from vulns.models import Finding
 
 
@@ -14,7 +14,7 @@ class GlobalSearchTests(TestCase):
         self.outsider = User.objects.create_user('outsider', role='pentester', password='testpass1')
 
         self.engagement = Engagement.objects.create(
-            name='ACME Web App Pentest', client_name='ACME Corp', created_by=self.admin,
+            name='ACME Web App Pentest', client=EngagementClient.objects.get_or_create(name='ACME Corp')[0], created_by=self.admin,
         )
         EngagementMember.objects.create(
             engagement=self.engagement, user=self.pentester, role='lead',

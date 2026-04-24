@@ -1,12 +1,18 @@
 from django.contrib import admin
-from .models import Engagement, EngagementNote, EngagementMember, Invitation, ActivityLog
+from .models import Engagement, EngagementNote, EngagementMember, Invitation, ActivityLog, Client
+
+
+@admin.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    list_display = ('name', 'primary_contact_email', 'created_at')
+    search_fields = ('name', 'primary_contact_email')
 
 
 @admin.register(Engagement)
 class EngagementAdmin(admin.ModelAdmin):
-    list_display = ('name', 'client_name', 'engagement_type', 'status', 'created_by', 'start_date')
-    list_filter = ('status', 'engagement_type')
-    search_fields = ('name', 'client_name')
+    list_display = ('name', 'client', 'engagement_type', 'status', 'created_by', 'start_date')
+    list_filter = ('status', 'engagement_type', 'client')
+    search_fields = ('name', 'client__name')
 
 
 @admin.register(EngagementMember)
