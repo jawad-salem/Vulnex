@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Edit comment — {{ finding.title }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:detail' finding.engagement.pk %}">{{ finding.engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'vulns:detail' finding.pk %}">{{ finding.title|truncatechars:30 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Edit comment</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Edit comment</h1>
+        <p class="page-subtitle">Edits lock 15 minutes after the original post.</p>
+    </div>
+</div>
+
+<div class="card">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<span class="form-error">{{ field.errors|join:", " }}</span>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <a href="{% url 'vulns:detail' finding.pk %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

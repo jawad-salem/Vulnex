@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Delete comment — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'vulns:detail' finding.pk %}">{{ finding.title|truncatechars:30 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Delete comment</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete comment</h1>
+        <p class="page-subtitle">This cannot be undone.</p>
+    </div>
+</div>
+
+<div class="card">
+    <p>Delete this comment by {{ comment.author|default:"(deleted user)" }} from {{ comment.created_at|date:"M d, Y H:i" }}?</p>
+    <blockquote class="text-sm text-secondary mt-3">{{ comment.body|truncatechars:400 }}</blockquote>
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Delete comment</button>
+        <a href="{% url 'vulns:detail' finding.pk %}" class="btn">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -6,9 +6,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from accounts.models import User
+from accounts.models import User, AuditLog
 from engagements.models import Engagement, EngagementMember, ActivityLog, Client as EngagementClient
-from .models import Finding, Evidence
+from .models import Finding, Evidence, FindingComment
+from .templatetags.vulns_extras import render_markdown
 
 
 class CVSSCalculationTests(TestCase):
@@ -989,3 +990,165 @@ class ToolImportDedupTests(TestCase):
     def test_zap_import_creates_one_finding_per_instance(self):
         self._import(ZAP_SAMPLE, 'zap.json', 'zap')
         self.assertEqual(Finding.objects.filter(engagement=self.engagement).count(), 2)
+
+
+class MarkdownRenderingTests(TestCase):
+    """Sanitization of Markdown → HTML for comments and finding bodies."""
+
+    def test_basic_markdown_renders(self):
+        html = render_markdown('**bold** and `code`')
+        self.assertIn('<strong>bold</strong>', html)
+        self.assertIn('<code>code</code>', html)
+
+    def test_script_stripped(self):
+        html = render_markdown('<script>alert(1)</script>hi')
+        self.assertNotIn('<script', html)
+        self.assertIn('hi', html)
+
+    def test_iframe_stripped(self):
+        html = render_markdown('<iframe src="evil"></iframe>after')
+        self.assertNotIn('<iframe', html)
+
+    def test_fenced_code_block_renders(self):
+        html = render_markdown('```\nprint("x")\n```')
+        self.assertIn('<pre>', html)
+        self.assertIn('<code', html)
+
+    def test_javascript_link_stripped(self):
+        html = render_markdown('[click](javascript:alert(1))')
+        self.assertNotIn('javascript:', html)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class FindingCommentTests(TestCase):
+    """Comment thread: posting, edit window, internal-only, review feedback."""
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='pw')
+        self.client_user = User.objects.create_user('cli', role='client', password='pw')
+        self.reviewer = User.objects.create_user('rv', role='pentester', password='pw')
+        self.engagement = Engagement.objects.create(
+            name='E1',
+            client=EngagementClient.objects.get_or_create(name='ACME')[0],
+            created_by=self.lead,
+            engagement_type='external',
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.client_user, role='client')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.reviewer, role='reviewer')
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='SQLi',
+            description='x', severity=Finding.Severity.HIGH,
+            review_state=Finding.ReviewState.APPROVED,
+        )
+
+    def _post_comment(self, user, password, **extra):
+        self.client.login(username=user.username, password=password)
+        data = {'post_comment': '1', 'body': 'hello **world**'}
+        data.update(extra)
+        return self.client.post(reverse('vulns:detail', args=[self.finding.pk]), data)
+
+    def test_lead_can_post_comment_and_audit_logged(self):
+        resp = self._post_comment(self.lead, 'pw')
+        self.assertEqual(resp.status_code, 302)
+        c = FindingComment.objects.get()
+        self.assertEqual(c.author, self.lead)
+        self.assertFalse(c.internal_only)
+        self.assertTrue(AuditLog.objects.filter(
+            action=AuditLog.Action.COMMENT_POST, target=str(c.pk),
+        ).exists())
+
+    def test_client_cannot_set_internal_only(self):
+        self._post_comment(self.client_user, 'pw', internal_only='on')
+        c = FindingComment.objects.get()
+        self.assertFalse(c.internal_only)
+
+    def test_client_cannot_see_internal_comment(self):
+        FindingComment.objects.create(
+            finding=self.finding, author=self.lead,
+            body='internal note', internal_only=True,
+        )
+        self.client.login(username='cli', password='pw')
+        resp = self.client.get(reverse('vulns:detail', args=[self.finding.pk]))
+        self.assertNotContains(resp, 'internal note')
+
+    def test_lead_can_set_internal_only(self):
+        self._post_comment(self.lead, 'pw', internal_only='on')
+        c = FindingComment.objects.get()
+        self.assertTrue(c.internal_only)
+
+    def test_only_reviewer_can_mark_review_feedback(self):
+        # Client attempts → stripped
+        self._post_comment(self.client_user, 'pw', is_review_feedback='on')
+        c = FindingComment.objects.get()
+        self.assertFalse(c.is_review_feedback)
+        # Reviewer can set it
+        c.delete()
+        self._post_comment(self.reviewer, 'pw', is_review_feedback='on')
+        c = FindingComment.objects.get()
+        self.assertTrue(c.is_review_feedback)
+
+    def test_edit_within_window(self):
+        c = FindingComment.objects.create(
+            finding=self.finding, author=self.lead, body='orig',
+        )
+        self.client.login(username='lead', password='pw')
+        resp = self.client.post(
+            reverse('vulns:comment_edit', args=[c.pk]),
+            {'body': 'edited'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        c.refresh_from_db()
+        self.assertEqual(c.body, 'edited')
+        self.assertIsNotNone(c.edited_at)
+
+    def test_edit_after_window_refused(self):
+        c = FindingComment.objects.create(
+            finding=self.finding, author=self.lead, body='orig',
+        )
+        # Age the comment past the 15-minute window.
+        FindingComment.objects.filter(pk=c.pk).update(
+            created_at=timezone.now() - timedelta(minutes=16),
+        )
+        c.refresh_from_db()
+        self.client.login(username='lead', password='pw')
+        resp = self.client.post(
+            reverse('vulns:comment_edit', args=[c.pk]),
+            {'body': 'edited'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        c.refresh_from_db()
+        self.assertEqual(c.body, 'orig')
+
+    def test_other_user_cannot_edit(self):
+        c = FindingComment.objects.create(
+            finding=self.finding, author=self.lead, body='orig',
+        )
+        self.client.login(username='rv', password='pw')
+        resp = self.client.post(
+            reverse('vulns:comment_edit', args=[c.pk]),
+            {'body': 'edited'},
+        )
+        c.refresh_from_db()
+        self.assertEqual(c.body, 'orig')
+
+    def test_admin_can_delete_any_comment(self):
+        c = FindingComment.objects.create(
+            finding=self.finding, author=self.lead, body='orig',
+        )
+        admin = User.objects.create_user('admin1', role='admin', password='pw')
+        self.client.login(username='admin1', password='pw')
+        resp = self.client.post(reverse('vulns:comment_delete', args=[c.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(FindingComment.objects.filter(pk=c.pk).exists())
+
+    def test_outsider_cannot_comment(self):
+        outsider = User.objects.create_user('out', role='pentester', password='pw')
+        self.client.login(username='out', password='pw')
+        resp = self.client.post(
+            reverse('vulns:detail', args=[self.finding.pk]),
+            {'post_comment': '1', 'body': 'x'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(FindingComment.objects.exists())

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load vulns_extras %}
 {% block title %}{{ finding.title }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
@@ -92,6 +93,7 @@
         <button class="tab-btn" data-tab="cvss" role="tab">CVSS</button>
         <button class="tab-btn" data-tab="retest" role="tab">Retest</button>
         {% if not is_client %}<button class="tab-btn" data-tab="review" role="tab">Review</button>{% endif %}
+        <button class="tab-btn" data-tab="comments" role="tab">Comments{% if comments %} <span class="tab-count">{{ comments|length }}</span>{% endif %}</button>
         <button class="tab-btn" data-tab="details" role="tab">Details</button>
     </div>
 
@@ -360,6 +362,58 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Comments tab -->
+    <div class="tab-panel" id="tab-comments" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Discussion</h2>
+            {% if comments %}
+            <ul class="comment-thread">
+                {% for c in comments %}
+                <li class="comment {% if c.parent_id %}comment--reply{% endif %} {% if c.internal_only %}comment--internal{% endif %} {% if c.is_review_feedback %}comment--review{% endif %}">
+                    <header class="comment-head">
+                        <span class="comment-author">{{ c.author|default:"(deleted user)" }}</span>
+                        <span class="comment-time">{{ c.created_at|date:"M d, Y H:i" }}{% if c.edited_at %} &middot; edited{% endif %}</span>
+                        {% if c.internal_only %}<span class="badge badge-warn">internal</span>{% endif %}
+                        {% if c.is_review_feedback %}<span class="badge badge-info">review feedback</span>{% endif %}
+                    </header>
+                    <div class="comment-body">{{ c.body|markdown }}</div>
+                    {% if c.user_can_edit or c.user_can_delete %}
+                    <footer class="comment-actions">
+                        {% if c.user_can_edit %}<a class="text-xs" href="{% url 'vulns:comment_edit' c.pk %}">Edit</a>{% endif %}
+                        {% if c.user_can_delete %}<a class="text-xs text-danger" href="{% url 'vulns:comment_delete' c.pk %}">Delete</a>{% endif %}
+                    </footer>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-secondary">No comments yet.</p>
+            {% endif %}
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="post_comment" value="1">
+                <div class="form-group">
+                    <label for="id_body">Add a comment</label>
+                    {{ comment_form.body }}
+                    {% if comment_form.body.errors %}<span class="form-error">{{ comment_form.body.errors|join:", " }}</span>{% endif %}
+                    <span class="form-help">Markdown supported. Links, lists, tables, fenced code blocks.</span>
+                </div>
+                {% if comment_form.internal_only %}
+                <label class="checkbox-row">
+                    {{ comment_form.internal_only }} Internal only (hidden from Client role)
+                </label>
+                {% endif %}
+                {% if comment_form.is_review_feedback %}
+                <label class="checkbox-row">
+                    {{ comment_form.is_review_feedback }} Mark as review feedback
+                </label>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Post comment</button>
+            </form>
+        </div>
+    </div>
 
     <!-- Details tab -->
     <div class="tab-panel" id="tab-details" role="tabpanel">

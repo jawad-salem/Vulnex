@@ -14,6 +14,8 @@ urlpatterns = [
     path('<uuid:pk>/approve/', views.approve_finding, name='approve'),
     path('<uuid:pk>/request-changes/', views.request_changes, name='request_changes'),
     path('evidence/<int:pk>/download/', views.evidence_download, name='evidence_download'),
+    path('comment/<uuid:pk>/edit/', views.comment_edit, name='comment_edit'),
+    path('comment/<uuid:pk>/delete/', views.comment_delete, name='comment_delete'),
     path('engagement/<uuid:engagement_pk>/export/csv/', views.export_csv, name='export_csv'),
     path('engagement/<uuid:engagement_pk>/export/json/', views.export_json, name='export_json'),
     # API endpoints for form auto-fill

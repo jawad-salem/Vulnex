@@ -408,3 +408,53 @@ class Evidence(models.Model):
     def is_image(self):
         return self.file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
 
+
+class FindingComment(models.Model):
+    """Threaded discussion on a finding.
+
+    Internal comments are hidden from the Client role; review-feedback
+    comments surface alongside the reviewer's decision notes. Authors can
+    edit their own comment for EDIT_WINDOW after posting, then it locks.
+    """
+    EDIT_WINDOW = timedelta(minutes=15)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    finding = models.ForeignKey(Finding, on_delete=models.CASCADE, related_name='comments')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='finding_comments')
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    body = models.TextField()
+    internal_only = models.BooleanField(
+        default=False,
+        help_text='Hide from Client role. Internal team discussion.',
+    )
+    is_review_feedback = models.BooleanField(
+        default=False,
+        help_text='Mark as review feedback — surfaces alongside the reviewer decision.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [models.Index(fields=['finding', 'created_at'])]
+
+    def __str__(self):
+        return f'Comment by {self.author} on {self.finding_id}'
+
+    @property
+    def is_editable(self):
+        return timezone.now() - self.created_at <= self.EDIT_WINDOW
+
+    def can_edit(self, user):
+        if not user.is_authenticated or self.author_id != user.pk:
+            return False
+        return self.is_editable
+
+    def can_delete(self, user):
+        """Authors can delete within edit window; admins can always delete."""
+        if not user.is_authenticated:
+            return False
+        if user.role == 'admin':
+            return True
+        return self.author_id == user.pk and self.is_editable
+

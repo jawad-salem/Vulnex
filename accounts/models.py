@@ -86,6 +86,9 @@ class AuditLog(models.Model):
         INVITATION_ACCEPTED = 'invitation_accepted', 'Invitation accepted'
         API_KEY_ISSUED = 'api_key_issued', 'API key issued'
         API_KEY_REVOKED = 'api_key_revoked', 'API key revoked'
+        COMMENT_POST = 'comment_post', 'Comment posted'
+        COMMENT_EDIT = 'comment_edit', 'Comment edited'
+        COMMENT_DELETE = 'comment_delete', 'Comment deleted'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

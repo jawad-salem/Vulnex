@@ -1,6 +1,6 @@
 from django import forms
 from django.conf import settings
-from .models import Finding, Evidence
+from .models import Finding, Evidence, FindingComment
 from recon.models import DiscoveredHost
 
 
@@ -125,6 +125,37 @@ class RetestForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
+
+
+class FindingCommentForm(forms.ModelForm):
+    """Comment post/edit form. `internal_only` and `is_review_feedback`
+    are gated in the view — hidden on the form for roles that can't use them.
+    """
+    class Meta:
+        model = FindingComment
+        fields = ['body', 'internal_only', 'is_review_feedback', 'parent']
+        widgets = {
+            'body': forms.Textarea(attrs={
+                'rows': 4, 'placeholder': 'Markdown supported — **bold**, `code`, lists, tables.',
+            }),
+            'parent': forms.HiddenInput(),
+        }
+
+    def __init__(self, *args, can_mark_internal=False, can_mark_review=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['body'].widget.attrs.setdefault('class', 'form-input')
+        if not can_mark_internal:
+            self.fields.pop('internal_only', None)
+        if not can_mark_review:
+            self.fields.pop('is_review_feedback', None)
+
+    def clean_body(self):
+        body = (self.cleaned_data.get('body') or '').strip()
+        if not body:
+            raise forms.ValidationError('Comment cannot be empty.')
+        if len(body) > 10000:
+            raise forms.ValidationError('Comment is too long (10,000 char max).')
+        return body
 
 
 class ToolImportForm(forms.Form):

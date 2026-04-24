@@ -9,8 +9,8 @@ from django.http import HttpResponse, FileResponse, HttpResponseForbidden
 from django.db.models import Q
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
-from .models import Finding, Evidence, FindingTemplate
-from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm
+from .models import Finding, Evidence, FindingTemplate, FindingComment
+from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm, FindingCommentForm
 from .parsers import (
     parse_burp_xml,
     parse_nessus_xml,
@@ -120,6 +120,10 @@ def finding_detail(request, pk):
     is_client = finding.engagement.user_is_client(request.user)
     can_edit = finding.engagement.user_can_edit(request.user)
     can_review = finding.engagement.user_can_review(request.user)
+    can_mark_internal = not is_client
+    comment_form = FindingCommentForm(
+        can_mark_internal=can_mark_internal, can_mark_review=can_review,
+    )
 
     if is_client and finding.review_state != Finding.ReviewState.APPROVED:
         messages.error(request, 'This finding is not yet available.')
@@ -150,16 +154,144 @@ def finding_detail(request, pk):
             messages.success(request, 'Retest recorded.')
             return redirect('vulns:detail', pk=pk)
 
+    if request.method == 'POST' and 'post_comment' in request.POST:
+        comment_form = FindingCommentForm(
+            request.POST,
+            can_mark_internal=can_mark_internal, can_mark_review=can_review,
+        )
+        if comment_form.is_valid():
+            comment = comment_form.save(commit=False)
+            comment.finding = finding
+            comment.author = request.user
+            if is_client:
+                comment.internal_only = False
+                comment.is_review_feedback = False
+            # Only reviewers/leads can mark as review feedback
+            if not can_review:
+                comment.is_review_feedback = False
+            # Validate parent belongs to this finding
+            if comment.parent and comment.parent.finding_id != finding.pk:
+                comment.parent = None
+            comment.save()
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.COMMENT_POST,
+                target=str(comment.pk),
+                details={
+                    'finding': finding.title,
+                    'engagement': finding.engagement.name,
+                    'internal_only': comment.internal_only,
+                    'is_review_feedback': comment.is_review_feedback,
+                },
+                request=request,
+            )
+            ActivityLog.objects.create(
+                engagement=finding.engagement, user=request.user,
+                action=f'Commented on finding: {finding.title}',
+            )
+            messages.success(request, 'Comment posted.')
+            return redirect('vulns:detail', pk=pk)
+
+    comments_qs = finding.comments.select_related('author', 'parent').all()
+    if is_client:
+        comments_qs = comments_qs.filter(internal_only=False)
+    comments = list(comments_qs)
+    # Tag each with per-user edit permission for template.
+    for c in comments:
+        c.user_can_edit = c.can_edit(request.user)
+        c.user_can_delete = c.can_delete(request.user)
+
     context = {
         'finding': finding,
         'evidence': finding.evidence.all(),
         'evidence_form': evidence_form,
         'retest_form': retest_form,
+        'comment_form': comment_form,
+        'comments': comments,
         'is_client': is_client,
         'can_edit': can_edit,
         'can_review': can_review,
     }
     return render(request, 'vulns/detail.html', context)
+
+
+@login_required
+def comment_edit(request, pk):
+    comment = get_object_or_404(
+        FindingComment.objects.select_related('finding__engagement', 'author'),
+        pk=pk,
+    )
+    finding = comment.finding
+    if not finding.engagement.user_can_access(request.user):
+        return HttpResponseForbidden('Not a member of this engagement.')
+    if not comment.can_edit(request.user):
+        messages.error(request, 'This comment can no longer be edited.')
+        return redirect('vulns:detail', pk=finding.pk)
+
+    is_client = finding.engagement.user_is_client(request.user)
+    can_review = finding.engagement.user_can_review(request.user)
+    can_mark_internal = not is_client
+
+    if request.method == 'POST':
+        form = FindingCommentForm(
+            request.POST, instance=comment,
+            can_mark_internal=can_mark_internal, can_mark_review=can_review,
+        )
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.edited_at = timezone.now()
+            if is_client:
+                updated.internal_only = False
+                updated.is_review_feedback = False
+            if not can_review:
+                updated.is_review_feedback = False
+            updated.save()
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.COMMENT_EDIT,
+                target=str(updated.pk),
+                details={'finding': finding.title},
+                request=request,
+            )
+            messages.success(request, 'Comment updated.')
+            return redirect('vulns:detail', pk=finding.pk)
+    else:
+        form = FindingCommentForm(
+            instance=comment,
+            can_mark_internal=can_mark_internal, can_mark_review=can_review,
+        )
+    return render(request, 'vulns/comment_edit.html', {
+        'form': form, 'comment': comment, 'finding': finding,
+    })
+
+
+@login_required
+def comment_delete(request, pk):
+    comment = get_object_or_404(
+        FindingComment.objects.select_related('finding__engagement', 'author'),
+        pk=pk,
+    )
+    finding = comment.finding
+    if not finding.engagement.user_can_access(request.user):
+        return HttpResponseForbidden('Not a member of this engagement.')
+    if not comment.can_delete(request.user):
+        messages.error(request, 'You cannot delete this comment.')
+        return redirect('vulns:detail', pk=finding.pk)
+    if request.method == 'POST':
+        target_id = str(comment.pk)
+        comment.delete()
+        AuditLog.record(
+            actor=request.user,
+            action=AuditLog.Action.COMMENT_DELETE,
+            target=target_id,
+            details={'finding': finding.title},
+            request=request,
+        )
+        messages.success(request, 'Comment deleted.')
+        return redirect('vulns:detail', pk=finding.pk)
+    return render(request, 'vulns/comment_confirm_delete.html', {
+        'comment': comment, 'finding': finding,
+    })
 
 
 @login_required
