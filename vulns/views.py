@@ -12,7 +12,7 @@ from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence, FindingTemplate, FindingComment
 from .forms import (
     FindingForm, EvidenceForm, ToolImportForm, RetestForm,
-    FindingCommentForm, FindingMergeForm,
+    FindingCommentForm, FindingMergeForm, CsvImportForm,
 )
 from .parsers import (
     parse_burp_xml,
@@ -728,6 +728,218 @@ EXPORT_FIELDS = [
     'affected_hosts', 'references', 'cvss_vector_string', 'created_at',
     'due_date', 'sla_status',
 ]
+
+# Columns the CSV importer accepts. Subset of EXPORT_FIELDS — derived/audit
+# columns (cvss_vector_string, created_at, due_date, sla_status) are dropped
+# even if present so we don't tempt operators into setting them by hand.
+CSV_IMPORT_COLUMNS = {
+    'title', 'severity', 'cvss_score', 'status', 'host', 'port', 'url',
+    'endpoint', 'http_method', 'parameter', 'description',
+    'proof_of_concept', 'remediation', 'cwe_id', 'tool_source',
+    'affected_hosts', 'references',
+}
+CSV_IMPORT_REQUIRED = {'title', 'severity'}
+CSV_IMPORT_DROPPED = {'cvss_vector_string', 'created_at', 'due_date', 'sla_status'}
+
+
+def _parse_csv_findings(content):
+    """Parse a CSV upload into ``(rows, row_errors, header_errors)``.
+
+    ``rows`` are dicts ready for ``_classify_import`` / ``_commit_import``.
+    ``row_errors`` is a list of ``{'row': N, 'error': str}`` for rows that
+    failed validation (skipped from the import). ``header_errors`` is a list
+    of fatal header-level errors that abort the import entirely.
+    """
+    valid_severities = {s for s, _ in Finding.Severity.choices}
+    valid_statuses = {s for s, _ in Finding.Status.choices}
+    header_errors = []
+
+    try:
+        text = content.decode('utf-8-sig')  # tolerate BOM from Excel exports
+    except UnicodeDecodeError:
+        return [], [], ['CSV must be UTF-8 encoded.']
+
+    reader = csv.DictReader(text.splitlines())
+    if reader.fieldnames is None:
+        return [], [], ['CSV is empty or has no header row.']
+
+    headers = {h.strip() for h in reader.fieldnames if h}
+    missing_required = CSV_IMPORT_REQUIRED - headers
+    if missing_required:
+        header_errors.append(
+            f'Missing required column(s): {", ".join(sorted(missing_required))}.'
+        )
+    unknown = headers - CSV_IMPORT_COLUMNS - CSV_IMPORT_DROPPED
+    if unknown:
+        header_errors.append(
+            f'Unknown column(s): {", ".join(sorted(unknown))}. '
+            f'Allowed: {", ".join(sorted(CSV_IMPORT_COLUMNS))}.'
+        )
+    if header_errors:
+        return [], [], header_errors
+
+    rows = []
+    row_errors = []
+    for idx, raw in enumerate(reader, start=2):  # row 1 is the header
+        row = {
+            (k.strip() if k else ''): (v.strip() if isinstance(v, str) else v)
+            for k, v in raw.items()
+            if k and k.strip() in CSV_IMPORT_COLUMNS
+        }
+        title = row.get('title', '')
+        severity = row.get('severity', '').lower()
+        if not title:
+            row_errors.append({'row': idx, 'error': 'title is required'})
+            continue
+        if severity not in valid_severities:
+            row_errors.append({
+                'row': idx,
+                'error': f'severity "{row.get("severity", "")}" is invalid '
+                         f'(allowed: {", ".join(sorted(valid_severities))})',
+            })
+            continue
+        row['severity'] = severity
+
+        status = (row.get('status') or '').lower()
+        if status:
+            if status not in valid_statuses:
+                row_errors.append({
+                    'row': idx,
+                    'error': f'status "{row.get("status", "")}" is invalid '
+                             f'(allowed: {", ".join(sorted(valid_statuses))})',
+                })
+                continue
+            row['status'] = status
+        else:
+            row.pop('status', None)
+
+        port_str = row.get('port', '')
+        if port_str:
+            try:
+                row['port'] = int(port_str)
+            except ValueError:
+                row_errors.append({'row': idx, 'error': f'port "{port_str}" is not a number'})
+                continue
+        else:
+            row.pop('port', None)
+
+        cvss_str = row.get('cvss_score', '')
+        if cvss_str:
+            try:
+                row['cvss_score'] = float(cvss_str)
+            except ValueError:
+                row_errors.append({'row': idx, 'error': f'cvss_score "{cvss_str}" is not a number'})
+                continue
+        else:
+            row.pop('cvss_score', None)
+
+        rows.append(row)
+
+    return rows, row_errors, []
+
+
+@login_required
+@engagement_edit_required
+def finding_import_csv(request, engagement_pk):
+    """Bulk CSV import. Two-step preview flow mirrors ``tool_import``.
+
+    Header validation is strict; per-row errors are surfaced in the preview
+    and those rows are skipped on commit. Dedup against existing engagement
+    findings reuses ``_classify_import``.
+    """
+    engagement = request.engagement
+
+    # Step 2: confirm and commit pre-parsed payload.
+    if request.method == 'POST' and 'confirm_import' in request.POST:
+        pending = request.session.pop('csv_import_pending', None)
+        if not pending or pending.get('engagement') != str(engagement.pk):
+            messages.error(request, 'CSV import preview expired. Please re-upload.')
+            return redirect('vulns:import_csv', engagement_pk=engagement.pk)
+        new_items = pending['new']
+        created = _commit_import(engagement, request.user, 'csv', new_items)
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Imported {created} findings from CSV',
+        )
+        messages.success(
+            request,
+            f'Imported {created} findings from CSV. '
+            f'{pending["skipped"]} duplicate(s) skipped, '
+            f'{pending["errored"]} row(s) had errors and were skipped.',
+        )
+        return redirect('vulns:list', engagement_pk=engagement_pk)
+
+    # Step 1: upload + parse.
+    if request.method == 'POST':
+        form = CsvImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            preview = form.cleaned_data.get('preview', True)
+            content = request.FILES['file'].read()
+            rows, row_errors, header_errors = _parse_csv_findings(content)
+
+            if header_errors:
+                for err in header_errors:
+                    messages.error(request, err)
+                return render(request, 'vulns/import_csv.html', {
+                    'form': form, 'engagement': engagement,
+                    'columns': sorted(CSV_IMPORT_COLUMNS),
+                    'required': sorted(CSV_IMPORT_REQUIRED),
+                })
+
+            new_items, dup_items = _classify_import(engagement, rows)
+
+            if preview:
+                if len(new_items) + len(dup_items) > _IMPORT_PREVIEW_LIMIT:
+                    messages.error(
+                        request,
+                        f'Preview supports up to {_IMPORT_PREVIEW_LIMIT} rows. '
+                        f'Re-run without preview, or split the file.',
+                    )
+                    return redirect('vulns:import_csv', engagement_pk=engagement.pk)
+                request.session['csv_import_pending'] = {
+                    'engagement': str(engagement.pk),
+                    'new': new_items,
+                    'skipped': len(dup_items),
+                    'errored': len(row_errors),
+                }
+                return render(request, 'vulns/import_csv_preview.html', {
+                    'engagement': engagement,
+                    'new_items': new_items,
+                    'dup_items': dup_items,
+                    'row_errors': row_errors,
+                })
+
+            if row_errors:
+                for err in row_errors[:10]:
+                    messages.warning(
+                        request, f'Row {err["row"]}: {err["error"]} (skipped)',
+                    )
+                if len(row_errors) > 10:
+                    messages.warning(
+                        request,
+                        f'… and {len(row_errors) - 10} more row error(s) skipped.',
+                    )
+
+            created = _commit_import(engagement, request.user, 'csv', new_items)
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Imported {created} findings from CSV',
+            )
+            msg = f'Imported {created} findings from CSV.'
+            if dup_items:
+                msg += f' {len(dup_items)} duplicate(s) skipped.'
+            if row_errors:
+                msg += f' {len(row_errors)} row(s) had errors.'
+            messages.success(request, msg)
+            return redirect('vulns:list', engagement_pk=engagement_pk)
+    else:
+        form = CsvImportForm()
+
+    return render(request, 'vulns/import_csv.html', {
+        'form': form, 'engagement': engagement,
+        'columns': sorted(CSV_IMPORT_COLUMNS),
+        'required': sorted(CSV_IMPORT_REQUIRED),
+    })
 
 
 @login_required

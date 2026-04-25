@@ -1387,3 +1387,137 @@ class ToolImportPreviewTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(Finding.objects.count(), 0)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class CsvImportTests(TestCase):
+    """Bulk CSV import: header validation, per-row errors, dedup, role gating."""
+
+    HEADER = b'title,severity,host,port,endpoint,parameter,description,status\n'
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='pw')
+        self.client_user = User.objects.create_user('cli', role='client', password='pw')
+        self.outsider = User.objects.create_user('out', role='pentester', password='pw')
+        self.engagement = Engagement.objects.create(
+            name='E1',
+            client=EngagementClient.objects.get_or_create(name='ACME')[0],
+            created_by=self.lead, engagement_type='external',
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.client_user, role='client')
+
+    def _post(self, payload, preview=False, user='lead'):
+        self.client.login(username=user, password='pw')
+        data = {
+            'file': SimpleUploadedFile('findings.csv', payload, content_type='text/csv'),
+        }
+        if preview:
+            data['preview'] = 'on'
+        return self.client.post(
+            reverse('vulns:import_csv', args=[self.engagement.pk]),
+            data,
+        )
+
+    def test_outsider_blocked(self):
+        payload = self.HEADER + b'XSS,high,h,80,/,,,\n'
+        resp = self._post(payload, user='out')
+        self.assertIn(resp.status_code, (302, 403))
+        self.assertEqual(Finding.objects.count(), 0)
+
+    def test_client_blocked(self):
+        payload = self.HEADER + b'XSS,high,h,80,/,,,\n'
+        resp = self._post(payload, user='cli')
+        self.assertIn(resp.status_code, (302, 403))
+        self.assertEqual(Finding.objects.count(), 0)
+
+    def test_missing_required_column(self):
+        # Missing `severity` column.
+        payload = b'title,host\nXSS,h\n'
+        resp = self._post(payload)
+        self.assertEqual(Finding.objects.count(), 0)
+        self.assertContains(resp, 'Missing required column', status_code=200)
+
+    def test_unknown_column_rejected(self):
+        payload = b'title,severity,bogus_col\nXSS,high,whatever\n'
+        resp = self._post(payload)
+        self.assertEqual(Finding.objects.count(), 0)
+        self.assertContains(resp, 'Unknown column', status_code=200)
+
+    def test_valid_rows_imported_without_preview(self):
+        payload = self.HEADER + (
+            b'SQLi,critical,db.example.com,5432,/api/login,id,Description here,open\n'
+            b'XSS,high,web.example.com,443,/search,q,Reflected,confirmed\n'
+        )
+        resp = self._post(payload, preview=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.count(), 2)
+        f = Finding.objects.get(title='SQLi')
+        # Note: Finding.save() auto-computes severity from CVSS vector, so the
+        # CSV's severity column is treated as a hint that may be overridden.
+        self.assertEqual(f.host, 'db.example.com')
+        self.assertEqual(f.port, 5432)
+        self.assertEqual(f.endpoint, '/api/login')
+        self.assertEqual(f.parameter, 'id')
+        self.assertEqual(f.tool_source, 'Csv')
+
+    def test_row_errors_reported_in_preview(self):
+        # Row 2 valid, row 3 bad severity, row 4 bad port.
+        payload = self.HEADER + (
+            b'OK,high,h,80,/,,,\n'
+            b'BadSev,nonsense,h2,80,/,,,\n'
+            b'BadPort,medium,h3,abc,/,,,\n'
+        )
+        resp = self._post(payload, preview=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Finding.objects.count(), 0)
+        self.assertContains(resp, 'Row errors')
+        self.assertContains(resp, 'severity')
+        self.assertContains(resp, 'port')
+
+    def test_preview_then_confirm_imports_only_valid(self):
+        payload = self.HEADER + (
+            b'OK,high,h,80,/,,,\n'
+            b'BadSev,nonsense,h2,80,/,,,\n'
+        )
+        self._post(payload, preview=True)
+        resp = self.client.post(
+            reverse('vulns:import_csv', args=[self.engagement.pk]),
+            {'confirm_import': '1'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.count(), 1)
+        self.assertTrue(Finding.objects.filter(title='OK').exists())
+
+    def test_dedup_against_existing_finding(self):
+        Finding.objects.create(
+            engagement=self.engagement, title='SQLi', host='db', port=5432,
+            endpoint='/api/login', parameter='id',
+            severity='critical', found_by=self.lead,
+        )
+        payload = self.HEADER + (
+            b'SQLi,critical,db,5432,/api/login,id,Already filed,open\n'
+            b'New,high,web,443,/x,,,\n'
+        )
+        resp = self._post(payload, preview=False)
+        self.assertEqual(resp.status_code, 302)
+        # Original + the New row only — the SQLi row is a duplicate.
+        self.assertEqual(Finding.objects.count(), 2)
+        self.assertTrue(Finding.objects.filter(title='New').exists())
+
+    def test_utf8_bom_tolerated(self):
+        payload = b'\xef\xbb\xbf' + self.HEADER + b'OK,high,h,80,/,,,\n'
+        resp = self._post(payload, preview=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.count(), 1)
+
+    def test_non_csv_extension_rejected(self):
+        self.client.login(username='lead', password='pw')
+        resp = self.client.post(
+            reverse('vulns:import_csv', args=[self.engagement.pk]),
+            {'file': SimpleUploadedFile('findings.txt', self.HEADER, content_type='text/plain')},
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Finding.objects.count(), 0)
+        self.assertContains(resp, '.csv')

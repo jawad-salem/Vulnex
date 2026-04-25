@@ -9,7 +9,10 @@
             &middot; Import from vulnerability scanners
         </p>
     </div>
-    <a href="{% url 'vulns:list' engagement.pk %}" class="btn">Cancel</a>
+    <div class="flex gap-2">
+        <a href="{% url 'vulns:import_csv' engagement.pk %}" class="btn">CSV import</a>
+        <a href="{% url 'vulns:list' engagement.pk %}" class="btn">Cancel</a>
+    </div>
 </div>
 
 <div class="import-layout">

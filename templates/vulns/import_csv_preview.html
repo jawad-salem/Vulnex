@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}CSV import preview — {{ engagement.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'vulns:import_csv' engagement.pk %}">CSV import</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Preview</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">CSV import preview</h1>
+        <p class="page-subtitle">
+            {{ new_items|length }} new &middot;
+            {{ dup_items|length }} duplicate(s) &middot;
+            {{ row_errors|length }} row error(s)
+        </p>
+    </div>
+    <a href="{% url 'vulns:import_csv' engagement.pk %}" class="btn">Cancel</a>
+</div>
+
+{% if row_errors %}
+<div class="card mb-4">
+    <h2 class="card-title">Row errors ({{ row_errors|length }})</h2>
+    <p class="text-sm text-secondary">These rows will be skipped on import.</p>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th style="width:80px">Row</th><th>Error</th></tr></thead>
+            <tbody>
+            {% for err in row_errors %}
+            <tr>
+                <td class="text-mono">{{ err.row }}</td>
+                <td>{{ err.error }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <div class="card">
+        <h2 class="card-title">New findings ({{ new_items|length }})</h2>
+        {% if new_items %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Title</th><th>Severity</th><th>Host</th><th>Endpoint</th></tr></thead>
+                <tbody>
+                {% for fd in new_items %}
+                <tr>
+                    <td>{{ fd.title|truncatechars:60 }}</td>
+                    <td><span class="badge badge-{{ fd.severity|default:'info' }}">{{ fd.severity|default:'info' }}</span></td>
+                    <td class="text-mono text-sm">{{ fd.host|default:"—" }}{% if fd.port %}:{{ fd.port }}{% endif %}</td>
+                    <td class="text-mono text-sm">{{ fd.endpoint|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-secondary">Nothing new to import.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">Duplicates skipped ({{ dup_items|length }})</h2>
+        {% if dup_items %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Title</th><th>Host</th><th>Endpoint</th></tr></thead>
+                <tbody>
+                {% for fd in dup_items %}
+                <tr>
+                    <td class="text-secondary">{{ fd.title|truncatechars:60 }}</td>
+                    <td class="text-mono text-sm">{{ fd.host|default:"—" }}{% if fd.port %}:{{ fd.port }}{% endif %}</td>
+                    <td class="text-mono text-sm">{{ fd.endpoint|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-secondary">No duplicates found.</p>
+        {% endif %}
+    </div>
+</div>
+
+<form method="post" action="{% url 'vulns:import_csv' engagement.pk %}" class="mt-4">
+    {% csrf_token %}
+    <input type="hidden" name="confirm_import" value="1">
+    {% if new_items %}
+    <button type="submit" class="btn btn-primary">Confirm — import {{ new_items|length }} finding(s)</button>
+    {% else %}
+    <button type="submit" class="btn" disabled>Nothing to import</button>
+    {% endif %}
+    <a href="{% url 'vulns:import_csv' engagement.pk %}" class="btn">Cancel</a>
+</form>
+{% endblock %}

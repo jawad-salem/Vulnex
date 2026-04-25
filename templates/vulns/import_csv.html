@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Import findings from CSV — Vulnex{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Import findings from CSV</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+            &middot; Bulk import from a spreadsheet or export
+        </p>
+    </div>
+    <div class="flex gap-2">
+        <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Tool importers</a>
+        <a href="{% url 'vulns:list' engagement.pk %}" class="btn">Cancel</a>
+    </div>
+</div>
+
+<div class="import-layout">
+    <div class="card import-upload">
+        <h2 class="card-title mb-4">Upload CSV</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.errors %}
+            <div class="alert alert-error mb-4">Please fix the errors below.</div>
+            {% endif %}
+
+            <div class="form-group">
+                <label for="{{ form.file.id_for_label }}">CSV file</label>
+                {{ form.file }}
+                {% if form.file.errors %}<p class="form-error">{{ form.file.errors.0 }}</p>{% endif %}
+            </div>
+
+            <div class="form-group checkbox-row">
+                {{ form.preview }}
+                <label for="{{ form.preview.id_for_label }}">Preview before importing</label>
+            </div>
+
+            <p class="muted import-note">
+                Header row must match the column names below. UTF-8 encoding;
+                Excel BOM tolerated. Max 5 MB.
+            </p>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Import findings</button>
+            </div>
+        </form>
+    </div>
+
+    <aside class="scanner-manifest card">
+        <header class="manifest-head">
+            <span class="manifest-tag">Schema</span>
+            <span class="manifest-count">{{ columns|length }} columns</span>
+        </header>
+
+        <section class="manifest-notes">
+            <header class="manifest-head">
+                <span class="manifest-tag">Required</span>
+            </header>
+            <dl class="manifest-dl">
+                {% for col in required %}
+                <div class="manifest-dl-row">
+                    <dt><code>{{ col }}</code></dt>
+                    <dd>Must be present and non-empty for every row.</dd>
+                </div>
+                {% endfor %}
+            </dl>
+        </section>
+
+        <div class="manifest-rule" aria-hidden="true"></div>
+
+        <section class="manifest-notes">
+            <header class="manifest-head">
+                <span class="manifest-tag">Optional columns</span>
+            </header>
+            <p class="text-xs text-muted" style="padding:0 1rem">
+                {% for col in columns %}{% if col not in required %}<code>{{ col }}</code>{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}
+            </p>
+        </section>
+
+        <div class="manifest-rule" aria-hidden="true"></div>
+
+        <section class="manifest-notes">
+            <header class="manifest-head">
+                <span class="manifest-tag">Notes</span>
+            </header>
+            <dl class="manifest-dl">
+                <div class="manifest-dl-row">
+                    <dt>Severity</dt>
+                    <dd>One of <code>critical</code>, <code>high</code>, <code>medium</code>, <code>low</code>, <code>info</code>.</dd>
+                </div>
+                <div class="manifest-dl-row">
+                    <dt>Status</dt>
+                    <dd>Defaults to <code>open</code> if blank.</dd>
+                </div>
+                <div class="manifest-dl-row">
+                    <dt>Dedup</dt>
+                    <dd>On <em>title · host · port · endpoint · parameter</em>. Skipped on re-import.</dd>
+                </div>
+                <div class="manifest-dl-row">
+                    <dt>Errors</dt>
+                    <dd>Bad rows are listed in the preview and skipped on commit; the rest still import.</dd>
+                </div>
+            </dl>
+        </section>
+
+        <footer class="manifest-foot">
+            <span class="manifest-foot-dot">&#9679;</span>
+            <span>vulnex.csv-import &middot; v1</span>
+        </footer>
+    </aside>
+</div>
+{% endblock %}

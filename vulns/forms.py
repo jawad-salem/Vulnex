@@ -181,6 +181,38 @@ class ToolImportForm(forms.Form):
                 field.widget.attrs.setdefault('class', 'form-input')
 
 
+class CsvImportForm(forms.Form):
+    """CSV bulk import. Format mirrors the JSON/CSV export — see
+    ``vulns.views.EXPORT_FIELDS``. Header validation and per-row checks
+    happen in the view so we can surface a per-row error list.
+    """
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB — CSV is plain text, this is plenty.
+
+    file = forms.FileField()
+    preview = forms.BooleanField(
+        required=False, initial=True,
+        help_text='Recommended — shows new vs duplicate rows and any per-row errors before committing.',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if not isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.setdefault('class', 'form-input')
+
+    def clean_file(self):
+        f = self.cleaned_data['file']
+        if f.size > self.MAX_FILE_SIZE:
+            raise forms.ValidationError(
+                f'File too large ({f.size // 1024} KB). Maximum is '
+                f'{self.MAX_FILE_SIZE // (1024 * 1024)} MB.'
+            )
+        name = (f.name or '').lower()
+        if not name.endswith('.csv'):
+            raise forms.ValidationError('File must be a .csv file.')
+        return f
+
+
 class FindingMergeForm(forms.Form):
     """Pick a target finding to merge the source into.
 
