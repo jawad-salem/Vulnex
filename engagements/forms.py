@@ -1,7 +1,10 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from accounts.models import User
-from .models import Engagement, EngagementNote, Client
+from .models import (
+    Engagement, EngagementNote, Client,
+    AttackPath, AttackPathNode, AttackPathEdge,
+)
 
 
 class InviteRegistrationForm(forms.Form):
@@ -117,4 +120,74 @@ class EngagementNoteForm(forms.ModelForm):
         widgets = {
             'content': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Add a note...', 'class': 'form-input'}),
         }
+
+
+class AttackPathForm(forms.ModelForm):
+    class Meta:
+        model = AttackPath
+        fields = ['name', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. External → Domain Admin'}),
+            'description': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')
+
+
+class AttackPathNodeForm(forms.ModelForm):
+    class Meta:
+        model = AttackPathNode
+        fields = ['label', 'kind', 'discovered_host', 'notes']
+        widgets = {
+            'label': forms.TextInput(attrs={'placeholder': 'e.g. CONTOSO\\administrator or web01.example.com'}),
+            'notes': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, engagement=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')
+        if engagement is not None:
+            from recon.models import DiscoveredHost
+            self.fields['discovered_host'].queryset = DiscoveredHost.objects.filter(
+                engagement=engagement,
+            )
+        self.fields['discovered_host'].required = False
+        self.fields['discovered_host'].empty_label = '— No linked recon host —'
+
+
+class AttackPathEdgeForm(forms.ModelForm):
+    class Meta:
+        model = AttackPathEdge
+        fields = ['from_node', 'to_node', 'technique', 'mitre_attack_id', 'finding']
+        widgets = {
+            'technique': forms.TextInput(attrs={'placeholder': 'e.g. Pass-the-Hash, Kerberoast, Phishing'}),
+            'mitre_attack_id': forms.TextInput(attrs={'placeholder': 'T1078'}),
+        }
+
+    def __init__(self, *args, path=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', 'form-input')
+        if path is not None:
+            node_qs = path.nodes.all()
+            self.fields['from_node'].queryset = node_qs
+            self.fields['to_node'].queryset = node_qs
+            from vulns.models import Finding
+            self.fields['finding'].queryset = Finding.objects.filter(
+                engagement=path.engagement,
+            )
+        self.fields['finding'].required = False
+        self.fields['finding'].empty_label = '— No linked finding —'
+
+    def clean(self):
+        cleaned = super().clean()
+        from_node = cleaned.get('from_node')
+        to_node = cleaned.get('to_node')
+        if from_node and to_node and from_node == to_node:
+            raise forms.ValidationError('Edge cannot connect a node to itself.')
+        return cleaned
 

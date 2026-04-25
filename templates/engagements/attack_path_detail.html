@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ path.name }} — Attack path — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:attack_path_list' engagement.pk %}">Attack paths</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ path.name|truncatechars:30 }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ path.name }}</h1>
+        {% if path.description %}<p class="page-subtitle">{{ path.description }}</p>{% endif %}
+    </div>
+    <div class="flex gap-2">
+        <a href="{% url 'engagements:attack_path_list' engagement.pk %}" class="btn">All paths</a>
+        {% if can_edit %}
+        <form method="post" action="{% url 'engagements:attack_path_delete' engagement.pk path.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger" data-confirm="Delete this attack path?">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="attack-path-layout">
+    <div class="card attack-path-canvas-card">
+        <div class="card-header">
+            <h2 class="card-title">Kill chain</h2>
+            <span class="text-xs text-muted">Hover an edge for technique &middot; click for the linked finding</span>
+        </div>
+        <div id="attack-path-canvas"
+             data-path-data-url="{% url 'engagements:attack_path_data' engagement.pk path.pk %}"
+             data-finding-url-prefix="/vulns/"
+             role="img" aria-label="Attack path graph">
+            <p class="text-secondary text-center" style="padding:3rem">Loading attack path…</p>
+        </div>
+        <div class="attack-path-legend">
+            <span class="legend-dot" data-kind="entrypoint"></span><span>Entry</span>
+            <span class="legend-dot" data-kind="host"></span><span>Host</span>
+            <span class="legend-dot" data-kind="identity"></span><span>Identity</span>
+            <span class="legend-dot" data-kind="asset"></span><span>Asset</span>
+            <span class="legend-dot" data-kind="objective"></span><span>Objective</span>
+        </div>
+    </div>
+
+    <aside class="attack-path-sidebar">
+        {% if can_edit %}
+        <div class="card">
+            <h2 class="card-title">Add node</h2>
+            <form method="post" action="{% url 'engagements:attack_path_node_create' engagement.pk path.pk %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ node_form.label.id_for_label }}">Label</label>
+                    {{ node_form.label }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ node_form.kind.id_for_label }}">Kind</label>
+                    {{ node_form.kind }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ node_form.discovered_host.id_for_label }}">Linked recon host</label>
+                    {{ node_form.discovered_host }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ node_form.notes.id_for_label }}">Notes</label>
+                    {{ node_form.notes }}
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add node</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Add edge</h2>
+            {% if path.nodes.count >= 2 %}
+            <form method="post" action="{% url 'engagements:attack_path_edge_create' engagement.pk path.pk %}">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ edge_form.from_node.id_for_label }}">From</label>
+                    {{ edge_form.from_node }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ edge_form.to_node.id_for_label }}">To</label>
+                    {{ edge_form.to_node }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ edge_form.technique.id_for_label }}">Technique</label>
+                    {{ edge_form.technique }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ edge_form.mitre_attack_id.id_for_label }}">MITRE ATT&amp;CK ID</label>
+                    {{ edge_form.mitre_attack_id }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ edge_form.finding.id_for_label }}">Linked finding</label>
+                    {{ edge_form.finding }}
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add edge</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="text-secondary text-sm">Add at least two nodes before connecting them.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <h2 class="card-title">Nodes ({{ path.nodes.count }})</h2>
+            {% if path.nodes.all %}
+            <div class="detail-list">
+                {% for n in path.nodes.all %}
+                <div class="detail-row">
+                    <div>
+                        <div class="font-semibold">{{ n.label }}</div>
+                        <div class="text-xs text-muted">{{ n.get_kind_display }}{% if n.discovered_host %} &middot; <a href="{% url 'recon:host_detail' engagement.pk n.discovered_host.pk %}">{{ n.discovered_host.hostname }}</a>{% endif %}</div>
+                    </div>
+                    {% if can_edit %}
+                    <form method="post" action="{% url 'engagements:attack_path_node_delete' engagement.pk path.pk n.pk %}" style="margin:0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" data-confirm="Delete this node? Connected edges will also be removed.">&times;</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-secondary">No nodes yet.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Edges ({{ path.edges.count }})</h2>
+            {% if path.edges.all %}
+            <div class="detail-list">
+                {% for e in path.edges.all %}
+                <div class="detail-row">
+                    <div>
+                        <div class="font-semibold">{{ e.from_node.label }} &rarr; {{ e.to_node.label }}</div>
+                        <div class="text-xs text-muted">
+                            {{ e.technique }}{% if e.mitre_attack_id %} &middot; <span class="text-mono">{{ e.mitre_attack_id }}</span>{% endif %}{% if e.finding %} &middot; <a href="{% url 'vulns:detail' e.finding.pk %}">{{ e.finding.title|truncatechars:30 }}</a>{% endif %}
+                        </div>
+                    </div>
+                    {% if can_edit %}
+                    <form method="post" action="{% url 'engagements:attack_path_edge_delete' engagement.pk path.pk e.pk %}" style="margin:0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-danger" data-confirm="Delete this edge?">&times;</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-secondary">No edges yet.</p>
+            {% endif %}
+        </div>
+    </aside>
+</div>
+
+<script src="{% static 'js/attack_path.js' %}" nonce="{{ request.csp_nonce }}"></script>
+{% endblock %}

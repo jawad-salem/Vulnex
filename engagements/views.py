@@ -9,8 +9,14 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
 from django.utils import timezone
-from .models import Engagement, EngagementMember, Invitation, ActivityLog, Client
-from .forms import EngagementForm, EngagementNoteForm
+from .models import (
+    Engagement, EngagementMember, Invitation, ActivityLog, Client,
+    AttackPath, AttackPathNode, AttackPathEdge,
+)
+from .forms import (
+    EngagementForm, EngagementNoteForm,
+    AttackPathForm, AttackPathNodeForm, AttackPathEdgeForm,
+)
 from reports.generator import calculate_engagement_risk_score, _risk_label
 from accounts.decorators import role_required, engagement_access, engagement_edit_required
 from accounts.models import AuditLog
@@ -594,3 +600,219 @@ def client_detail(request, pk):
         'sla_counts': sla_counts,
     }
     return render(request, 'engagements/client_detail.html', context)
+
+
+# ── Attack Path mapper (Red Team only) ──────────────────────────────────────
+
+def _require_red_team(engagement):
+    """Attack-path features are red-team only. Returns True if accessible."""
+    return engagement.engagement_type == Engagement.EngagementType.RED_TEAM
+
+
+@login_required
+@engagement_access(allow_client=True)
+def attack_path_list(request, pk):
+    """List all attack paths for a red-team engagement, with create form."""
+    engagement = request.engagement
+    if not _require_red_team(engagement):
+        messages.error(request, 'Attack paths are available only on Red Team engagements.')
+        return redirect('engagements:detail', pk=engagement.pk)
+
+    can_edit = request.eng_role in ('admin', 'lead', 'pentester')
+
+    if request.method == 'POST' and can_edit:
+        form = AttackPathForm(request.POST)
+        if form.is_valid():
+            path = form.save(commit=False)
+            path.engagement = engagement
+            path.created_by = request.user
+            path.save()
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Created attack path: {path.name}',
+            )
+            messages.success(request, 'Attack path created.')
+            return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+    else:
+        form = AttackPathForm()
+
+    paths = engagement.attack_paths.all().annotate(
+        node_count=Count('nodes', distinct=True),
+        edge_count=Count('edges', distinct=True),
+    )
+    return render(request, 'engagements/attack_path_list.html', {
+        'engagement': engagement,
+        'paths': paths,
+        'form': form,
+        'can_edit': can_edit,
+    })
+
+
+def _get_path(engagement, path_pk):
+    return get_object_or_404(AttackPath, pk=path_pk, engagement=engagement)
+
+
+@login_required
+@engagement_access(allow_client=True)
+def attack_path_detail(request, pk, path_pk):
+    """Render the DAG canvas + sidebar forms for a single attack path."""
+    engagement = request.engagement
+    if not _require_red_team(engagement):
+        messages.error(request, 'Attack paths are available only on Red Team engagements.')
+        return redirect('engagements:detail', pk=engagement.pk)
+    path = _get_path(engagement, path_pk)
+
+    can_edit = request.eng_role in ('admin', 'lead', 'pentester')
+
+    node_form = AttackPathNodeForm(engagement=engagement)
+    edge_form = AttackPathEdgeForm(path=path)
+
+    return render(request, 'engagements/attack_path_detail.html', {
+        'engagement': engagement,
+        'path': path,
+        'node_form': node_form,
+        'edge_form': edge_form,
+        'kind_choices': AttackPathNode.Kind.choices,
+        'can_edit': can_edit,
+    })
+
+
+@login_required
+@engagement_access(allow_client=True)
+def attack_path_data(request, pk, path_pk):
+    """JSON endpoint consumed by the SVG renderer."""
+    from django.http import JsonResponse
+    engagement = request.engagement
+    if not _require_red_team(engagement):
+        return JsonResponse({'error': 'not_red_team'}, status=403)
+    path = _get_path(engagement, path_pk)
+
+    nodes = [
+        {
+            'id': str(n.pk),
+            'label': n.label,
+            'kind': n.kind,
+            'x': n.position_x,
+            'y': n.position_y,
+            'host_pk': str(n.discovered_host_id) if n.discovered_host_id else None,
+        }
+        for n in path.nodes.all()
+    ]
+    edges = [
+        {
+            'id': str(e.pk),
+            'from': str(e.from_node_id),
+            'to': str(e.to_node_id),
+            'technique': e.technique,
+            'mitre': e.mitre_attack_id,
+            'finding_pk': str(e.finding_id) if e.finding_id else None,
+            'finding_title': e.finding.title if e.finding_id else None,
+        }
+        for e in path.edges.select_related('finding').all()
+    ]
+    return JsonResponse({'nodes': nodes, 'edges': edges})
+
+
+@login_required
+@engagement_edit_required
+def attack_path_node_create(request, pk, path_pk):
+    engagement = request.engagement
+    if not _require_red_team(engagement):
+        return redirect('engagements:detail', pk=engagement.pk)
+    path = _get_path(engagement, path_pk)
+    if request.method != 'POST':
+        return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+    form = AttackPathNodeForm(request.POST, engagement=engagement)
+    if form.is_valid():
+        node = form.save(commit=False)
+        node.path = path
+        node.save()
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Added node "{node.label}" to attack path "{path.name}"',
+        )
+        messages.success(request, 'Node added.')
+    else:
+        messages.error(request, 'Invalid node: ' + '; '.join(
+            f'{k}: {", ".join(v)}' for k, v in form.errors.items()
+        ))
+    return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+
+
+@login_required
+@engagement_edit_required
+def attack_path_node_delete(request, pk, path_pk, node_pk):
+    engagement = request.engagement
+    path = _get_path(engagement, path_pk)
+    node = get_object_or_404(AttackPathNode, pk=node_pk, path=path)
+    if request.method != 'POST':
+        return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+    label = node.label
+    node.delete()
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Removed node "{label}" from attack path "{path.name}"',
+    )
+    messages.success(request, 'Node removed.')
+    return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+
+
+@login_required
+@engagement_edit_required
+def attack_path_edge_create(request, pk, path_pk):
+    engagement = request.engagement
+    if not _require_red_team(engagement):
+        return redirect('engagements:detail', pk=engagement.pk)
+    path = _get_path(engagement, path_pk)
+    if request.method != 'POST':
+        return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+    form = AttackPathEdgeForm(request.POST, path=path)
+    if form.is_valid():
+        edge = form.save(commit=False)
+        edge.path = path
+        edge.save()
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Added edge "{edge.technique}" to attack path "{path.name}"',
+        )
+        messages.success(request, 'Edge added.')
+    else:
+        messages.error(request, 'Invalid edge: ' + '; '.join(
+            f'{k}: {", ".join(v)}' for k, v in form.errors.items()
+        ))
+    return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+
+
+@login_required
+@engagement_edit_required
+def attack_path_edge_delete(request, pk, path_pk, edge_pk):
+    engagement = request.engagement
+    path = _get_path(engagement, path_pk)
+    edge = get_object_or_404(AttackPathEdge, pk=edge_pk, path=path)
+    if request.method != 'POST':
+        return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+    technique = edge.technique
+    edge.delete()
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Removed edge "{technique}" from attack path "{path.name}"',
+    )
+    messages.success(request, 'Edge removed.')
+    return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
+
+
+@login_required
+@engagement_edit_required
+def attack_path_delete(request, pk, path_pk):
+    engagement = request.engagement
+    path = _get_path(engagement, path_pk)
+    if request.method != 'POST':
+        return redirect('engagements:attack_path_list', pk=engagement.pk)
+    name = path.name
+    path.delete()
+    ActivityLog.objects.create(
+        engagement=engagement, user=request.user,
+        action=f'Deleted attack path: {name}',
+    )
+    messages.success(request, 'Attack path deleted.')
+    return redirect('engagements:attack_path_list', pk=engagement.pk)

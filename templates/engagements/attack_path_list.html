@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Attack paths — {{ engagement.name }} — Vulnex{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Attack paths</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+            &middot; Red team kill-chain visualization
+        </p>
+    </div>
+    <a href="{% url 'engagements:detail' engagement.pk %}" class="btn">Back to engagement</a>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h2 class="card-title">Paths ({{ paths.count }})</h2>
+        {% if paths %}
+        <div class="detail-list">
+            {% for p in paths %}
+            <a href="{% url 'engagements:attack_path_detail' engagement.pk p.pk %}" class="detail-row" style="text-decoration:none">
+                <div>
+                    <div class="font-semibold">{{ p.name }}</div>
+                    <div class="text-xs text-muted">
+                        {{ p.node_count }} node{{ p.node_count|pluralize }} &middot;
+                        {{ p.edge_count }} edge{{ p.edge_count|pluralize }} &middot;
+                        updated {{ p.updated_at|date:"M d, Y" }}
+                    </div>
+                </div>
+                <span class="text-xs text-muted">&rsaquo;</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p class="text-secondary">No attack paths yet.</p>
+            <p class="text-xs text-muted mt-2">Map the kill-chain from initial access to your objective.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if can_edit %}
+    <div class="card">
+        <h2 class="card-title">New path</h2>
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="{{ form.name.id_for_label }}">Name</label>
+                {{ form.name }}
+                {% if form.name.errors %}<p class="form-error">{{ form.name.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.description.id_for_label }}">Description</label>
+                {{ form.description }}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Create path</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

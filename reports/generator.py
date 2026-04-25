@@ -23,6 +23,9 @@ from reportlab.platypus import (
     PageBreak, HRFlowable, Image,
 )
 from reportlab.lib.enums import TA_CENTER
+from reportlab.graphics.shapes import Drawing, Circle, String, Line, PolyLine
+
+from vulns.templatetags.vulns_extras import markdown_to_platypus
 
 
 def _esc(text):
@@ -483,17 +486,21 @@ def generate_report_pdf(engagement, report_type='full', template=None, cover_onl
                     elements.append(Spacer(1, 8))
 
                     elements.append(Paragraph('<b>Description</b>', styles['BodyText2']))
-                    elements.append(Paragraph(_esc(f.description), styles['BodyText2']))
+                    elements.extend(markdown_to_platypus(
+                        f.description, styles, brand_primary=brand.primary,
+                    ))
 
                     if f.proof_of_concept:
                         elements.append(Paragraph('<b>Proof of Concept</b>', styles['BodyText2']))
-                        elements.append(Paragraph(
-                            _esc(f.proof_of_concept).replace('\n', '<br/>'), styles['BodyText2']
+                        elements.extend(markdown_to_platypus(
+                            f.proof_of_concept, styles, brand_primary=brand.primary,
                         ))
 
                     if f.remediation:
                         elements.append(Paragraph('<b>Remediation</b>', styles['BodyText2']))
-                        elements.append(Paragraph(_esc(f.remediation), styles['BodyText2']))
+                        elements.extend(markdown_to_platypus(
+                            f.remediation, styles, brand_primary=brand.primary,
+                        ))
 
                     if f.references:
                         elements.append(Paragraph('<b>References</b>', styles['BodyText2']))
@@ -507,6 +514,49 @@ def generate_report_pdf(engagement, report_type='full', template=None, cover_onl
                     elements.append(Spacer(1, 10))
 
                 elements.append(PageBreak())
+
+    # ── Attack paths (red team only) ──
+    if engagement.engagement_type == 'red_team':
+        attack_paths = list(engagement.attack_paths.prefetch_related('nodes', 'edges__finding'))
+        if attack_paths:
+            elements.append(Paragraph('Attack Paths', styles['SectionHeading']))
+            elements.append(Paragraph(
+                'Kill-chain visualizations from initial access through to the '
+                'engagement objective. Edges are labelled with the technique '
+                '(MITRE ATT&amp;CK ID where applicable) and link to the '
+                'underlying finding.',
+                styles['BodyText2'],
+            ))
+            for path in attack_paths:
+                elements.append(Paragraph(_esc(path.name), styles['SubHeading']))
+                if path.description:
+                    elements.append(Paragraph(_esc(path.description), styles['BodyText2']))
+                drawing = _render_attack_path(path)
+                if drawing is not None:
+                    elements.append(drawing)
+                # Edge listing for accessibility / printable copy.
+                edges = list(path.edges.select_related('from_node', 'to_node', 'finding'))
+                if edges:
+                    rows = [['From', 'Technique', 'ATT&CK', 'To', 'Finding']]
+                    for e in edges:
+                        rows.append([
+                            _esc(e.from_node.label),
+                            _esc(e.technique),
+                            _esc(e.mitre_attack_id or ''),
+                            _esc(e.to_node.label),
+                            _esc(e.finding.title) if e.finding_id else '',
+                        ])
+                    edge_table = Table(rows, colWidths=[35*mm, 35*mm, 18*mm, 35*mm, 47*mm])
+                    edge_table.setStyle(TableStyle([
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 8),
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+                        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#cbd5e1')),
+                        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ]))
+                    elements.append(edge_table)
+                elements.append(Spacer(1, 12))
+            elements.append(PageBreak())
 
     # ── Disclaimer ──
     if brand.disclaimer:
@@ -613,3 +663,122 @@ def _risk_label(score):
     elif score >= 0.1:
         return 'Low', '#378ADD'
     return 'Info', '#888780'
+
+
+_ATTACK_PATH_KIND_COLORS = {
+    'entrypoint': colors.HexColor('#0ea5e9'),
+    'host':       colors.HexColor('#64748b'),
+    'identity':   colors.HexColor('#a855f7'),
+    'asset':      colors.HexColor('#f59e0b'),
+    'objective':  colors.HexColor('#ef4444'),
+}
+
+
+def _attack_path_depths(nodes, edges):
+    """Topological depths from any source nodes (no incoming edges)."""
+    indegree = {n.pk: 0 for n in nodes}
+    out_adj = {n.pk: [] for n in nodes}
+    for e in edges:
+        if e.to_node_id in indegree:
+            indegree[e.to_node_id] += 1
+        if e.from_node_id in out_adj:
+            out_adj[e.from_node_id].append(e.to_node_id)
+    depths = {}
+    queue = []
+    for n in nodes:
+        if indegree[n.pk] == 0:
+            depths[n.pk] = 0
+            queue.append(n.pk)
+    if not queue and nodes:
+        depths[nodes[0].pk] = 0
+        queue.append(nodes[0].pk)
+    while queue:
+        cur = queue.pop(0)
+        for nxt in out_adj.get(cur, []):
+            d = depths[cur] + 1
+            if nxt not in depths or d > depths[nxt]:
+                depths[nxt] = d
+                queue.append(nxt)
+    for n in nodes:
+        depths.setdefault(n.pk, 0)
+    return depths
+
+
+def _render_attack_path(path):
+    """Render a single AttackPath as a ReportLab Drawing.
+
+    Layout is column-based by topological depth, mirroring the SVG renderer
+    on the web side. Returns a Drawing or None if the path is empty.
+    """
+    nodes = list(path.nodes.all())
+    edges = list(path.edges.select_related('from_node', 'to_node').all())
+    if not nodes:
+        return None
+
+    width = 460
+    height = max(180, min(420, len(nodes) * 50))
+    drawing = Drawing(width, height)
+
+    depths = _attack_path_depths(nodes, edges)
+    by_depth = defaultdict(list)
+    for n in nodes:
+        by_depth[depths[n.pk]].append(n)
+    max_depth = max(by_depth.keys()) if by_depth else 0
+    col_spacing = (width - 80) / max(max_depth, 1)
+
+    positions = {}
+    for d, col in by_depth.items():
+        row_spacing = (height - 30) / (len(col) + 1)
+        for i, n in enumerate(col):
+            positions[n.pk] = (
+                40 + d * col_spacing,
+                height - (15 + (i + 1) * row_spacing),
+            )
+
+    # Edges
+    for e in edges:
+        p1 = positions.get(e.from_node_id)
+        p2 = positions.get(e.to_node_id)
+        if not p1 or not p2:
+            continue
+        drawing.add(Line(p1[0], p1[1], p2[0], p2[1],
+                         strokeColor=colors.HexColor('#94a3b8'),
+                         strokeWidth=1))
+        # Arrowhead — small triangle at p2.
+        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+        length = max(math.hypot(dx, dy), 0.001)
+        ux, uy = dx / length, dy / length
+        tip_x, tip_y = p2[0] - ux * 12, p2[1] - uy * 12
+        perp_x, perp_y = -uy * 4, ux * 4
+        arrow = PolyLine([
+            p2[0], p2[1],
+            tip_x + perp_x, tip_y + perp_y,
+            tip_x - perp_x, tip_y - perp_y,
+            p2[0], p2[1],
+        ], strokeColor=colors.HexColor('#475569'),
+           fillColor=colors.HexColor('#475569'),
+           strokeWidth=0.5)
+        drawing.add(arrow)
+        # Edge label.
+        label = e.technique
+        if e.mitre_attack_id:
+            label += f' ({e.mitre_attack_id})'
+        mx = (p1[0] + p2[0]) / 2
+        my = (p1[1] + p2[1]) / 2 + 4
+        drawing.add(String(mx, my, label[:36],
+                           fontSize=7, fillColor=colors.HexColor('#475569'),
+                           textAnchor='middle'))
+
+    # Nodes
+    for n in nodes:
+        x, y = positions[n.pk]
+        color = _ATTACK_PATH_KIND_COLORS.get(n.kind, colors.HexColor('#64748b'))
+        drawing.add(Circle(x, y, 8, fillColor=color,
+                           strokeColor=colors.HexColor('#0f172a'),
+                           strokeWidth=0.7))
+        label = n.label if len(n.label) <= 22 else n.label[:21] + '…'
+        drawing.add(String(x, y - 16, label,
+                           fontSize=7, fillColor=colors.HexColor('#0f172a'),
+                           textAnchor='middle'))
+
+    return drawing

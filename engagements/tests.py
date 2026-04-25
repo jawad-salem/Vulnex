@@ -1,7 +1,10 @@
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
-from .models import Engagement, EngagementMember, Invitation, Client as EngagementClient
+from .models import (
+    Engagement, EngagementMember, Invitation, Client as EngagementClient,
+    AttackPath, AttackPathNode, AttackPathEdge,
+)
 
 
 @override_settings(MFA_REQUIRED_ROLES=[])
@@ -332,3 +335,155 @@ class InvitationFlowTests(TestCase):
         self.assertEqual(
             Invitation.objects.filter(email='dup@test.com').count(), 1
         )
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class AttackPathTests(TestCase):
+    """Attack path mapper: red-team gating, role enforcement, CRUD, JSON, PDF."""
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='pw')
+        self.outsider = User.objects.create_user('out', role='pentester', password='pw')
+        self.client_user = User.objects.create_user('cli', role='client', password='pw')
+        self.eng_client = EngagementClient.objects.get_or_create(name='ACME')[0]
+
+        self.red_team = Engagement.objects.create(
+            name='RT-1', client=self.eng_client, created_by=self.lead,
+            engagement_type='red_team',
+        )
+        EngagementMember.objects.create(engagement=self.red_team, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.red_team, user=self.client_user, role='client')
+
+        self.web_eng = Engagement.objects.create(
+            name='Web-1', client=self.eng_client, created_by=self.lead,
+            engagement_type='webapp',
+        )
+        EngagementMember.objects.create(engagement=self.web_eng, user=self.lead, role='lead')
+
+    def _login(self, user):
+        self.client.login(username=user, password='pw')
+
+    def test_non_red_team_blocked(self):
+        self._login('lead')
+        resp = self.client.get(reverse('engagements:attack_path_list', args=[self.web_eng.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(self.web_eng.attack_paths.count(), 0)
+
+    def test_outsider_cannot_access(self):
+        self._login('out')
+        resp = self.client.get(reverse('engagements:attack_path_list', args=[self.red_team.pk]))
+        self.assertEqual(resp.status_code, 302)
+
+    def test_lead_creates_path(self):
+        self._login('lead')
+        resp = self.client.post(
+            reverse('engagements:attack_path_list', args=[self.red_team.pk]),
+            {'name': 'External → DA', 'description': 'phish to DA'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(self.red_team.attack_paths.count(), 1)
+        path = self.red_team.attack_paths.get()
+        self.assertEqual(path.created_by, self.lead)
+
+    def test_client_can_view_but_not_edit(self):
+        path = AttackPath.objects.create(
+            engagement=self.red_team, name='P1', created_by=self.lead,
+        )
+        self._login('cli')
+        resp = self.client.get(
+            reverse('engagements:attack_path_detail', args=[self.red_team.pk, path.pk]),
+        )
+        self.assertEqual(resp.status_code, 200)
+        # Client cannot create nodes (engagement_edit_required redirects).
+        resp = self.client.post(
+            reverse('engagements:attack_path_node_create', args=[self.red_team.pk, path.pk]),
+            {'label': 'Foo', 'kind': 'host'},
+        )
+        self.assertIn(resp.status_code, (302, 403))
+        self.assertEqual(path.nodes.count(), 0)
+
+    def test_lead_adds_nodes_and_edge(self):
+        path = AttackPath.objects.create(
+            engagement=self.red_team, name='P1', created_by=self.lead,
+        )
+        self._login('lead')
+        self.client.post(
+            reverse('engagements:attack_path_node_create', args=[self.red_team.pk, path.pk]),
+            {'label': 'Phish', 'kind': 'entrypoint'},
+        )
+        self.client.post(
+            reverse('engagements:attack_path_node_create', args=[self.red_team.pk, path.pk]),
+            {'label': 'DA', 'kind': 'objective'},
+        )
+        self.assertEqual(path.nodes.count(), 2)
+        a, b = path.nodes.all()
+        self.client.post(
+            reverse('engagements:attack_path_edge_create', args=[self.red_team.pk, path.pk]),
+            {'from_node': str(a.pk), 'to_node': str(b.pk),
+             'technique': 'Pass-the-Hash', 'mitre_attack_id': 'T1550'},
+        )
+        self.assertEqual(path.edges.count(), 1)
+        self.assertEqual(path.edges.get().mitre_attack_id, 'T1550')
+
+    def test_self_loop_rejected(self):
+        path = AttackPath.objects.create(
+            engagement=self.red_team, name='P1', created_by=self.lead,
+        )
+        node = AttackPathNode.objects.create(path=path, label='X', kind='host')
+        self._login('lead')
+        self.client.post(
+            reverse('engagements:attack_path_edge_create', args=[self.red_team.pk, path.pk]),
+            {'from_node': str(node.pk), 'to_node': str(node.pk), 'technique': 'X'},
+        )
+        self.assertEqual(path.edges.count(), 0)
+
+    def test_data_endpoint_shape(self):
+        path = AttackPath.objects.create(
+            engagement=self.red_team, name='P1', created_by=self.lead,
+        )
+        a = AttackPathNode.objects.create(path=path, label='Phish', kind='entrypoint')
+        b = AttackPathNode.objects.create(path=path, label='DA', kind='objective')
+        AttackPathEdge.objects.create(
+            path=path, from_node=a, to_node=b,
+            technique='Phishing', mitre_attack_id='T1566',
+        )
+        self._login('lead')
+        resp = self.client.get(
+            reverse('engagements:attack_path_data', args=[self.red_team.pk, path.pk]),
+        )
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.json()
+        self.assertEqual(len(payload['nodes']), 2)
+        self.assertEqual(len(payload['edges']), 1)
+        self.assertEqual(payload['edges'][0]['technique'], 'Phishing')
+        self.assertEqual(payload['edges'][0]['mitre'], 'T1566')
+
+    def test_data_endpoint_blocked_on_non_red_team(self):
+        # Manually plant a path on the wrong engagement type to confirm the
+        # type-check guard fires on the JSON endpoint too.
+        path = AttackPath.objects.create(
+            engagement=self.web_eng, name='P1', created_by=self.lead,
+        )
+        self._login('lead')
+        resp = self.client.get(
+            reverse('engagements:attack_path_data', args=[self.web_eng.pk, path.pk]),
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_pdf_includes_attack_paths_section(self):
+        path = AttackPath.objects.create(
+            engagement=self.red_team, name='External-to-DA', created_by=self.lead,
+        )
+        a = AttackPathNode.objects.create(path=path, label='Phish', kind='entrypoint')
+        b = AttackPathNode.objects.create(path=path, label='DA', kind='objective')
+        AttackPathEdge.objects.create(
+            path=path, from_node=a, to_node=b,
+            technique='Pass-the-Hash', mitre_attack_id='T1550',
+        )
+        from reports.generator import generate_report_pdf
+        pdf = generate_report_pdf(self.red_team, report_type='technical')
+        self.assertTrue(pdf.startswith(b'%PDF'))
+        # The report should be larger than a no-attack-path baseline; this is a
+        # smoke test that the section was emitted without raising.
+        self.assertGreater(len(pdf), 5000)

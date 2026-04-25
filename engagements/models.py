@@ -250,6 +250,101 @@ class Invitation(models.Model):
         return (timezone.now() - self.created_at).days > 7
 
 
+class AttackPath(models.Model):
+    """A red-team attack path: a DAG of nodes (hosts/identities/assets/objectives)
+    connected by edges that carry a technique label and an optional ATT&CK ID
+    plus a linked finding. Visible only on red-team engagements.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    engagement = models.ForeignKey(
+        Engagement, on_delete=models.CASCADE, related_name='attack_paths',
+    )
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='created_attack_paths',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.name} ({self.engagement.name})'
+
+
+class AttackPathNode(models.Model):
+    class Kind(models.TextChoices):
+        ENTRYPOINT = 'entrypoint', 'Entry Point'
+        HOST = 'host', 'Host'
+        IDENTITY = 'identity', 'Identity'
+        ASSET = 'asset', 'Asset'
+        OBJECTIVE = 'objective', 'Objective'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    path = models.ForeignKey(
+        AttackPath, on_delete=models.CASCADE, related_name='nodes',
+    )
+    label = models.CharField(max_length=200)
+    kind = models.CharField(
+        max_length=20, choices=Kind.choices, default=Kind.HOST,
+    )
+    discovered_host = models.ForeignKey(
+        'recon.DiscoveredHost', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='attack_path_nodes',
+    )
+    notes = models.TextField(blank=True)
+    position_x = models.IntegerField(default=0)
+    position_y = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.get_kind_display()}: {self.label}'
+
+
+class AttackPathEdge(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    path = models.ForeignKey(
+        AttackPath, on_delete=models.CASCADE, related_name='edges',
+    )
+    from_node = models.ForeignKey(
+        AttackPathNode, on_delete=models.CASCADE, related_name='outgoing_edges',
+    )
+    to_node = models.ForeignKey(
+        AttackPathNode, on_delete=models.CASCADE, related_name='incoming_edges',
+    )
+    technique = models.CharField(
+        max_length=200,
+        help_text='Free-form technique label, e.g. "Pass-the-Hash", "Kerberoast".',
+    )
+    mitre_attack_id = models.CharField(
+        max_length=20, blank=True,
+        help_text='Optional MITRE ATT&CK technique ID, e.g. T1078.',
+    )
+    finding = models.ForeignKey(
+        'vulns.Finding', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='attack_path_edges',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=~models.Q(from_node=models.F('to_node')),
+                name='attackpathedge_no_self_loop',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.from_node.label} → {self.to_node.label} ({self.technique})'
+
+
 class ActivityLog(models.Model):
     """Audit trail for engagement actions."""
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='activity_logs')
