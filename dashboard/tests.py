@@ -1,7 +1,9 @@
 from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from accounts.models import User
+from credentials.models import Credential
 from engagements.models import Engagement, EngagementMember, Client as EngagementClient
+from recon.models import DiscoveredHost
 from vulns.models import Finding
 
 
@@ -65,3 +67,67 @@ class GlobalSearchTests(TestCase):
         resp = self.client.get(reverse('dashboard:search') + '?q=anything')
         self.assertEqual(resp.status_code, 302)
         self.assertIn('login', resp.url)
+
+    def test_credential_match_visible_to_member(self):
+        Credential.objects.create(
+            engagement=self.engagement, username='svc_admin', service='SSH',
+            found_by=self.pentester,
+        )
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=svc_admin')
+        self.assertContains(resp, 'svc_admin')
+
+    def test_credential_hidden_from_client(self):
+        client_user = User.objects.create_user('cli', role='client', password='testpass1')
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=client_user, role='client',
+        )
+        Credential.objects.create(
+            engagement=self.engagement, username='svc_admin', service='SSH',
+            found_by=self.pentester,
+        )
+        # Approve the existing finding so the client has at least one match in
+        # the rest of the page; we need to check ONLY the credential is hidden.
+        self.finding.review_state = Finding.ReviewState.APPROVED
+        self.finding.save()
+        self.client.login(username='cli', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=svc_admin')
+        # The query string is echoed in the page title/subtitle/search input,
+        # so we check that the Credentials section itself was not rendered.
+        self.assertNotContains(resp, '<h2 class="card-title">Credentials</h2>')
+
+    def test_host_match_visible_to_member(self):
+        DiscoveredHost.objects.create(
+            engagement=self.engagement, hostname='vault.acme.example.com',
+        )
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=vault')
+        self.assertContains(resp, 'vault.acme.example.com')
+
+    def test_host_hidden_from_client(self):
+        client_user = User.objects.create_user('cli2', role='client', password='testpass1')
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=client_user, role='client',
+        )
+        DiscoveredHost.objects.create(
+            engagement=self.engagement, hostname='vault.acme.example.com',
+        )
+        self.client.login(username='cli2', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=vault')
+        self.assertNotContains(resp, 'vault.acme.example.com')
+
+    def test_finding_status_chip_present(self):
+        self.client.login(username='pt', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=injection')
+        # Status badge is now alongside the severity badge in results.
+        self.assertContains(resp, 'badge-open')
+
+    def test_client_only_sees_approved_findings(self):
+        client_user = User.objects.create_user('cli3', role='client', password='testpass1')
+        EngagementMember.objects.create(
+            engagement=self.engagement, user=client_user, role='client',
+        )
+        # Default review_state is DRAFT — must be invisible to client.
+        self.client.login(username='cli3', password='testpass1')
+        resp = self.client.get(reverse('dashboard:search') + '?q=injection')
+        self.assertNotContains(resp, 'SQL injection in login form')

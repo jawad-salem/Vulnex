@@ -56,9 +56,38 @@
                     {{ f.engagement.name }}
                     {% if f.host %} &middot; <span class="text-mono">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</span>{% endif %}
                     {% if f.cwe_id %} &middot; <span class="text-mono">{{ f.cwe_id }}</span>{% endif %}
+                    &middot; updated {{ f.updated_at|date:"M d, Y" }}
                 </div>
             </div>
-            <span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span>
+            <div class="flex gap-2">
+                <span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span>
+                <span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if credentials %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Credentials</h2>
+        <span class="text-xs text-muted">{{ credentials|length }}</span>
+    </div>
+    <div class="detail-list">
+        {% for c in credentials %}
+        <a href="{% url 'credentials:list' c.engagement.pk %}" class="detail-row" style="text-decoration:none">
+            <div>
+                <div class="font-semibold">{{ c.username|default:"(no user)" }}{% if c.service %} <span class="text-muted">@ {{ c.service }}</span>{% endif %}</div>
+                <div class="text-xs text-muted">
+                    {{ c.engagement.name }}
+                    &middot; {{ c.get_credential_type_display }}
+                    {% if c.host %} &middot; <span class="text-mono">{{ c.host.hostname }}</span>{% endif %}
+                    &middot; updated {{ c.updated_at|date:"M d, Y" }}
+                </div>
+            </div>
+            <span class="badge badge-{{ c.status }}">{{ c.get_status_display }}</span>
         </a>
         {% endfor %}
     </div>
@@ -97,7 +126,7 @@
         {% endif %}
     {% else %}
     <p class="text-secondary">Enter at least 2 characters to search.</p>
-    <p class="text-xs text-muted mt-2">Searches titles, descriptions, hosts, URLs, CWEs, engagement names, and client names across engagements you have access to.</p>
+    <p class="text-xs text-muted mt-2">Searches titles, descriptions, hosts, URLs, CWEs, engagement names, client names, and credentials across engagements you have access to.</p>
     {% endif %}
 </div>
 {% endif %}
