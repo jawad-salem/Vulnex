@@ -37,6 +37,9 @@
         <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
         <a href="{% url 'vulns:delete' finding.pk %}" class="btn btn-danger">Delete</a>
         {% endif %}
+        {% if can_review %}
+        <a href="{% url 'vulns:merge' finding.pk %}" class="btn">Merge into…</a>
+        {% endif %}
     </div>
 </div>
 
@@ -101,20 +104,20 @@
     <div class="tab-panel active" id="tab-overview" role="tabpanel">
         <div class="card">
             <h2 class="card-title mb-3">Description</h2>
-            <div class="prose">{{ finding.description|linebreaksbr }}</div>
+            <div class="prose">{{ finding.description|markdown }}</div>
         </div>
 
         {% if finding.proof_of_concept %}
         <div class="card mt-4">
             <h2 class="card-title mb-3">Proof of concept</h2>
-            <div class="mono-block text-pre">{{ finding.proof_of_concept }}</div>
+            <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
         </div>
         {% endif %}
 
         {% if finding.remediation %}
         <div class="card mt-4">
             <h2 class="card-title mb-3">Remediation</h2>
-            <div class="prose">{{ finding.remediation|linebreaksbr }}</div>
+            <div class="prose">{{ finding.remediation|markdown }}</div>
         </div>
         {% endif %}
 

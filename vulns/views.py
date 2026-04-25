@@ -10,7 +10,10 @@ from django.db.models import Q
 from django.utils import timezone
 from engagements.models import Engagement, ActivityLog
 from .models import Finding, Evidence, FindingTemplate, FindingComment
-from .forms import FindingForm, EvidenceForm, ToolImportForm, RetestForm, FindingCommentForm
+from .forms import (
+    FindingForm, EvidenceForm, ToolImportForm, RetestForm,
+    FindingCommentForm, FindingMergeForm,
+)
 from .parsers import (
     parse_burp_xml,
     parse_nessus_xml,
@@ -213,6 +216,116 @@ def finding_detail(request, pk):
         'can_review': can_review,
     }
     return render(request, 'vulns/detail.html', context)
+
+
+def _merge_into(source: Finding, target: Finding, actor) -> dict:
+    """Move source's evidence + comments into target, append source's body
+    fields as a labelled section, then delete source. Returns a small summary
+    suitable for the audit log details payload.
+
+    Caller must check both belong to the same engagement and that ``actor``
+    has permission. The whole operation runs in a single transaction.
+    """
+    from django.db import transaction
+
+    moved_evidence = source.evidence.count()
+    moved_comments = source.comments.count()
+
+    sections = []
+    label = f'Merged from "{source.title}" ({source.get_severity_display()})'
+    if source.description:
+        sections.append(f'### {label} — Description\n\n{source.description}')
+    if source.proof_of_concept:
+        sections.append(f'### {label} — Proof of concept\n\n{source.proof_of_concept}')
+    if source.remediation:
+        sections.append(f'### {label} — Remediation\n\n{source.remediation}')
+    extra = '\n\n'.join(sections)
+
+    with transaction.atomic():
+        if extra:
+            target.description = (
+                (target.description or '').rstrip() + '\n\n' + extra
+            ).strip()
+        # Reparent evidence and comments. Bulk update keeps queries to one each.
+        source.evidence.update(finding=target)
+        source.comments.update(finding=target)
+        target.save()
+        source_id = source.pk
+        source_title = source.title
+        source.delete()
+
+    return {
+        'source_id': str(source_id),
+        'source_title': source_title,
+        'target_id': str(target.pk),
+        'target_title': target.title,
+        'moved_evidence': moved_evidence,
+        'moved_comments': moved_comments,
+    }
+
+
+@login_required
+def finding_merge(request, pk):
+    """Lead/Reviewer-only action: merge ``pk`` (source) into a chosen target.
+
+    GET renders a confirmation page with the side-by-side preview; POST with
+    a valid target performs the merge.
+    """
+    source = get_object_or_404(Finding.objects.select_related('engagement'), pk=pk)
+    engagement = source.engagement
+    if not engagement.user_can_review(request.user):
+        messages.error(request, 'Only leads and reviewers can merge findings.')
+        return redirect('vulns:detail', pk=pk)
+
+    if request.method == 'POST':
+        form = FindingMergeForm(request.POST, source=source)
+        if form.is_valid():
+            target = form.cleaned_data['target']
+            if target.engagement_id != source.engagement_id:
+                # ModelChoiceField queryset already enforces this, but
+                # belt-and-braces in case of a tampered request.
+                return HttpResponseForbidden('Cross-engagement merge denied.')
+            details = _merge_into(source, target, request.user)
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.FINDING_MERGE,
+                target=details['target_id'],
+                details={**details, 'engagement': engagement.name},
+                request=request,
+            )
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=(
+                    f'Merged finding "{details["source_title"]}" '
+                    f'into "{details["target_title"]}"'
+                ),
+            )
+            messages.success(
+                request,
+                f'Merged into "{details["target_title"]}". '
+                f'{details["moved_evidence"]} evidence item(s) and '
+                f'{details["moved_comments"]} comment(s) moved.',
+            )
+            return redirect('vulns:detail', pk=target.pk)
+    else:
+        form = FindingMergeForm(source=source)
+
+    target_id = request.GET.get('target')
+    target_preview = None
+    if target_id:
+        try:
+            target_preview = Finding.objects.get(
+                pk=target_id, engagement_id=source.engagement_id,
+            )
+        except (Finding.DoesNotExist, ValueError):
+            target_preview = None
+
+    return render(request, 'vulns/merge_confirm.html', {
+        'source': source,
+        'engagement': engagement,
+        'form': form,
+        'target_preview': target_preview,
+    })
 
 
 @login_required
@@ -472,75 +585,140 @@ def request_changes(request, pk):
     return redirect('vulns:detail', pk=pk)
 
 
+_PARSERS = {
+    'nuclei': parse_nuclei_json,
+    'nikto': parse_nikto_json,
+    'burp': parse_burp_xml,
+    'nessus': parse_nessus_xml,
+    'zap': parse_zap_json,
+    'semgrep': parse_semgrep_json,
+}
+
+_IMPORT_PREVIEW_LIMIT = 1000
+
+
+def _classify_import(engagement, findings_data):
+    """Split parser output into (new_items, duplicate_items) using the
+    (title, host, port, endpoint, parameter) dedup key against existing
+    findings. Returns lists of plain dicts so they're JSON-serialisable
+    for session storage.
+    """
+    existing_keys = set(
+        engagement.findings.values_list(
+            'title', 'host', 'port', 'endpoint', 'parameter',
+        )
+    )
+    new_items, dup_items = [], []
+    seen_in_batch = set()
+    for fd in findings_data:
+        dedup_key = (
+            fd.get('title', ''),
+            fd.get('host', ''),
+            fd.get('port'),
+            fd.get('endpoint', ''),
+            fd.get('parameter', ''),
+        )
+        # JSON-friendly version (tuples can't survive session round-trip)
+        if dedup_key in existing_keys or dedup_key in seen_in_batch:
+            dup_items.append(fd)
+        else:
+            seen_in_batch.add(dedup_key)
+            new_items.append(fd)
+    return new_items, dup_items
+
+
 @login_required
 @engagement_edit_required
 def tool_import(request, engagement_pk):
     engagement = request.engagement
+
+    # ── Step 2 of preview flow: confirm and commit pre-parsed payload ──
+    if request.method == 'POST' and 'confirm_import' in request.POST:
+        pending = request.session.pop('import_pending', None)
+        if not pending or pending.get('engagement') != str(engagement.pk):
+            messages.error(request, 'Import preview expired. Please re-upload.')
+            return redirect('vulns:import', engagement_pk=engagement.pk)
+        tool = pending['tool']
+        new_items = pending['new']
+        created = _commit_import(engagement, request.user, tool, new_items)
+        ActivityLog.objects.create(
+            engagement=engagement, user=request.user,
+            action=f'Imported {created} findings from {tool.capitalize()}',
+        )
+        messages.success(
+            request,
+            f'Imported {created} findings from {tool.capitalize()}. '
+            f'{pending["skipped"]} duplicate(s) skipped.',
+        )
+        return redirect('vulns:list', engagement_pk=engagement_pk)
+
+    # ── Step 1: upload + parse ──
     if request.method == 'POST':
         form = ToolImportForm(request.POST, request.FILES)
         if form.is_valid():
             tool = form.cleaned_data['tool']
-            uploaded = request.FILES['file']
-            content = uploaded.read()
-
-            parsers = {
-                'nuclei': parse_nuclei_json,
-                'nikto': parse_nikto_json,
-                'burp': parse_burp_xml,
-                'nessus': parse_nessus_xml,
-                'zap': parse_zap_json,
-                'semgrep': parse_semgrep_json,
-            }
+            preview = form.cleaned_data.get('preview', False)
+            content = request.FILES['file'].read()
             try:
-                findings_data = parsers[tool](content)
-                created = 0
-                skipped = 0
-                # Dedup on (title, host, port, endpoint, parameter) — the same
-                # bug rediscovered on the same surface should not double-file.
-                existing_keys = set(
-                    engagement.findings.values_list(
-                        'title', 'host', 'port', 'endpoint', 'parameter',
-                    )
-                )
-                model_fields = {f.name for f in Finding._meta.get_fields()}
-                for fd in findings_data:
-                    dedup_key = (
-                        fd.get('title', ''),
-                        fd.get('host', ''),
-                        fd.get('port'),
-                        fd.get('endpoint', ''),
-                        fd.get('parameter', ''),
-                    )
-                    if dedup_key in existing_keys:
-                        skipped += 1
-                        continue
-                    existing_keys.add(dedup_key)
-                    # Parsers may emit keys the Finding model doesn't define
-                    # (e.g. Burp's `confidence`). Drop them before create().
-                    clean = {k: v for k, v in fd.items() if k in model_fields}
-                    Finding.objects.create(
-                        engagement=engagement,
-                        found_by=request.user,
-                        tool_source=tool.capitalize(),
-                        **clean
-                    )
-                    created += 1
-                ActivityLog.objects.create(
-                    engagement=engagement, user=request.user,
-                    action=f'Imported {created} findings from {tool.capitalize()}'
-                )
-                msg = f'Imported {created} findings from {tool.capitalize()}.'
-                if skipped:
-                    msg += f' {skipped} duplicate(s) skipped.'
-                messages.success(request, msg)
+                findings_data = _PARSERS[tool](content)
             except Exception as e:
                 messages.error(request, f'Import failed: {str(e)}')
+                return redirect('vulns:import', engagement_pk=engagement_pk)
+
+            new_items, dup_items = _classify_import(engagement, findings_data)
+
+            if preview:
+                if len(new_items) + len(dup_items) > _IMPORT_PREVIEW_LIMIT:
+                    messages.error(
+                        request,
+                        f'Preview supports up to {_IMPORT_PREVIEW_LIMIT} entries. '
+                        f'Re-run without preview, or split the file.',
+                    )
+                    return redirect('vulns:import', engagement_pk=engagement_pk)
+                request.session['import_pending'] = {
+                    'engagement': str(engagement.pk),
+                    'tool': tool,
+                    'new': new_items,
+                    'skipped': len(dup_items),
+                }
+                return render(request, 'vulns/import_preview.html', {
+                    'engagement': engagement,
+                    'tool': tool,
+                    'new_items': new_items,
+                    'dup_items': dup_items,
+                })
+
+            created = _commit_import(engagement, request.user, tool, new_items)
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action=f'Imported {created} findings from {tool.capitalize()}',
+            )
+            msg = f'Imported {created} findings from {tool.capitalize()}.'
+            if dup_items:
+                msg += f' {len(dup_items)} duplicate(s) skipped.'
+            messages.success(request, msg)
             return redirect('vulns:list', engagement_pk=engagement_pk)
     else:
         form = ToolImportForm()
     return render(request, 'vulns/import.html', {
         'form': form, 'engagement': engagement,
     })
+
+
+def _commit_import(engagement, user, tool, new_items):
+    """Bulk-create findings from a pre-classified ``new_items`` payload."""
+    model_fields = {f.name for f in Finding._meta.get_fields()}
+    created = 0
+    for fd in new_items:
+        clean = {k: v for k, v in fd.items() if k in model_fields}
+        Finding.objects.create(
+            engagement=engagement,
+            found_by=user,
+            tool_source=tool.capitalize(),
+            **clean,
+        )
+        created += 1
+    return created
 
 
 EXPORT_FIELDS = [
@@ -628,6 +806,18 @@ def evidence_download(request, pk):
         request=request,
     )
     return FileResponse(evidence.file.open('rb'), filename=filename)
+
+
+@login_required
+def markdown_preview(request):
+    """Render raw Markdown to sanitized HTML using the same pipeline as the
+    finding/comment views. POST-only so request bodies don't end up in logs.
+    """
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+    raw = request.POST.get('text', '')[:20000]
+    from .templatetags.vulns_extras import render_markdown
+    return HttpResponse(render_markdown(raw), content_type='text/html; charset=utf-8')
 
 
 @login_required

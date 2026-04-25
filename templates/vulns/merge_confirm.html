@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load vulns_extras %}
+{% block title %}Merge finding — {{ source.title }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'vulns:detail' source.pk %}">{{ source.title|truncatechars:30 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Merge</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Merge into another finding</h1>
+        <p class="page-subtitle">
+            This will move all evidence and comments to the target, append the
+            source's body fields, then delete this finding. <strong>Cannot be undone.</strong>
+        </p>
+    </div>
+    <a href="{% url 'vulns:detail' source.pk %}" class="btn">Cancel</a>
+</div>
+
+<form method="get" class="card mb-4">
+    <h2 class="card-title mb-3">1. Pick a target</h2>
+    <div class="form-row" style="grid-template-columns:1fr auto">
+        <div class="form-group mb-0">
+            <label for="{{ form.target.id_for_label }}">Target finding</label>
+            {{ form.target }}
+            {% if form.target.errors %}<span class="form-error">{{ form.target.errors|join:", " }}</span>{% endif %}
+        </div>
+        <div class="form-group mb-0" style="align-self:flex-end">
+            <button type="submit" class="btn">Preview merge</button>
+        </div>
+    </div>
+    <p class="text-xs text-secondary mt-2">Only findings inside this engagement are listed.</p>
+</form>
+
+{% if target_preview %}
+<div class="card mb-4">
+    <h2 class="card-title mb-3">2. Preview</h2>
+    <div class="grid-2">
+        <div>
+            <header class="mb-2">
+                <span class="text-xs text-secondary">Source — will be deleted</span>
+                <h3 class="m-0">{{ source.title }}</h3>
+                <div class="mt-1">
+                    <span class="badge badge-{{ source.severity }}">{{ source.get_severity_display }}</span>
+                    <span class="badge badge-{{ source.status }}">{{ source.get_status_display }}</span>
+                </div>
+            </header>
+            <div class="prose text-sm">{{ source.description|markdown }}</div>
+            <p class="text-xs text-secondary mt-2">
+                {{ source.evidence.count }} evidence · {{ source.comments.count }} comment(s) will move.
+            </p>
+        </div>
+        <div>
+            <header class="mb-2">
+                <span class="text-xs text-secondary">Target — will absorb</span>
+                <h3 class="m-0">{{ target_preview.title }}</h3>
+                <div class="mt-1">
+                    <span class="badge badge-{{ target_preview.severity }}">{{ target_preview.get_severity_display }}</span>
+                    <span class="badge badge-{{ target_preview.status }}">{{ target_preview.get_status_display }}</span>
+                </div>
+            </header>
+            <div class="prose text-sm">{{ target_preview.description|markdown }}</div>
+            <p class="text-xs text-secondary mt-2">
+                Currently has {{ target_preview.evidence.count }} evidence · {{ target_preview.comments.count }} comment(s).
+            </p>
+        </div>
+    </div>
+</div>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    <input type="hidden" name="target" value="{{ target_preview.pk }}">
+    <h2 class="card-title mb-3">3. Confirm merge</h2>
+    <p class="text-sm text-secondary mb-3">
+        After merging, you'll be redirected to the target. Source will be gone.
+    </p>
+    <button type="submit" class="btn btn-danger">Merge into "{{ target_preview.title|truncatechars:50 }}"</button>
+    <a href="{% url 'vulns:detail' source.pk %}" class="btn">Cancel</a>
+</form>
+{% endif %}
+{% endblock %}

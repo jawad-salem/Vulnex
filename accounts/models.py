@@ -89,6 +89,7 @@ class AuditLog(models.Model):
         COMMENT_POST = 'comment_post', 'Comment posted'
         COMMENT_EDIT = 'comment_edit', 'Comment edited'
         COMMENT_DELETE = 'comment_delete', 'Comment deleted'
+        FINDING_MERGE = 'finding_merge', 'Finding merged'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

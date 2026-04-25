@@ -13,6 +13,7 @@ urlpatterns = [
     path('<uuid:pk>/submit-review/', views.submit_for_review, name='submit_review'),
     path('<uuid:pk>/approve/', views.approve_finding, name='approve'),
     path('<uuid:pk>/request-changes/', views.request_changes, name='request_changes'),
+    path('<uuid:pk>/merge/', views.finding_merge, name='merge'),
     path('evidence/<int:pk>/download/', views.evidence_download, name='evidence_download'),
     path('comment/<uuid:pk>/edit/', views.comment_edit, name='comment_edit'),
     path('comment/<uuid:pk>/delete/', views.comment_delete, name='comment_delete'),
@@ -21,5 +22,6 @@ urlpatterns = [
     # API endpoints for form auto-fill
     path('api/template/<int:pk>/', views.api_template_detail, name='api_template'),
     path('api/host/<int:pk>/', views.api_host_detail, name='api_host'),
+    path('api/markdown-preview/', views.markdown_preview, name='markdown_preview'),
 ]
 

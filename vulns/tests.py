@@ -1018,6 +1018,88 @@ class MarkdownRenderingTests(TestCase):
         html = render_markdown('[click](javascript:alert(1))')
         self.assertNotIn('javascript:', html)
 
+    def test_table_renders(self):
+        raw = '| h1 | h2 |\n| --- | --- |\n| a | b |'
+        html = render_markdown(raw)
+        self.assertIn('<table>', html)
+        self.assertIn('<th>h1</th>', html)
+        self.assertIn('<td>a</td>', html)
+
+    def test_heading_renders(self):
+        html = render_markdown('# Big')
+        self.assertIn('<h1', html)
+        self.assertIn('Big', html)
+
+    def test_nl2br_makes_single_newline_a_break(self):
+        html = render_markdown('line1\nline2')
+        self.assertIn('<br', html)
+
+
+class MarkdownToPlatypusTests(TestCase):
+    """The PDF helper that lowers Markdown into ReportLab flowables."""
+
+    def setUp(self):
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        self.styles = getSampleStyleSheet()
+        self.styles.add(ParagraphStyle('BodyText2', parent=self.styles['Normal']))
+
+    def test_empty_input_returns_empty_list(self):
+        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        self.assertEqual(markdown_to_platypus('', self.styles), [])
+
+    def test_plain_paragraph_emits_one_flowable(self):
+        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        flows = markdown_to_platypus('Just a sentence.', self.styles)
+        self.assertEqual(len(flows), 1)
+
+    def test_code_fence_emits_courier_paragraph(self):
+        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        flows = markdown_to_platypus('```\nprint(1)\n```', self.styles)
+        self.assertTrue(any('Courier' in getattr(f, 'text', '') for f in flows))
+
+    def test_table_emits_table_flowable(self):
+        from reportlab.platypus import Table
+        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        flows = markdown_to_platypus(
+            '| a | b |\n| --- | --- |\n| 1 | 2 |', self.styles,
+        )
+        self.assertTrue(any(isinstance(f, Table) for f in flows))
+
+    def test_list_emits_multiple_paragraphs(self):
+        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        flows = markdown_to_platypus('- one\n- two\n- three', self.styles)
+        # at least three flowables for the three list items
+        self.assertGreaterEqual(len(flows), 3)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class MarkdownPreviewEndpointTests(TestCase):
+    """The /api/markdown-preview/ endpoint used by the finding form."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user('u', role='pentester', password='pw')
+
+    def test_anonymous_redirects_to_login(self):
+        resp = self.client.post(reverse('vulns:markdown_preview'), {'text': '**hi**'})
+        self.assertEqual(resp.status_code, 302)
+
+    def test_get_not_allowed(self):
+        self.client.login(username='u', password='pw')
+        resp = self.client.get(reverse('vulns:markdown_preview'))
+        self.assertEqual(resp.status_code, 405)
+
+    def test_post_renders_sanitized_html(self):
+        self.client.login(username='u', password='pw')
+        resp = self.client.post(
+            reverse('vulns:markdown_preview'),
+            {'text': '**bold** <script>alert(1)</script>'},
+        )
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode('utf-8')
+        self.assertIn('<strong>bold</strong>', body)
+        self.assertNotIn('<script', body)
+
 
 @override_settings(MFA_REQUIRED_ROLES=[])
 class FindingCommentTests(TestCase):
@@ -1152,3 +1234,156 @@ class FindingCommentTests(TestCase):
         )
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(FindingComment.objects.exists())
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class FindingMergeTests(TestCase):
+    """Merge two findings: evidence + comments move, body fields append, source deletes."""
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='pw')
+        self.pentester = User.objects.create_user('pt', role='pentester', password='pw')
+        self.client_user = User.objects.create_user('cli', role='client', password='pw')
+        self.engagement = Engagement.objects.create(
+            name='E1',
+            client=EngagementClient.objects.get_or_create(name='ACME')[0],
+            created_by=self.lead, engagement_type='external',
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.pentester, role='pentester')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.client_user, role='client')
+        self.source = Finding.objects.create(
+            engagement=self.engagement, title='SQLi (dup)',
+            description='source desc', proof_of_concept='source poc',
+            remediation='source rem', severity=Finding.Severity.HIGH,
+        )
+        self.target = Finding.objects.create(
+            engagement=self.engagement, title='SQLi',
+            description='target desc', severity=Finding.Severity.HIGH,
+        )
+
+    def test_pentester_cannot_merge(self):
+        self.client.login(username='pt', password='pw')
+        resp = self.client.post(
+            reverse('vulns:merge', args=[self.source.pk]),
+            {'target': str(self.target.pk)},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Finding.objects.filter(pk=self.source.pk).exists())
+
+    def test_lead_can_merge_and_audit_logged(self):
+        FindingComment.objects.create(
+            finding=self.source, author=self.lead, body='note',
+        )
+        self.client.login(username='lead', password='pw')
+        resp = self.client.post(
+            reverse('vulns:merge', args=[self.source.pk]),
+            {'target': str(self.target.pk)},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Finding.objects.filter(pk=self.source.pk).exists())
+        self.target.refresh_from_db()
+        self.assertIn('source desc', self.target.description)
+        self.assertIn('source poc', self.target.description)
+        self.assertIn('source rem', self.target.description)
+        self.assertEqual(self.target.comments.count(), 1)
+        self.assertTrue(AuditLog.objects.filter(
+            action=AuditLog.Action.FINDING_MERGE, target=str(self.target.pk),
+        ).exists())
+
+    def test_evidence_moves_to_target(self):
+        ev = Evidence.objects.create(
+            finding=self.source, uploaded_by=self.lead,
+            file=SimpleUploadedFile('e.txt', b'x', content_type='text/plain'),
+        )
+        self.client.login(username='lead', password='pw')
+        self.client.post(
+            reverse('vulns:merge', args=[self.source.pk]),
+            {'target': str(self.target.pk)},
+        )
+        ev.refresh_from_db()
+        self.assertEqual(ev.finding_id, self.target.pk)
+
+    def test_cross_engagement_target_rejected(self):
+        other_eng = Engagement.objects.create(
+            name='E2',
+            client=EngagementClient.objects.get_or_create(name='Other')[0],
+            created_by=self.lead, engagement_type='external',
+        )
+        EngagementMember.objects.create(engagement=other_eng, user=self.lead, role='lead')
+        other_finding = Finding.objects.create(
+            engagement=other_eng, title='X', description='x',
+            severity=Finding.Severity.LOW,
+        )
+        self.client.login(username='lead', password='pw')
+        resp = self.client.post(
+            reverse('vulns:merge', args=[self.source.pk]),
+            {'target': str(other_finding.pk)},
+        )
+        # Form's queryset filters out cross-engagement targets, so the form
+        # is invalid → page re-renders without performing the merge.
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(Finding.objects.filter(pk=self.source.pk).exists())
+
+    def test_get_with_target_param_renders_preview(self):
+        self.client.login(username='lead', password='pw')
+        resp = self.client.get(
+            reverse('vulns:merge', args=[self.source.pk]) + f'?target={self.target.pk}',
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, self.target.title)
+        self.assertContains(resp, 'Confirm merge')
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class ToolImportPreviewTests(TestCase):
+    """Two-step import preview flow: upload → preview → confirm."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user('pt', role='pentester', password='pw')
+        self.engagement = Engagement.objects.create(
+            name='E1',
+            client=EngagementClient.objects.get_or_create(name='ACME')[0],
+            created_by=self.user, engagement_type='external',
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.user, role='lead')
+        self.client.login(username='pt', password='pw')
+
+    def _upload(self, payload, preview=False):
+        data = {
+            'tool': 'nuclei',
+            'file': SimpleUploadedFile('out.json', payload, content_type='application/json'),
+        }
+        if preview:
+            data['preview'] = 'on'
+        return self.client.post(
+            reverse('vulns:import', args=[self.engagement.pk]),
+            data,
+        )
+
+    def test_preview_does_not_commit(self):
+        payload = b'[{"templateID":"x","info":{"name":"XSS","severity":"high","description":"d"},"host":"h"}]'
+        resp = self._upload(payload, preview=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Finding.objects.count(), 0)
+        self.assertContains(resp, 'Confirm')
+
+    def test_confirm_commits_pending(self):
+        payload = b'[{"templateID":"x","info":{"name":"XSS","severity":"high","description":"d"},"host":"h"}]'
+        self._upload(payload, preview=True)
+        resp = self.client.post(
+            reverse('vulns:import', args=[self.engagement.pk]),
+            {'confirm_import': '1'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.count(), 1)
+
+    def test_confirm_without_pending_redirects(self):
+        resp = self.client.post(
+            reverse('vulns:import', args=[self.engagement.pk]),
+            {'confirm_import': '1'},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(Finding.objects.count(), 0)

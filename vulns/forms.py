@@ -169,9 +169,36 @@ class ToolImportForm(forms.Form):
     ]
     tool = forms.ChoiceField(choices=TOOL_CHOICES)
     file = forms.FileField()
+    preview = forms.BooleanField(
+        required=False, initial=False,
+        help_text='Show a preview of new vs duplicate entries before importing.',
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
-            field.widget.attrs.setdefault('class', 'form-input')
+            if not isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.setdefault('class', 'form-input')
+
+
+class FindingMergeForm(forms.Form):
+    """Pick a target finding to merge the source into.
+
+    Target queryset is scoped to the source's engagement and excludes the
+    source itself in __init__.
+    """
+    target = forms.ModelChoiceField(
+        queryset=Finding.objects.none(),
+        empty_label='— Select a target finding —',
+    )
+
+    def __init__(self, *args, source=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if source is not None:
+            qs = (Finding.objects
+                  .filter(engagement_id=source.engagement_id)
+                  .exclude(pk=source.pk)
+                  .order_by('-created_at'))
+            self.fields['target'].queryset = qs
+        self.fields['target'].widget.attrs['class'] = 'form-input'
 

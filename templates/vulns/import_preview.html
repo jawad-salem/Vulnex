@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Import preview — {{ engagement.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'vulns:import' engagement.pk %}">Import</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Preview</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Import preview</h1>
+        <p class="page-subtitle">
+            {{ tool|capfirst }} · {{ new_items|length }} new · {{ dup_items|length }} duplicate(s)
+        </p>
+    </div>
+    <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Cancel</a>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <h2 class="card-title">New findings ({{ new_items|length }})</h2>
+        {% if new_items %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Title</th><th>Severity</th><th>Host</th><th>Endpoint</th></tr></thead>
+                <tbody>
+                {% for fd in new_items %}
+                <tr>
+                    <td>{{ fd.title|truncatechars:60 }}</td>
+                    <td><span class="badge badge-{{ fd.severity|default:'info' }}">{{ fd.severity|default:'info' }}</span></td>
+                    <td class="text-mono text-sm">{{ fd.host|default:"—" }}{% if fd.port %}:{{ fd.port }}{% endif %}</td>
+                    <td class="text-mono text-sm">{{ fd.endpoint|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-secondary">Nothing new to import.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 class="card-title">Duplicates skipped ({{ dup_items|length }})</h2>
+        {% if dup_items %}
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Title</th><th>Host</th><th>Endpoint</th></tr></thead>
+                <tbody>
+                {% for fd in dup_items %}
+                <tr>
+                    <td class="text-secondary">{{ fd.title|truncatechars:60 }}</td>
+                    <td class="text-mono text-sm">{{ fd.host|default:"—" }}{% if fd.port %}:{{ fd.port }}{% endif %}</td>
+                    <td class="text-mono text-sm">{{ fd.endpoint|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-secondary">No duplicates found.</p>
+        {% endif %}
+    </div>
+</div>
+
+<form method="post" action="{% url 'vulns:import' engagement.pk %}" class="mt-4">
+    {% csrf_token %}
+    <input type="hidden" name="confirm_import" value="1">
+    {% if new_items %}
+    <button type="submit" class="btn btn-primary">Confirm — import {{ new_items|length }} finding(s)</button>
+    {% else %}
+    <button type="submit" class="btn" disabled>Nothing to import</button>
+    {% endif %}
+    <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Cancel</a>
+</form>
+{% endblock %}

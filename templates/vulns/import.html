@@ -32,6 +32,11 @@
                 {{ form.file }}
             </div>
 
+            <div class="form-group checkbox-row">
+                {{ form.preview }}
+                <label for="{{ form.preview.id_for_label }}">Preview before importing</label>
+            </div>
+
             <p class="muted import-note">
                 Max file size is governed by your server's upload limit. Files
                 are parsed in-memory; nothing is stored until findings are
