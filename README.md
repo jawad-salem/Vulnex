@@ -146,7 +146,7 @@ Detailed in [`NEXT_STEPS.md`](NEXT_STEPS.md). Highlights of what's still open:
 
 ## Contributing
 
-Bug reports, ideas, and pull requests welcome. Dev setup, code style, branch and commit conventions live in `CONTRIBUTING.md` (landing in NEXT_STEPS 0.6). Until then: clone, follow the local-development quick start below, and open a PR against `main`.
+Bug reports, ideas, and pull requests welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for dev setup, code style, branch and commit conventions, and what's in / out of scope. Be aware of the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Security issues go private — see [`SECURITY.md`](SECURITY.md).
 
 ### Local development (no Docker)
 

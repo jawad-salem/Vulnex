@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/jawad-salem/Vulnex/security/policy
+    about: "Please do NOT file public issues for security bugs. Follow SECURITY.md."
+  - name: Question or discussion
+    url: https://github.com/jawad-salem/Vulnex/discussions
+    about: For usage questions, deployment help, or workflow ideas that aren't yet a concrete feature request.

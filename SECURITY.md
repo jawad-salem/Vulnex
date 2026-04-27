@@ -16,10 +16,14 @@ I will acknowledge receipt within a reasonable time (this is a solo project, not
 
 In scope:
 - Authentication, authorization, and session handling bugs
-- Injection issues (SQL, template, command, XSS)
-- Access-control bypasses between engagement roles
+- MFA / TOTP bypasses, recovery-code reuse, MFA-required middleware gaps
+- API-key issues (predictable tokens, missing scope checks, leakage in logs / responses)
+- Injection issues (SQL, template, command, XSS, Markdown rendering, file upload)
+- Access-control bypasses between engagement roles (admin, lead, pentester, reviewer, client)
 - Credentials-vault weaknesses (key derivation, encryption, audit gaps)
-- Insecure direct object references in engagement / finding / report endpoints
+- Insecure direct object references in engagement / finding / report / recon endpoints
+- CSRF, clickjacking, or CSP-bypass on authenticated views
+- Audit-log tampering or omission
 
 Out of scope:
 - Issues in third-party dependencies (report those upstream)
@@ -32,13 +36,27 @@ Out of scope:
 This project is designed to showcase a pentest-workflow data model and UI, not to be deployed to the public internet as-is. Before any real-world deployment, at minimum:
 
 - Set a strong `DJANGO_SECRET_KEY` and `DJANGO_DEBUG=False`
+- Set `VAULT_MASTER_KEY` to a Fernet key generated per the section below (the `DEBUG=True` fallback is refused when `DEBUG=False`)
+- Set `DJANGO_USE_HTTPS=True` so cookies, CSRF, and HSTS headers are configured for TLS
 - Restrict `ALLOWED_HOSTS`
 - Put Django behind a reverse proxy with TLS and an `X-Forwarded-For` policy
-- Rotate the default PostgreSQL credentials in `docker-compose.yml`
-- Review the `SITE_URL` used for invitation links
+- Rotate the default PostgreSQL credentials and the bootstrap superuser password (`DJANGO_BOOTSTRAP_PASSWORD`) baked into `docker-compose.yml` / `.env.example`
+- Require MFA for every admin and engagement-lead account (the `MFARequiredMiddleware` only fires once a user enrolls — enforce enrollment via policy)
+- Treat API keys as credentials: rotate, scope, and revoke them through the UI; never paste them into shared chat or screenshots
+- Review the `SITE_URL` used for invitation links and password resets
 - Audit the credentials-vault Fernet key rotation strategy
 
 These are not vulnerabilities — they are deployment responsibilities.
+
+## MFA and API Keys
+
+Vulnex ships with TOTP-based MFA (django-otp) and a per-user API key system. A few things worth knowing if you're auditing or reporting:
+
+- **MFA enrollment is opt-in by default.** The `MFARequiredMiddleware` redirects users who *have* an active TOTP device but no verified session to the verification step. It does not force enrollment for users who never set up TOTP — that's enforced by org policy, not code. If you find a way to bypass MFA for an *already-enrolled* user, that's a vulnerability and in scope.
+- **Recovery codes are single-use.** Reusing a recovery code, predicting them, or recovering them from logs is in scope.
+- **API keys are stored hashed** (Argon2). The plaintext token is shown to the user exactly once at creation. If the plaintext can be recovered after that point, it's a vulnerability.
+- **API keys carry the issuing user's role and engagement scope.** Bypassing those checks via the API (e.g. a client-role key reading another client's findings) is in scope.
+- **Showcase mode** (`SHOWCASE_MODE=True`, used on the public Fly.io demo) blocks new admin user creation and new API key issuance at the middleware layer. Bypassing those blocks on a showcase deployment is in scope.
 
 ## Credentials Vault Key Management
 
