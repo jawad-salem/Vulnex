@@ -1,0 +1,44 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "staticfiles",
+    "migrations",
+    "node_modules",
+]
+
+[tool.ruff.lint]
+# Start conservative: catch real bugs (Pyflakes) and obvious style breaks
+# (pycodestyle errors). Style nits are intentionally off so first-time CI
+# doesn't drown in cosmetic findings.
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long — a few long template strings live in the codebase
+    "E741",  # ambiguous variable names (e.g. `l` in legacy spots)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests.py" = ["F401", "F811"]
+"**/migrations/*.py" = ["F401", "E"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests.py",
+    "*/tests/*",
+    "manage.py",
+    "vulnex/asgi.py",
+    "vulnex/wsgi.py",
+    ".venv/*",
+    "venv/*",
+    "staticfiles/*",
+]
+
+[tool.coverage.report]
+skip_covered = false
+show_missing = true
