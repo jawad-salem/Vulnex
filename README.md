@@ -102,7 +102,9 @@ DAG editor — entrypoints, hosts, identities, assets, objectives connected by t
 
 ## Architecture
 
-Vulnex is a vanilla Django 5 app with one Postgres database, Redis as the Celery broker, and a single Gunicorn web service. Each domain lives in its own app: `accounts` (auth, MFA, audit log), `engagements` (scope, members, attack paths), `vulns` (findings, evidence, comments, imports), `recon` (scanners, hosts, scheduled scans), `methodology` (checklists), `reports` (templates, PDF generator), `credentials` (Fernet vault), `api` (DRF). HTML is server-rendered with a small amount of vanilla JS for live widgets (CVSS calculator, attack-path SVG renderer, Markdown preview); no SPA framework. Long-running work — recon scans, retest reminders — runs in Celery workers backed by Redis. A more detailed write-up will land in `docs/ARCHITECTURE.md` (NEXT_STEPS 0.7).
+Vulnex is a vanilla Django 5 app with one Postgres database, Redis as the Celery broker, and a single Gunicorn web service. Each domain lives in its own app: `accounts` (auth, MFA, audit log), `engagements` (scope, members, attack paths), `vulns` (findings, evidence, comments, imports), `recon` (scanners, hosts, scheduled scans), `methodology` (checklists), `reports` (templates, PDF generator), `credentials` (Fernet vault), `api` (DRF). HTML is server-rendered with a small amount of vanilla JS for live widgets (CVSS calculator, attack-path SVG renderer, Markdown preview); no SPA framework. Long-running work — recon scans, retest reminders, the showcase-mode hourly reset — runs in Celery workers backed by Redis.
+
+For the request lifecycle, data model, report-generation pipeline, web-vs-API auth split, and deployment topologies, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## REST API
 
