@@ -2,75 +2,100 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      - POSTGRES_DB=vulnex
-      - POSTGRES_USER=vulnex
-      - POSTGRES_PASSWORD=vulnex
+      POSTGRES_DB: vulnex
+      POSTGRES_USER: vulnex
+      POSTGRES_PASSWORD: vulnex
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vulnex -d vulnex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   web:
     build: .
+    image: vulnex:local
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
-      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
-      - SITE_URL=http://localhost:8000
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DJANGO_USE_HTTPS: ${DJANGO_USE_HTTPS:-False}
+      DATABASE_URL: postgres://vulnex:vulnex@db:5432/vulnex
+      SITE_URL: ${SITE_URL:-http://localhost:8000}
+      VAULT_MASTER_KEY: ${VAULT_MASTER_KEY:-}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-admin}
+      DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-admin1}
+      DJANGO_BOOTSTRAP_EMAIL: ${DJANGO_BOOTSTRAP_EMAIL:-admin@example.com}
     volumes:
-      - .:/app
+      - static_data:/app/staticfiles
       - media_data:/app/media
+      - protected_media_data:/app/protected_media
     depends_on:
-      - db
-      - redis
-    command: >
-      sh -c "sleep 3 &&
-             python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput 2>/dev/null;
-             gunicorn vulnex.wsgi:application --bind 0.0.0.0:8000 --reload"
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   celery-worker:
     build: .
+    image: vulnex:local
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
-      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DATABASE_URL: postgres://vulnex:vulnex@db:5432/vulnex
+      VAULT_MASTER_KEY: ${VAULT_MASTER_KEY:-}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     volumes:
-      - .:/app
       - media_data:/app/media
+      - protected_media_data:/app/protected_media
     depends_on:
-      - db
-      - redis
-    command: >
-      sh -c "sleep 8 && celery -A vulnex worker -l info"
+      web:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: []
+    command: celery -A vulnex worker -l info
 
   celery-beat:
     build: .
+    image: vulnex:local
     environment:
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
-      - DJANGO_DEBUG=${DJANGO_DEBUG:-False}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - DATABASE_URL=postgres://vulnex:vulnex@db:5432/vulnex
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    volumes:
-      - .:/app
-      - media_data:/app/media
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      DATABASE_URL: postgres://vulnex:vulnex@db:5432/vulnex
+      VAULT_MASTER_KEY: ${VAULT_MASTER_KEY:-}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
-      - db
-      - redis
-    command: >
-      sh -c "sleep 10 && celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
+      web:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    entrypoint: []
+    command: celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
 volumes:
   postgres_data:
+  static_data:
   media_data:
+  protected_media_data:

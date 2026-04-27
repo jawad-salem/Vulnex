@@ -166,52 +166,42 @@ Things this project intentionally does **not** do — call these out so you can 
 
 ## Quick Start
 
+### Docker (recommended — three commands, ~60 seconds)
+
+```bash
+git clone https://github.com/jawad-salem/Vulnex.git
+cd Vulnex
+cp .env.example .env && docker compose up --build
+```
+
+When the logs settle, open <http://localhost:8000> and sign in with the bootstrap superuser:
+
+| Username | Password |
+|---|---|
+| `admin` | `admin1` |
+
+The entrypoint runs migrations, collects static files, seeds finding templates and OWASP methodology checklists, and creates that superuser only if no superuser already exists. Override the bootstrap creds via `DJANGO_BOOTSTRAP_USERNAME` / `DJANGO_BOOTSTRAP_PASSWORD` / `DJANGO_BOOTSTRAP_EMAIL` in `.env`.
+
+> The shipped `.env.example` is dev-only — it pre-fills a known-bad `DJANGO_SECRET_KEY` and runs with `DJANGO_DEBUG=True` so a fresh clone boots without configuration. Rotate every value before exposing the instance to the public internet.
+
 ### Local Development
 
 ```bash
-# Clone the repository
 git clone https://github.com/jawad-salem/Vulnex.git
 cd Vulnex
 
-# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate  # Linux/Mac
 .venv\Scripts\activate     # Windows
 
-# Install dependencies
-pip install -e .
+pip install -r requirements.txt
+cp .env.example .env
 
-# Run migrations
 python manage.py migrate
-
-# Create admin user
-python manage.py createsuperuser
-
-# Seed finding templates (optional)
 python manage.py seed_templates
-
-# Start the server
+python manage.py seed_methodologies
+python manage.py createsuperuser
 python manage.py runserver
-```
-
-### One-line setup
-
-```bash
-pip install -r requirements.txt && python manage.py migrate && python manage.py seed_templates && python manage.py seed_methodologies && python manage.py createsuperuser && python manage.py runserver
-```
-
-Then open http://localhost:8000 and log in with your superuser credentials.
-
-### Docker
-
-```bash
-docker compose up --build
-```
-
-Then create an admin user:
-
-```bash
-docker compose exec web python manage.py createsuperuser
 ```
 
 ## Project Structure

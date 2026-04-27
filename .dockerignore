@@ -1,13 +1,58 @@
+# Python
 __pycache__
 *.pyc
 *.pyo
+
+# VCS / CI
 .git
+.github/
+.gitignore
+.dockerignore
+
+# Virtualenvs
 .venv
 venv
+
+# Django / data
 *.sqlite3
+db.sqlite3
 media/
 staticfiles/
+
+# Env / secrets
 .env
+.env.*
+
+# Logs
 *.log
+
+# Personal / scratch files
+error.txt
+*.pdf
+vulnex_mindmap.txt
+
+# Docs (not needed in image)
+*.md
+LICENSE
+docs/
+
+# Build / dev tooling
+Dockerfile*
+docker-compose*.yml
+scripts/
 node_modules
+
+# Editor / OS
+.idea/
+.vscode/
 .claude
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Celery runtime
+celerybeat-schedule*
