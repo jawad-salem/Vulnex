@@ -49,7 +49,14 @@ Open <http://localhost:8000> after `web` finishes boot. The entrypoint migrates,
 
 ### Live demo
 
-Public live demo: **TBD** — Fly.io deployment is on the roadmap (`NEXT_STEPS.md` 0.5). The Docker quick-start above gets you to a populated dashboard in about a minute.
+Public live demo: <https://vulnex-demo.fly.dev> (URL pending first deploy — see [`fly.toml`](fly.toml) for the bring-up commands). The instance runs in **showcase mode**:
+
+- "Public demo · resets hourly · do not enter real data" banner on every page.
+- Database wiped and re-seeded every hour by a Celery beat job (`vulnex.showcase.reset_showcase_database`) — anything you enter disappears at the top of the next hour.
+- Outbound email is silenced (locmem backend), so password resets / invitations never reach a real inbox.
+- New admin-account creation and API-key issuance are blocked at the middleware layer.
+
+Sign in with any of the demo accounts above. Toggle showcase mode locally with `SHOWCASE_MODE=True` in `.env` — note that the hourly reset requires a real Celery broker (Redis), not the in-memory default.
 
 ## Feature tour
 
@@ -129,7 +136,6 @@ Vulnex is a vanilla Django 5 app with one Postgres database, Redis as the Celery
 
 Detailed in [`NEXT_STEPS.md`](NEXT_STEPS.md). Highlights of what's still open:
 
-- **Live demo + showcase mode** (0.5) — Fly.io deployment with hourly reset.
 - **OWASP Top 10 + MITRE ATT&CK tagging** (1.1) — taxonomy fields with chips, filters, and PDF rendering.
 - **DOCX export + report versioning** (1.2) — Word output and per-regeneration version history.
 - **Bulk actions, kanban, keyboard shortcuts** on the findings list (1.3).
