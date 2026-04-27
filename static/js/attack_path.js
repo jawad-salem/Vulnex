@@ -72,6 +72,33 @@
             (byDepth[depths[n.id]] = byDepth[depths[n.id]] || []).push(n);
         });
         var depthKeys = Object.keys(byDepth).map(Number).sort(function (a, b) { return a - b; });
+
+        // One pass of barycenter ordering: position each node by the average
+        // index of its predecessors in the previous column so edges run roughly
+        // parallel instead of fanning across the diagram.
+        var orderIndex = {};
+        depthKeys.forEach(function (d) {
+            byDepth[d].forEach(function (n, i) { orderIndex[n.id] = i; });
+        });
+        var preds = {};
+        edges.forEach(function (e) { (preds[e.to] = preds[e.to] || []).push(e.from); });
+        depthKeys.forEach(function (d) {
+            if (d === depthKeys[0]) return;
+            byDepth[d].sort(function (a, b) {
+                function bary(n) {
+                    var ps = preds[n.id] || [];
+                    if (!ps.length) return orderIndex[n.id];
+                    var sum = 0, count = 0;
+                    ps.forEach(function (pid) {
+                        if (orderIndex[pid] !== undefined) { sum += orderIndex[pid]; count += 1; }
+                    });
+                    return count ? sum / count : orderIndex[n.id];
+                }
+                return bary(a) - bary(b);
+            });
+            byDepth[d].forEach(function (n, i) { orderIndex[n.id] = i; });
+        });
+
         var maxDepth = depthKeys[depthKeys.length - 1] || 0;
         var colSpacing = (width - 160) / Math.max(maxDepth, 1);
         var positions = {};
@@ -112,7 +139,7 @@
         }
 
         var width = canvas.clientWidth || 800;
-        var height = Math.max(360, Math.min(720, nodes.length * 70));
+        var height = Math.max(canvas.clientHeight || 480, Math.min(900, nodes.length * 70));
 
         var root = svg('svg', {
             xmlns: SVG_NS,
@@ -128,7 +155,7 @@
             refX: 10, refY: 5, markerWidth: 8, markerHeight: 8,
             orient: 'auto-start-reverse',
         }, defs);
-        svg('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#94a3b8' }, marker);
+        svg('path', { d: 'M0,0 L10,5 L0,10 z', fill: '#cbd5e1' }, marker);
 
         var positions = layout(nodes, edges, width, height);
 
@@ -138,7 +165,7 @@
             if (!p1 || !p2) return;
             var line = svg('line', {
                 x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
-                stroke: '#94a3b8', 'stroke-width': 1.5,
+                stroke: '#cbd5e1', 'stroke-width': 1.5,
                 'marker-end': 'url(#ap-arrow)',
                 'class': 'ap-edge',
             }, root);
@@ -154,7 +181,7 @@
             var label = e.technique;
             if (e.mitre) label += ' (' + e.mitre + ')';
             var t = svg('text', {
-                x: mx, y: my, fill: '#475569', 'font-size': 11,
+                x: mx, y: my, fill: '#94a3b8', 'font-size': 11,
                 'text-anchor': 'middle', 'class': 'ap-edge-label',
             }, root);
             t.textContent = label;
@@ -171,15 +198,15 @@
             if (!p) return;
             var color = KIND_COLOR[n.kind] || '#64748b';
             var g = svg('g', { 'class': 'ap-node', transform: 'translate(' + p.x + ',' + p.y + ')' }, root);
-            svg('circle', { r: 18, fill: color, stroke: '#0f172a', 'stroke-width': 1.5 }, g);
+            svg('circle', { r: 18, fill: color, stroke: '#1f2638', 'stroke-width': 2 }, g);
             var lbl = svg('text', {
                 y: 36, 'text-anchor': 'middle', 'font-size': 12,
-                fill: '#0f172a', 'class': 'ap-node-label',
+                fill: '#e6edf3', 'class': 'ap-node-label',
             }, g);
             lbl.textContent = n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label;
             var sub = svg('text', {
                 y: 50, 'text-anchor': 'middle', 'font-size': 10,
-                fill: '#64748b',
+                fill: '#8b949e',
             }, g);
             sub.textContent = n.kind;
         });

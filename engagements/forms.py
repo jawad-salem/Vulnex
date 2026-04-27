@@ -140,7 +140,7 @@ class AttackPathForm(forms.ModelForm):
 class AttackPathNodeForm(forms.ModelForm):
     class Meta:
         model = AttackPathNode
-        fields = ['label', 'kind', 'discovered_host', 'notes']
+        fields = ['label', 'kind', 'notes']
         widgets = {
             'label': forms.TextInput(attrs={'placeholder': 'e.g. CONTOSO\\administrator or web01.example.com'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
@@ -150,13 +150,6 @@ class AttackPathNodeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
-        if engagement is not None:
-            from recon.models import DiscoveredHost
-            self.fields['discovered_host'].queryset = DiscoveredHost.objects.filter(
-                engagement=engagement,
-            )
-        self.fields['discovered_host'].required = False
-        self.fields['discovered_host'].empty_label = '— No linked recon host —'
 
 
 class AttackPathEdgeForm(forms.ModelForm):

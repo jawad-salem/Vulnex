@@ -18,7 +18,7 @@ Most open-source tools in this space are one slice — reporting (Dradis, PwnDoc
 - **End-to-end workflow** — engagement → recon → methodology checklists → findings → peer review → PDF/DOCX report → retest tracking.
 - **Scanner-agnostic ingestion** — Nuclei, Nikto, Burp, Nessus, ZAP, Semgrep, Nmap XML, plus CSV bulk import. Automatic dedup against existing findings.
 - **Hardened by default** — TOTP MFA, login lockout, CSP, encrypted credential vault with a dedicated `VAULT_MASTER_KEY`, authenticated evidence downloads, full audit log.
-- **Red-team aware** — Attack-path DAG editor on red-team engagements, exported into the PDF technical report.
+- **Red-team aware** — Kill-chain diagram editor on red-team engagements (a small DAG you draw to narrate the path you walked, embedded in the PDF). Not a BloodHound replacement — narrative, not enumeration.
 - **Scriptable** — every UI capability is also exposed via a DRF REST API with OpenAPI docs and per-user API keys.
 
 ## Why I built this
@@ -95,7 +95,7 @@ PDF templates with brand kit (logo, colours, preamble, disclaimer), per-client d
 
 ![Report generation](docs/screenshots/Screenshot%202026-04-10%20034815.png)
 
-### Red-team attack path
+### Kill-chain diagram (red-team)
 DAG editor — entrypoints, hosts, identities, assets, objectives connected by techniques with optional ATT&CK IDs. Embedded into the technical PDF.
 
 ![Attack path](docs/screenshots/Screenshot%202026-04-10%20034828.png)
@@ -131,7 +131,7 @@ For the request lifecycle, data model, report-generation pipeline, web-vs-API au
 - **Web only.** No mobile or native client.
 - **No compliance-framework auto-mapping** (PCI / ISO / NIST / SOC 2 control linkage on findings is not implemented).
 - **No agent-based recon.** Scanners run from the Vulnex host; there is no installable endpoint agent.
-- **Red-team scope is intentionally lightweight.** Attack-path mapping and credential capture are supported; BloodHound-style AD enumeration, C2 integration, and live session management are out of scope.
+- **Red-team scope is intentionally lightweight.** The kill-chain diagram is a *report artifact* — a 5–10 node DAG you draw by hand to narrate one path you walked. BloodHound-style AD enumeration, automated path-finding, C2 integration, and live session management are out of scope.
 - **No production-grade Jira / GitHub Issues sync** yet — see roadmap.
 
 ## Roadmap
