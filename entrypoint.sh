@@ -32,6 +32,11 @@ echo "[entrypoint] seeding finding templates and methodologies (idempotent)..."
 python manage.py seed_templates || true
 python manage.py seed_methodologies || true
 
+if [ "${SEED_DEMO:-0}" = "1" ] || [ "${SEED_DEMO:-}" = "true" ]; then
+    echo "[entrypoint] seeding demo data (SEED_DEMO=$SEED_DEMO)..."
+    python manage.py seed_demo || true
+fi
+
 echo "[entrypoint] ensuring a superuser exists..."
 python manage.py shell <<'PYEOF'
 import os

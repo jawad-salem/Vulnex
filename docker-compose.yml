@@ -39,6 +39,7 @@ services:
       DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-admin}
       DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-admin1}
       DJANGO_BOOTSTRAP_EMAIL: ${DJANGO_BOOTSTRAP_EMAIL:-admin@example.com}
+      SEED_DEMO: ${SEED_DEMO:-1}
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media

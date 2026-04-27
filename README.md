@@ -174,13 +174,17 @@ cd Vulnex
 cp .env.example .env && docker compose up --build
 ```
 
-When the logs settle, open <http://localhost:8000> and sign in with the bootstrap superuser:
+When the logs settle, open <http://localhost:8000> and sign in with one of:
 
-| Username | Password |
-|---|---|
-| `admin` | `admin1` |
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `admin1` | Bootstrap superuser |
+| `demo-admin` | `demo-password` | Platform admin (demo) |
+| `demo-pentester` | `demo-password` | Engagement lead + pentester |
+| `demo-reviewer` | `demo-password` | Reviewer |
+| `demo-client` | `demo-password` | Read-only client |
 
-The entrypoint runs migrations, collects static files, seeds finding templates and OWASP methodology checklists, and creates that superuser only if no superuser already exists. Override the bootstrap creds via `DJANGO_BOOTSTRAP_USERNAME` / `DJANGO_BOOTSTRAP_PASSWORD` / `DJANGO_BOOTSTRAP_EMAIL` in `.env`.
+The entrypoint runs migrations, collects static files, seeds finding templates and OWASP methodology checklists, creates the bootstrap superuser if no superuser exists, then runs `seed_demo` (when `SEED_DEMO=1`) to populate a demo client (`Acme Corporation`), two engagements (one external pentest, one red-team adversary simulation), eight findings spanning every severity, placeholder evidence, recon hosts, an attack-path DAG, an activity log, and one generated PDF. Set `SEED_DEMO=0` in `.env` for a clean install. Override bootstrap creds via `DJANGO_BOOTSTRAP_USERNAME` / `DJANGO_BOOTSTRAP_PASSWORD` / `DJANGO_BOOTSTRAP_EMAIL`.
 
 > The shipped `.env.example` is dev-only — it pre-fills a known-bad `DJANGO_SECRET_KEY` and runs with `DJANGO_DEBUG=True` so a fresh clone boots without configuration. Rotate every value before exposing the instance to the public internet.
 
