@@ -210,9 +210,50 @@ class JWTAuthTests(TestCase):
 
 @override_settings(MFA_REQUIRED_ROLES=[])
 class APIDocsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('pt', role='pentester', password='pw')
+        self.api = APIClient()
+        self.api.force_authenticate(self.user)
+
     def test_schema_accessible(self):
-        user = User.objects.create_user('pt', role='pentester', password='pw')
-        api = APIClient()
-        api.force_authenticate(user)
-        resp = api.get('/api/schema/')
+        resp = self.api.get('/api/schema/')
         self.assertEqual(resp.status_code, 200)
+
+    def test_schema_json_accessible(self):
+        resp = self.api.get('/api/schema/?format=json')
+        self.assertEqual(resp.status_code, 200)
+        # Must parse as valid OpenAPI 3
+        body = resp.json()
+        self.assertEqual(body.get('openapi', '')[:3], '3.0')
+        # API-key auth scheme must be advertised (registered via
+        # api/schema_extensions.py).
+        schemes = body.get('components', {}).get('securitySchemes', {})
+        self.assertIn('ApiKeyAuth', schemes)
+
+    def test_swagger_ui_loads(self):
+        resp = self.api.get('/api/docs/')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(b'swagger-ui', resp.content)
+
+    def test_schema_generation_emits_no_warnings(self):
+        # Catches regressions like ReadOnlyField without a type hint, an
+        # unannotated path parameter, or an unregistered authenticator —
+        # all of which generate runtime warnings but a still-served schema.
+        import tempfile, os
+        from io import StringIO
+        from django.core.management import call_command
+        out, err = StringIO(), StringIO()
+        with tempfile.NamedTemporaryFile(suffix='.yml', delete=False) as fh:
+            tmp = fh.name
+        try:
+            call_command(
+                'spectacular', '--validate', '--fail-on-warn',
+                '--file', tmp, stdout=out, stderr=err,
+            )
+        except SystemExit as exc:  # spectacular calls sys.exit on warnings
+            self.fail(
+                f'spectacular --fail-on-warn exited {exc.code}:\n{err.getvalue()}'
+            )
+        finally:
+            try: os.unlink(tmp)
+            except OSError: pass

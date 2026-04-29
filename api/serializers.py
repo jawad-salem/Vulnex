@@ -8,10 +8,12 @@ from vulns.models import Evidence, Finding
 
 
 class EngagementSerializer(serializers.ModelSerializer):
-    scope_targets = serializers.ReadOnlyField()
-    finding_count = serializers.ReadOnlyField()
-    critical_count = serializers.ReadOnlyField()
-    high_count = serializers.ReadOnlyField()
+    scope_targets = serializers.ListField(
+        child=serializers.CharField(), read_only=True,
+    )
+    finding_count = serializers.IntegerField(read_only=True)
+    critical_count = serializers.IntegerField(read_only=True)
+    high_count = serializers.IntegerField(read_only=True)
     client_name = serializers.CharField(
         required=False, allow_blank=True, write_only=False,
         help_text='Client name — writing this gets-or-creates a Client record.',
@@ -55,7 +57,7 @@ class EngagementSerializer(serializers.ModelSerializer):
 
 class FindingSerializer(serializers.ModelSerializer):
     engagement = serializers.PrimaryKeyRelatedField(queryset=Engagement.objects.all())
-    cvss_vector_string = serializers.ReadOnlyField()
+    cvss_vector_string = serializers.CharField(read_only=True)
     severity = serializers.ChoiceField(choices=Finding.Severity.choices, required=False)
 
     class Meta:
@@ -108,7 +110,7 @@ class CredentialSerializer(serializers.ModelSerializer):
 
     engagement = serializers.PrimaryKeyRelatedField(queryset=Engagement.objects.all())
     secret = serializers.CharField(write_only=True, required=False, allow_blank=True)
-    masked_secret = serializers.ReadOnlyField()
+    masked_secret = serializers.CharField(read_only=True)
 
     class Meta:
         model = Credential

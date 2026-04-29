@@ -39,9 +39,15 @@ def _accessible_engagement_ids(user):
 class EngagementViewSet(viewsets.ModelViewSet):
     serializer_class = EngagementSerializer
     permission_classes = [IsEngagementEditor]
+    # Class-level queryset is what drf-spectacular falls back to for schema
+    # generation, since get_queryset() reads request.user.role and AnonymousUser
+    # has no role attribute. Runtime requests still go through get_queryset().
+    queryset = Engagement.objects.none()
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Engagement.objects.none()
         if user.role == 'admin':
             return Engagement.objects.all()
         return Engagement.objects.filter(members__user=user).distinct()
@@ -86,9 +92,12 @@ class EngagementViewSet(viewsets.ModelViewSet):
 class FindingViewSet(viewsets.ModelViewSet):
     serializer_class = FindingSerializer
     permission_classes = [IsEngagementEditor]
+    queryset = Finding.objects.none()
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Finding.objects.none()
         if user.role == 'admin':
             return Finding.objects.all()
         return Finding.objects.filter(
@@ -120,9 +129,12 @@ class FindingViewSet(viewsets.ModelViewSet):
 class DiscoveredHostViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = DiscoveredHostSerializer
     permission_classes = [IsEngagementMember]
+    queryset = DiscoveredHost.objects.none()
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return DiscoveredHost.objects.none()
         if user.role == 'admin':
             return DiscoveredHost.objects.all()
         return DiscoveredHost.objects.filter(
@@ -133,9 +145,12 @@ class DiscoveredHostViewSet(viewsets.ReadOnlyModelViewSet):
 class CredentialViewSet(viewsets.ModelViewSet):
     serializer_class = CredentialSerializer
     permission_classes = [CredentialVaultPermission]
+    queryset = Credential.objects.none()
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Credential.objects.none()
         if user.role == 'admin':
             return Credential.objects.all()
         return Credential.objects.filter(
@@ -183,9 +198,12 @@ class ReportViewSet(viewsets.ReadOnlyModelViewSet):
     action so the metadata endpoint stays cheap."""
     serializer_class = ReportSerializer
     permission_classes = [IsEngagementMember]
+    queryset = Report.objects.none()
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Report.objects.none()
         if user.role == 'admin':
             return Report.objects.all()
         return Report.objects.filter(

@@ -285,6 +285,15 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
+    # Collapse confidentiality/integrity/availability impact (all share H/L/N)
+    # into a single CvssImpactEnum component instead of three identical copies.
+    'ENUM_NAME_OVERRIDES': {
+        'CvssImpactEnum': [
+            ('H', 'High'),
+            ('L', 'Low'),
+            ('N', 'None'),
+        ],
+    },
 }
 
 # CVSS severity thresholds
