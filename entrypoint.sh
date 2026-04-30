@@ -1,6 +1,20 @@
 #!/bin/sh
 set -e
 
+# When Compose creates a named volume for the first time and mounts it on top
+# of an existing image directory, the mount inherits root:root ownership —
+# even though the image had chowned the path to vulnex during build. Fix
+# permissions on the mount points before dropping privileges. If we're
+# already running as vulnex (e.g. someone passed --user), this block is a
+# no-op.
+if [ "$(id -u)" = "0" ]; then
+    for d in /app/staticfiles /app/media /app/protected_media; do
+        [ -d "$d" ] && chown -R vulnex:vulnex "$d" || true
+    done
+    # Re-exec as the unprivileged user.
+    exec gosu vulnex "$0" "$@"
+fi
+
 echo "[entrypoint] waiting for postgres..."
 python <<'PYEOF'
 import os, time, sys, urllib.parse as u

@@ -53,6 +53,7 @@ services:
   celery-worker:
     build: .
     image: vulnex:local
+    user: vulnex
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
@@ -77,6 +78,7 @@ services:
   celery-beat:
     build: .
     image: vulnex:local
+    user: vulnex
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}

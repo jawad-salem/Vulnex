@@ -34,6 +34,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         curl \
+        gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1000 vulnex \
     && useradd --system --uid 1000 --gid vulnex --home-dir /app --shell /usr/sbin/nologin vulnex
@@ -48,7 +49,9 @@ RUN sed -i 's/\r$//' /app/entrypoint.sh \
     && mkdir -p /app/staticfiles /app/media /app/protected_media \
     && chown -R vulnex:vulnex /app/staticfiles /app/media /app/protected_media
 
-USER vulnex
+# Entrypoint starts as root so it can chown freshly-attached named volumes
+# (which Compose creates root-owned on first mount), then drops to vulnex via
+# gosu before exec'ing the actual command.
 
 EXPOSE 8000
 
