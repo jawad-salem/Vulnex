@@ -16,6 +16,9 @@
         {% if client.logo %}<img src="{{ client.logo.url }}" alt="{{ client.name }}" style="max-height:48px;margin-bottom:8px">{% endif %}
         <h1 class="eng-hero-title">{{ client.name }}</h1>
         <div class="eng-hero-meta">
+            {% if client.primary_contact_name %}
+            <span class="eng-meta-item">{{ client.primary_contact_name }}</span>
+            {% endif %}
             {% if client.primary_contact_email %}
             <span class="eng-meta-item">{{ client.primary_contact_email }}</span>
             {% endif %}
@@ -23,6 +26,16 @@
             <span class="eng-meta-item">{{ active_count }} active</span>
         </div>
     </div>
+    {% if can_manage or can_delete %}
+    <div class="eng-hero-actions">
+        {% if can_manage %}
+        <a href="{% url 'engagements:client_edit' client.pk %}" class="btn">Edit</a>
+        {% endif %}
+        {% if can_delete %}
+        <a href="{% url 'engagements:client_delete' client.pk %}" class="btn btn-danger">Delete</a>
+        {% endif %}
+    </div>
+    {% endif %}
 </div>
 
 <!-- ── KPI strip ── -->

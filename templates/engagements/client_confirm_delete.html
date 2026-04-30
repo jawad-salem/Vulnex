@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ client.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:client_list' %}">Clients</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:client_detail' client.pk %}">{{ client.name|truncatechars:40 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Delete</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Delete client</h1>
+        <p class="page-subtitle">{{ client.name }}</p>
+    </div>
+    <a href="{% url 'engagements:client_detail' client.pk %}" class="btn">Cancel</a>
+</div>
+
+<div class="card">
+    {% if engagement_count %}
+    <div class="alert alert-error">
+        <strong>Cannot delete this client.</strong>
+        {{ engagement_count }} engagement{{ engagement_count|pluralize }} reference{{ engagement_count|pluralize:"s," }} it.
+        Reassign or delete those engagements first.
+    </div>
+    <div class="form-actions">
+        <a href="{% url 'engagements:client_detail' client.pk %}" class="btn">Back to client</a>
+    </div>
+    {% else %}
+    <p>You're about to permanently delete <strong>{{ client.name }}</strong>. This cannot be undone.</p>
+    <form method="post" style="margin-top:16px">
+        {% csrf_token %}
+        <div class="form-actions">
+            <button type="submit" class="btn btn-danger">Delete client</button>
+            <a href="{% url 'engagements:client_detail' client.pk %}" class="btn">Cancel</a>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

@@ -15,6 +15,11 @@
             <span class="eng-meta-item">{{ total_count }} client{{ total_count|pluralize }}</span>
         </div>
     </div>
+    {% if can_manage %}
+    <div class="eng-hero-actions">
+        <a href="{% url 'engagements:client_create' %}" class="btn btn-primary">+ New client</a>
+    </div>
+    {% endif %}
 </div>
 
 <div class="filter-bar">

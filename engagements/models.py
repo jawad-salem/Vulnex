@@ -13,6 +13,7 @@ class Client(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
     logo = models.ImageField(upload_to=client_logo_path, blank=True, null=True)
+    primary_contact_name = models.CharField(max_length=200, blank=True)
     primary_contact_email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
     default_report_template = models.ForeignKey(

@@ -113,6 +113,67 @@ class EngagementForm(forms.ModelForm):
         return super().save(commit=commit)
 
 
+class ClientForm(forms.ModelForm):
+    """Create / edit a Client. Validates the logo by opening it through PIL so
+    a renamed `.exe` masquerading as `logo.png` fails before it touches disk."""
+
+    LOGO_MAX_BYTES = 1024 * 1024  # 1 MB
+    LOGO_ALLOWED_FORMATS = ('PNG', 'JPEG')
+
+    class Meta:
+        model = Client
+        fields = [
+            'name', 'primary_contact_name', 'primary_contact_email',
+            'logo', 'notes',
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Acme Corporation'}),
+            'primary_contact_name': forms.TextInput(attrs={'placeholder': 'Jane Doe'}),
+            'primary_contact_email': forms.EmailInput(attrs={'placeholder': 'jane@acme.test'}),
+            'notes': forms.Textarea(attrs={'rows': 4, 'placeholder': 'Optional internal notes (markdown).'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if not isinstance(field.widget, (forms.CheckboxInput, forms.RadioSelect, forms.FileInput)):
+                field.widget.attrs.setdefault('class', 'form-input')
+
+    def clean_name(self):
+        name = (self.cleaned_data.get('name') or '').strip()
+        if not name:
+            raise forms.ValidationError('Name is required.')
+        qs = Client.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('A client with this name already exists.')
+        return name
+
+    def clean_logo(self):
+        logo = self.cleaned_data.get('logo')
+        if not logo or not hasattr(logo, 'size'):
+            return logo
+        if logo.size > self.LOGO_MAX_BYTES:
+            raise forms.ValidationError('Logo must be 1 MB or smaller.')
+        try:
+            from PIL import Image
+        except ImportError:
+            return logo
+        try:
+            with Image.open(logo) as img:
+                fmt = (img.format or '').upper()
+                img.verify()
+        except Exception:
+            raise forms.ValidationError('Logo could not be parsed as a PNG or JPEG image.')
+        if fmt not in self.LOGO_ALLOWED_FORMATS:
+            raise forms.ValidationError('Logo must be a PNG or JPEG file.')
+        # PIL closes the file after verify(); rewind so the storage backend can re-read it.
+        if hasattr(logo, 'seek'):
+            logo.seek(0)
+        return logo
+
+
 class EngagementNoteForm(forms.ModelForm):
     class Meta:
         model = EngagementNote

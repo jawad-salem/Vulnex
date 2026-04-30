@@ -438,6 +438,7 @@ class AttackPathTests(TestCase):
         )
         self.assertEqual(path.edges.count(), 0)
 
+
     def test_data_endpoint_shape(self):
         path = AttackPath.objects.create(
             engagement=self.red_team, name='P1', created_by=self.lead,
@@ -487,3 +488,108 @@ class AttackPathTests(TestCase):
         # The report should be larger than a no-attack-path baseline; this is a
         # smoke test that the section was emitted without raising.
         self.assertGreater(len(pdf), 5000)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class ClientCRUDTests(TestCase):
+    """Round-trips for the +New client / edit / delete flow plus the gates
+    that keep clients out of non-admin destruction paths."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user('admin', role='admin', password='pw')
+        self.pentester = User.objects.create_user('pt', role='pentester', password='pw')
+        self.reviewer = User.objects.create_user('rev', role='reviewer', password='pw')
+        self.client_user = User.objects.create_user('cli', role='client', password='pw')
+
+    def _login(self, username):
+        self.client.login(username=username, password='pw')
+
+    def test_admin_can_create_client(self):
+        self._login('admin')
+        resp = self.client.post(reverse('engagements:client_create'), {
+            'name': 'Acme Corp',
+            'primary_contact_name': 'Jane',
+            'primary_contact_email': 'jane@acme.test',
+            'notes': 'VIP',
+        }, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        client_obj = EngagementClient.objects.get(name='Acme Corp')
+        self.assertEqual(client_obj.primary_contact_name, 'Jane')
+
+    def test_pentester_can_create_client(self):
+        self._login('pt')
+        resp = self.client.post(reverse('engagements:client_create'), {'name': 'Beta Inc'})
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(EngagementClient.objects.filter(name='Beta Inc').exists())
+
+    def test_reviewer_cannot_create_client(self):
+        self._login('rev')
+        resp = self.client.post(reverse('engagements:client_create'), {'name': 'Nope'})
+        self.assertFalse(EngagementClient.objects.filter(name='Nope').exists())
+        self.assertEqual(resp.status_code, 302)
+
+    def test_client_role_cannot_create_client(self):
+        self._login('cli')
+        resp = self.client.post(reverse('engagements:client_create'), {'name': 'Nope'})
+        self.assertFalse(EngagementClient.objects.filter(name='Nope').exists())
+        self.assertEqual(resp.status_code, 302)
+
+    def test_duplicate_name_rejected(self):
+        EngagementClient.objects.create(name='Acme Corp')
+        self._login('admin')
+        resp = self.client.post(reverse('engagements:client_create'), {'name': 'acme corp'})
+        self.assertEqual(resp.status_code, 200)  # form re-rendered with error
+        self.assertEqual(EngagementClient.objects.filter(name__iexact='acme corp').count(), 1)
+
+    def test_admin_can_edit_client(self):
+        c = EngagementClient.objects.create(name='Acme', primary_contact_email='old@a.test')
+        self._login('admin')
+        self.client.post(
+            reverse('engagements:client_edit', args=[c.pk]),
+            {'name': 'Acme', 'primary_contact_email': 'new@a.test'},
+        )
+        c.refresh_from_db()
+        self.assertEqual(c.primary_contact_email, 'new@a.test')
+
+    def test_create_emits_audit_log(self):
+        self._login('admin')
+        self.client.post(reverse('engagements:client_create'), {'name': 'Audited Co'})
+        from accounts.models import AuditLog
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action=AuditLog.Action.CLIENT_CREATED, target='Audited Co',
+            ).exists()
+        )
+
+    def test_admin_can_delete_unused_client(self):
+        c = EngagementClient.objects.create(name='Lone')
+        self._login('admin')
+        resp = self.client.post(reverse('engagements:client_delete', args=[c.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(EngagementClient.objects.filter(pk=c.pk).exists())
+
+    def test_pentester_cannot_delete_client(self):
+        c = EngagementClient.objects.create(name='Lone')
+        self._login('pt')
+        resp = self.client.post(reverse('engagements:client_delete', args=[c.pk]))
+        self.assertTrue(EngagementClient.objects.filter(pk=c.pk).exists())
+        # Redirected to client detail with error message.
+        self.assertEqual(resp.status_code, 302)
+
+    def test_delete_blocked_when_engagements_exist(self):
+        c = EngagementClient.objects.create(name='Busy')
+        Engagement.objects.create(name='E1', client=c, created_by=self.admin)
+        self._login('admin')
+        resp = self.client.post(reverse('engagements:client_delete', args=[c.pk]))
+        # Client must still exist; FK is on_delete=PROTECT.
+        self.assertTrue(EngagementClient.objects.filter(pk=c.pk).exists())
+        self.assertEqual(resp.status_code, 302)
+
+    def test_delete_confirmation_page_shows_block_message(self):
+        c = EngagementClient.objects.create(name='Busy')
+        Engagement.objects.create(name='E1', client=c, created_by=self.admin)
+        self._login('admin')
+        resp = self.client.get(reverse('engagements:client_delete', args=[c.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Cannot delete')

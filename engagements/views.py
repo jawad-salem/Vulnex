@@ -6,6 +6,7 @@ from django.core.cache import cache
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.db.models import Count, Q
 from django.http import Http404, HttpResponse
 from django.utils import timezone
@@ -14,7 +15,7 @@ from .models import (
     AttackPath, AttackPathNode, AttackPathEdge,
 )
 from .forms import (
-    EngagementForm, EngagementNoteForm,
+    ClientForm, EngagementForm, EngagementNoteForm,
     AttackPathForm, AttackPathNodeForm, AttackPathEdgeForm,
 )
 from reports.generator import calculate_engagement_risk_score, _risk_label
@@ -539,6 +540,7 @@ def client_list(request):
         'clients': clients,
         'search_query': search,
         'total_count': len(clients),
+        'can_manage': _can_manage_clients(request.user),
     })
 
 
@@ -598,8 +600,116 @@ def client_detail(request, pk):
         'total_findings': findings_qs.count(),
         'severity_counts': severity_counts,
         'sla_counts': sla_counts,
+        'can_manage': _can_manage_clients(request.user),
+        'can_delete': request.user.role == 'admin',
     }
     return render(request, 'engagements/client_detail.html', context)
+
+
+# ── Client CRUD ─────────────────────────────────────────────────────────────
+
+def _can_manage_clients(user):
+    """Admins and global pentesters can create/edit/delete clients. Mirrors
+    the engagement-create gate so the same set of users who can spin up an
+    engagement can also seed the client record beforehand."""
+    return user.is_authenticated and user.role in ('admin', 'pentester')
+
+
+@login_required
+def client_create(request):
+    if not _can_manage_clients(request.user):
+        messages.error(request, 'You do not have permission to create clients.')
+        return redirect('engagements:client_list')
+    if request.method == 'POST':
+        form = ClientForm(request.POST, request.FILES)
+        if form.is_valid():
+            client = form.save()
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.CLIENT_CREATED,
+                target=client.name,
+                details={'client_id': str(client.pk)},
+                request=request,
+            )
+            messages.success(request, f'Client "{client.name}" created.')
+            return redirect('engagements:client_detail', pk=client.pk)
+    else:
+        form = ClientForm()
+    return render(request, 'engagements/client_form.html', {
+        'form': form, 'title': 'New client',
+    })
+
+
+@login_required
+def client_edit(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    if not _can_manage_clients(request.user):
+        messages.error(request, 'You do not have permission to edit clients.')
+        return redirect('engagements:client_detail', pk=pk)
+    if request.method == 'POST':
+        form = ClientForm(request.POST, request.FILES, instance=client)
+        if form.is_valid():
+            form.save()
+            AuditLog.record(
+                actor=request.user,
+                action=AuditLog.Action.CLIENT_UPDATED,
+                target=client.name,
+                details={
+                    'client_id': str(client.pk),
+                    'fields': sorted(form.changed_data),
+                },
+                request=request,
+            )
+            messages.success(request, 'Client updated.')
+            return redirect('engagements:client_detail', pk=client.pk)
+    else:
+        form = ClientForm(instance=client)
+    return render(request, 'engagements/client_form.html', {
+        'form': form, 'title': 'Edit client', 'client': client,
+    })
+
+
+@login_required
+def client_delete(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    # Tighter gate than create/edit — destructive, so admin only.
+    if request.user.role != 'admin':
+        messages.error(request, 'Only admins can delete clients.')
+        return redirect('engagements:client_detail', pk=pk)
+    engagement_count = client.engagements.count()
+    if request.method == 'POST':
+        if engagement_count:
+            # FK is on_delete=PROTECT; surface a friendly message instead of a 500.
+            messages.error(
+                request,
+                f'Cannot delete "{client.name}" — {engagement_count} '
+                f'engagement{"s" if engagement_count != 1 else ""} reference it. '
+                'Reassign or delete those first.',
+            )
+            return redirect('engagements:client_detail', pk=pk)
+        name = client.name
+        client_id = str(client.pk)
+        try:
+            client.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                f'Cannot delete "{name}" — it is still referenced by other records.',
+            )
+            return redirect('engagements:client_detail', pk=pk)
+        AuditLog.record(
+            actor=request.user,
+            action=AuditLog.Action.CLIENT_DELETED,
+            target=name,
+            details={'client_id': client_id},
+            request=request,
+        )
+        messages.success(request, f'Client "{name}" deleted.')
+        return redirect('engagements:client_list')
+    return render(request, 'engagements/client_confirm_delete.html', {
+        'client': client,
+        'engagement_count': engagement_count,
+    })
 
 
 # ── Attack Path mapper (Red Team only) ──────────────────────────────────────

@@ -8,7 +8,10 @@ urlpatterns = [
     path('new/', views.engagement_create, name='create'),
     # Clients directory — must come before <uuid:pk>/ so "clients" isn't parsed as one
     path('clients/', views.client_list, name='client_list'),
+    path('clients/new/', views.client_create, name='client_create'),
     path('clients/<uuid:pk>/', views.client_detail, name='client_detail'),
+    path('clients/<uuid:pk>/edit/', views.client_edit, name='client_edit'),
+    path('clients/<uuid:pk>/delete/', views.client_delete, name='client_delete'),
     path('<uuid:pk>/', views.engagement_detail, name='detail'),
     path('<uuid:pk>/edit/', views.engagement_edit, name='edit'),
     path('<uuid:pk>/delete/', views.engagement_delete, name='delete'),

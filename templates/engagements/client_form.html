@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:client_list' %}">Clients</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ title }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="page-subtitle">{% if client %}Editing {{ client.name }}{% else %}Add a new client to the directory{% endif %}</p>
+    </div>
+    <a href="{% if client %}{% url 'engagements:client_detail' client.pk %}{% else %}{% url 'engagements:client_list' %}{% endif %}" class="btn">Cancel</a>
+</div>
+
+<div class="card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.errors %}
+        <div class="alert alert-error mb-4">Please fix the errors below.</div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="{{ form.name.id_for_label }}">Name</label>
+            {{ form.name }}
+            {% if form.name.errors %}<span class="field-error">{{ form.name.errors.0 }}</span>{% endif %}
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.primary_contact_name.id_for_label }}">Primary contact</label>
+                {{ form.primary_contact_name }}
+                {% if form.primary_contact_name.errors %}<span class="field-error">{{ form.primary_contact_name.errors.0 }}</span>{% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.primary_contact_email.id_for_label }}">Contact email</label>
+                {{ form.primary_contact_email }}
+                {% if form.primary_contact_email.errors %}<span class="field-error">{{ form.primary_contact_email.errors.0 }}</span>{% endif %}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.logo.id_for_label }}">Logo</label>
+            {% if client and client.logo %}
+            <div class="text-sm text-secondary" style="margin-bottom:6px">
+                Current: <img src="{{ client.logo.url }}" alt="{{ client.name }}" style="max-height:32px;vertical-align:middle">
+            </div>
+            {% endif %}
+            {{ form.logo }}
+            <span class="form-help">PNG or JPEG, max 1 MB.</span>
+            {% if form.logo.errors %}<span class="field-error">{{ form.logo.errors.0 }}</span>{% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.notes.id_for_label }}">Notes</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}<span class="field-error">{{ form.notes.errors.0 }}</span>{% endif %}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">{% if client %}Save changes{% else %}Create client{% endif %}</button>
+            <a href="{% if client %}{% url 'engagements:client_detail' client.pk %}{% else %}{% url 'engagements:client_list' %}{% endif %}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
