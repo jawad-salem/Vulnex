@@ -7,6 +7,22 @@ from rest_framework.permissions import SAFE_METHODS, BasePermission
 from engagements.models import Engagement
 
 
+class IsStaffOrPentester(BasePermission):
+    """Vulnex's REST API is internal — only admins and pentesters use it
+    programmatically. Reviewers and clients work through the UI; exposing the
+    schema/docs to them just enumerates the back-office attack surface."""
+
+    message = 'API access is restricted to admins and pentesters.'
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and getattr(user, 'role', None) in ('admin', 'pentester')
+        )
+
+
 def _engagement_from_obj(obj):
     """Return the Engagement instance the object belongs to, or ``None``."""
     if isinstance(obj, Engagement):

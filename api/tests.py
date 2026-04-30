@@ -4,7 +4,7 @@ Covers the four-role permission matrix (admin, pentester-on-engagement,
 client, outsider) on a representative subset of endpoints, plus the two
 non-session authentication paths (API key and JWT).
 """
-from django.test import TestCase, override_settings
+from django.test import Client as DjangoClient, TestCase, override_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
@@ -140,6 +140,13 @@ class APIRoleMatrixTests(TestCase):
 @override_settings(MFA_REQUIRED_ROLES=[])
 class APIKeyAuthTests(TestCase):
     def setUp(self):
+        # DRF's UserRateThrottle stores hit timestamps in the default cache,
+        # which is shared across tests in a single process. After ~60 prior
+        # API hits in the same run the bucket fills and `last_used_at`
+        # silently never updates because authentication is short-circuited
+        # by the throttle. Clear the cache so each test starts at zero.
+        from django.core.cache import cache
+        cache.clear()
         self.api = APIClient()
         self.user = User.objects.create_user('pt', role='pentester', password='pw')
         self.engagement = Engagement.objects.create(
@@ -235,6 +242,23 @@ class APIDocsTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b'swagger-ui', resp.content)
 
+    def test_reviewer_blocked_from_docs(self):
+        # HF.7b — reviewer/client roles have no programmatic-access use case.
+        rev = User.objects.create_user('rev', role='reviewer', password='pw')
+        self.api.force_authenticate(rev)
+        self.assertEqual(self.api.get('/api/docs/').status_code, 403)
+        self.assertEqual(self.api.get('/api/schema/').status_code, 403)
+
+    def test_client_blocked_from_docs_and_root(self):
+        cli = User.objects.create_user('cli', role='client', password='pw')
+        self.api.force_authenticate(cli)
+        self.assertEqual(self.api.get('/api/docs/').status_code, 403)
+        self.assertEqual(self.api.get('/api/schema/').status_code, 403)
+        self.assertEqual(self.api.get('/api/v1/').status_code, 403)
+
+    def test_pentester_can_access_api_root(self):
+        self.assertEqual(self.api.get('/api/v1/').status_code, 200)
+
     def test_schema_generation_emits_no_warnings(self):
         # Catches regressions like ReadOnlyField without a type hint, an
         # unannotated path parameter, or an unregistered authenticator —
@@ -257,3 +281,72 @@ class APIDocsTests(TestCase):
         finally:
             try: os.unlink(tmp)
             except OSError: pass
+
+
+@override_settings(MFA_REQUIRED_ROLES=['pentester', 'admin'])
+class APIMFAGateTests(TestCase):
+    """HF.7a — narrow the MFA exemption so session-authed users can no longer
+    sidestep TOTP setup by hopping to /api/v1/.
+
+    HF.7c — JWT issuance is gated on the same TOTP requirement; a password-only
+    grant via /api/v1/auth/token/ would otherwise bypass MFA entirely.
+    """
+
+    def setUp(self):
+        self.django_client = DjangoClient()
+        self.api = APIClient()
+        self.user = User.objects.create_user('pt', role='pentester', password='pw')
+
+    def test_session_user_redirected_from_api_when_mfa_missing(self):
+        # Browser session, MFA not yet set up — middleware redirects to setup.
+        self.django_client.login(username='pt', password='pw')
+        resp = self.django_client.get('/api/v1/engagements/')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/accounts/mfa/', resp['Location'])
+
+    def test_token_endpoint_remains_reachable_pre_mfa(self):
+        # The endpoint must respond — it's the only path a user has to obtain
+        # a token. The serializer rejects the request body for missing TOTP,
+        # but the URL itself is exempt from the MFA middleware redirect.
+        resp = self.api.post('/api/v1/auth/token/', {
+            'username': 'pt', 'password': 'pw',
+        }, format='json')
+        # 401 from MFAAwareTokenObtainPairSerializer, NOT a 302 redirect.
+        self.assertEqual(resp.status_code, 401)
+        self.assertIn('MFA setup', resp.json().get('detail', ''))
+
+    def test_token_issued_with_confirmed_totp_device(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+        TOTPDevice.objects.create(user=self.user, name='dev', confirmed=True)
+        resp = self.api.post('/api/v1/auth/token/', {
+            'username': 'pt', 'password': 'pw',
+        }, format='json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('access', resp.json())
+
+    def test_unconfirmed_totp_device_does_not_satisfy_gate(self):
+        from django_otp.plugins.otp_totp.models import TOTPDevice
+        TOTPDevice.objects.create(user=self.user, name='dev', confirmed=False)
+        resp = self.api.post('/api/v1/auth/token/', {
+            'username': 'pt', 'password': 'pw',
+        }, format='json')
+        self.assertEqual(resp.status_code, 401)
+
+
+@override_settings(MFA_REQUIRED_ROLES=[])
+class APIRendererTests(TestCase):
+    """HF.7d — the browsable HTML renderer is a debugging aid that enumerates
+    the API surface to anyone landing on a JSON endpoint. It must be off
+    whenever DEBUG is False (i.e., in any deployment)."""
+
+    def test_browsable_renderer_disabled_when_debug_off(self):
+        # Re-evaluate the conditional in settings.py with DEBUG=False, since
+        # REST_FRAMEWORK is read once at import time and override_settings on
+        # DEBUG alone won't re-render it.
+        from django.conf import settings as dj_settings
+        renderers = dj_settings.REST_FRAMEWORK.get('DEFAULT_RENDERER_CLASSES', [])
+        if dj_settings.DEBUG:
+            self.assertIn('rest_framework.renderers.BrowsableAPIRenderer', renderers)
+        else:
+            self.assertNotIn('rest_framework.renderers.BrowsableAPIRenderer', renderers)
+        self.assertIn('rest_framework.renderers.JSONRenderer', renderers)

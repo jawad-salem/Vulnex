@@ -1,10 +1,35 @@
+from django.conf import settings
+from django_otp import user_has_device
 from rest_framework import serializers
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from credentials.models import Credential
 from engagements.models import Engagement
 from recon.models import DiscoveredHost
 from reports.models import Report
 from vulns.models import Evidence, Finding
+
+
+class MFAAwareTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """JWT issuance honours the same MFA policy the UI enforces. Users in
+    ``settings.MFA_REQUIRED_ROLES`` must have a confirmed TOTP device before
+    they can mint programmatic tokens — otherwise password-only login would
+    bypass the whole MFA gate via the API."""
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        required = getattr(settings, 'MFA_REQUIRED_ROLES', []) or []
+        if (
+            getattr(self.user, 'role', None) in required
+            and not user_has_device(self.user, confirmed=True)
+        ):
+            raise AuthenticationFailed(
+                'MFA setup is required before issuing API tokens. '
+                'Sign in to the web UI and complete TOTP setup first.',
+                code='mfa_required',
+            )
+        return data
 
 
 class EngagementSerializer(serializers.ModelSerializer):

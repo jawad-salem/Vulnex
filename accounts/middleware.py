@@ -18,9 +18,14 @@ ALLOWED_PATH_PREFIXES = (
     '/accounts/logout/',
     '/accounts/login/',
     '/accounts/mfa/',
-    # REST API authenticates per-request (API key or JWT); the browser-session
-    # MFA gate doesn't apply. Authenticated viewsets still enforce role checks.
-    '/api/',
+    # JWT-bootstrap and schema only. The schema endpoint is needed because the
+    # docs UI fetches it during render. Every other /api/v1/ path is gated:
+    # session-authed users land here as request.user, get redirected to MFA
+    # setup; JWT/API-key clients hit Django middleware as AnonymousUser (DRF
+    # authenticates per-request, after middleware) and pass through.
+    '/api/v1/auth/token/',
+    '/api/v1/auth/token/refresh/',
+    '/api/schema/',
 )
 
 
