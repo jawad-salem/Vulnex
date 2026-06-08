@@ -67,11 +67,15 @@ services:
       - protected_media_data:/app/protected_media
     depends_on:
       web:
-        condition: service_started
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Celery containers don't serve HTTP, so the image's port-8000 healthcheck
+    # would mark them unhealthy. Disable it here.
+    healthcheck:
+      disable: true
     entrypoint: []
     command: celery -A vulnex worker -l info
 
@@ -89,11 +93,15 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       web:
-        condition: service_started
+        condition: service_healthy
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Celery containers don't serve HTTP, so the image's port-8000 healthcheck
+    # would mark them unhealthy. Disable it here.
+    healthcheck:
+      disable: true
     entrypoint: []
     command: celery -A vulnex beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
 
