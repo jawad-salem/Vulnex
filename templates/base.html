@@ -1,3 +1,4 @@
+{% load nav_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,30 +29,30 @@
                 <span>Vulnex</span>
             </div>
             <nav class="sidebar-nav">
-                <a href="{% url 'dashboard:home' %}" class="nav-item {% if request.resolver_match.app_name == 'dashboard' %}active{% endif %}">
+                <a href="{% url 'dashboard:home' %}" class="nav-item {% nav_active app='dashboard' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
                     Dashboard
                 </a>
-                <a href="{% url 'engagements:list' %}" class="nav-item {% if request.resolver_match.app_name == 'engagements' and request.resolver_match.url_name != 'client_list' and request.resolver_match.url_name != 'client_detail' %}active{% endif %}">
+                <a href="{% url 'engagements:list' %}" class="nav-item {% nav_active app='engagements' exclude='client_list,client_detail' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
                     Engagements
                 </a>
                 {% if user.is_admin or user.is_engagement_lead %}
-                <a href="{% url 'engagements:client_list' %}" class="nav-item {% if request.resolver_match.url_name == 'client_list' or request.resolver_match.url_name == 'client_detail' %}active{% endif %}">
+                <a href="{% url 'engagements:client_list' %}" class="nav-item {% nav_active urls='client_list,client_detail' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/></svg>
                     Clients
                 </a>
                 {% endif %}
                 {% if user.is_admin %}
-                <a href="{% url 'accounts:user_list' %}" class="nav-item {% if request.resolver_match.app_name == 'accounts' and request.resolver_match.url_name == 'user_list' or request.resolver_match.url_name == 'user_create' or request.resolver_match.url_name == 'user_edit' or request.resolver_match.url_name == 'user_delete' %}active{% endif %}">
+                <a href="{% url 'accounts:user_list' %}" class="nav-item {% nav_active urls='user_list,user_create,user_edit,user_delete' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
                     Users
                 </a>
-                <a href="{% url 'accounts:audit_log' %}" class="nav-item {% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">
+                <a href="{% url 'accounts:audit_log' %}" class="nav-item {% nav_active urls='audit_log' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
                     Audit log
                 </a>
-                <a href="{% url 'reports:template_list' %}" class="nav-item {% if request.resolver_match.app_name == 'reports' and 'template' in request.resolver_match.url_name %}active{% endif %}">
+                <a href="{% url 'reports:template_list' %}" class="nav-item {% nav_active app='reports' contains='template' %}">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M7 8h10M7 12h6"/></svg>
                     Report templates
                 </a>
@@ -63,13 +64,13 @@
                 <div class="sidebar-section-title">Engagement</div>
                 <div class="sidebar-section-name" title="{{ engagement.name }}">{{ engagement.name|truncatechars:28 }}</div>
                 <a href="{% url 'engagements:detail' engagement.pk %}" class="nav-item sub">Overview</a>
-                <a href="{% url 'vulns:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'vulns' %}active{% endif %}">Findings</a>
+                <a href="{% url 'vulns:list' engagement.pk %}" class="nav-item sub {% nav_active app='vulns' %}">Findings</a>
                 {% if not is_client_role %}
-                <a href="{% url 'recon:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'recon' %}active{% endif %}">Recon</a>
-                <a href="{% url 'credentials:list' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'credentials' %}active{% endif %}">Credentials</a>
-                <a href="{% url 'methodology:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'methodology' %}active{% endif %}">Methodology</a>
+                <a href="{% url 'recon:dashboard' engagement.pk %}" class="nav-item sub {% nav_active app='recon' %}">Recon</a>
+                <a href="{% url 'credentials:list' engagement.pk %}" class="nav-item sub {% nav_active app='credentials' %}">Credentials</a>
+                <a href="{% url 'methodology:dashboard' engagement.pk %}" class="nav-item sub {% nav_active app='methodology' %}">Methodology</a>
                 {% endif %}
-                <a href="{% url 'reports:dashboard' engagement.pk %}" class="nav-item sub {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">Reports</a>
+                <a href="{% url 'reports:dashboard' engagement.pk %}" class="nav-item sub {% nav_active app='reports' %}">Reports</a>
             </div>
             {% endif %}
 

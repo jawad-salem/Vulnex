@@ -1044,32 +1044,41 @@ class MarkdownToPlatypusTests(TestCase):
         self.styles.add(ParagraphStyle('BodyText2', parent=self.styles['Normal']))
 
     def test_empty_input_returns_empty_list(self):
-        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        from reports.markdown import markdown_to_platypus
         self.assertEqual(markdown_to_platypus('', self.styles), [])
 
     def test_plain_paragraph_emits_one_flowable(self):
-        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        from reports.markdown import markdown_to_platypus
         flows = markdown_to_platypus('Just a sentence.', self.styles)
         self.assertEqual(len(flows), 1)
 
     def test_code_fence_emits_courier_paragraph(self):
-        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        from reports.markdown import markdown_to_platypus
         flows = markdown_to_platypus('```\nprint(1)\n```', self.styles)
         self.assertTrue(any('Courier' in getattr(f, 'text', '') for f in flows))
 
     def test_table_emits_table_flowable(self):
         from reportlab.platypus import Table
-        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        from reports.markdown import markdown_to_platypus
         flows = markdown_to_platypus(
             '| a | b |\n| --- | --- |\n| 1 | 2 |', self.styles,
         )
         self.assertTrue(any(isinstance(f, Table) for f in flows))
 
     def test_list_emits_multiple_paragraphs(self):
-        from vulns.templatetags.vulns_extras import markdown_to_platypus
+        from reports.markdown import markdown_to_platypus
         flows = markdown_to_platypus('- one\n- two\n- three', self.styles)
         # at least three flowables for the three list items
         self.assertGreaterEqual(len(flows), 3)
+
+    def test_link_with_ampersand_in_href_does_not_crash(self):
+        # Regression: a URL containing '&' (or '<'/'>') must be XML-escaped so
+        # ReportLab's paragraph parser doesn't raise and abort PDF generation.
+        from reports.markdown import markdown_to_platypus
+        flows = markdown_to_platypus(
+            '[search](https://example.com/?a=1&b=2)', self.styles,
+        )
+        self.assertTrue(flows)
 
 
 @override_settings(MFA_REQUIRED_ROLES=[])

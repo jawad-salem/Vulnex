@@ -3,6 +3,9 @@
 Pipeline: raw → markdown → bleach allowlist → safe HTML. The allowlist comes
 from NEXT_STEPS 2.5/2.6 — basic inline formatting, code blocks, tables, no
 scripts/styles/iframes.
+
+The PDF generator reuses ``render_markdown`` and lowers the resulting HTML into
+ReportLab flowables in ``reports.markdown`` (kept out of this template layer).
 """
 import bleach
 import markdown as md
@@ -27,6 +30,8 @@ ALLOWED_ATTRIBUTES = {
 }
 ALLOWED_PROTOCOLS = ['http', 'https', 'mailto']
 
+MARKDOWN_EXTENSIONS = ['fenced_code', 'tables', 'sane_lists', 'nl2br', 'toc']
+
 
 def render_markdown(raw: str) -> str:
     """Render Markdown → sanitized HTML. Returns empty string on falsy input."""
@@ -34,7 +39,7 @@ def render_markdown(raw: str) -> str:
         return ''
     html = md.markdown(
         raw,
-        extensions=['fenced_code', 'tables', 'sane_lists'],
+        extensions=MARKDOWN_EXTENSIONS,
         output_format='html',
     )
     clean = bleach.clean(

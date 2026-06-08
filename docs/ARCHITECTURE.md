@@ -16,7 +16,8 @@ vulnex/                    # Django project (settings, root URLs, Celery, showca
 ├── engagements/           # Client → Engagement → Members → Notes → Activity log
 │                          # Attack-path DAG (path / node / edge) lives here too
 ├── vulns/                 # Findings, evidence, comments, finding templates,
-│                          # scanner importers (vulns/importers/)
+│                          # scanner parsers (vulns/parsers.py) + import/merge
+│                          # services (vulns/services/)
 ├── recon/                 # Recon scans, discovered hosts, scheduled scans, pipelines
 ├── credentials/           # Encrypted credentials vault (Fernet)
 ├── methodology/           # OWASP-style checklists scoped to engagements
@@ -54,7 +55,7 @@ Client ───< Engagement ───< EngagementMember >─── User
 Notes worth knowing if you're reading the code:
 
 - **`User` is custom** (`accounts.User`, `AbstractUser`). `User.role` is the source of truth for "what can this person do" outside an engagement (admin / engagement-lead / pentester / reviewer / client). `EngagementMember` is the per-engagement scoping layer on top of that.
-- **`Finding`** carries the ATT&CK / OWASP fields, severity, CVSS, status, dedup key, and the rendered/sanitised Markdown body. Bulk imports go through `vulns/importers/` and write `Finding` rows directly.
+- **`Finding`** carries the ATT&CK / OWASP fields, severity, CVSS, status, dedup key, and the rendered/sanitised Markdown body. Bulk imports parse scanner output in `vulns/parsers.py`, then the import service (`vulns/services/imports.py`) dedups and writes `Finding` rows; views just handle the upload/preview flow.
 - **`AttackPath` / `AttackPathNode` / `AttackPathEdge`** form the kill-chain diagram — a small hand-drawn DAG (typically 5–10 nodes) the pentester sketches to narrate the path they walked, embedded in the PDF report. It is *not* a BloodHound-style enumeration engine, just a labelled diagram. Edges carry the ATT&CK technique tag and an optional finding link; the PDF generator walks the graph in BFS order.
 - **`Credential.secret_encrypted`** is a single Fernet ciphertext column. The key comes from `VAULT_MASTER_KEY` — see `SECURITY.md` for rotation and the pre-1.2 SECRET_KEY-derived fallback.
 - **`AuditLog`** is the append-only forensic trail for sensitive actions (login, role change, credential access, report download). It is never edited or deleted at the model layer.

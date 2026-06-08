@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ title }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
@@ -57,7 +58,15 @@
 
         <div class="form-group">
             <label for="{{ form.description.id_for_label }}">Description</label>
-            {{ form.description }}
+            <div class="md-field" data-md-field>
+                <div class="md-tabs" role="tablist">
+                    <button type="button" class="md-tab" data-md-tab="edit" role="tab">Write</button>
+                    <button type="button" class="md-tab" data-md-tab="preview" role="tab">Preview</button>
+                    <span class="md-help text-xs text-secondary">Markdown supported.</span>
+                </div>
+                {{ form.description }}
+                <div class="md-preview-pane prose"></div>
+            </div>
         </div>
 
         <div class="form-row" style="grid-template-columns:1fr 1fr">
@@ -182,8 +191,15 @@
             <div class="form-2col">
                 <div class="form-group">
                     <label for="{{ form.proof_of_concept.id_for_label }}">Proof of concept</label>
-                    {{ form.proof_of_concept }}
-                    <span class="form-help">Steps to reproduce the vulnerability</span>
+                    <div class="md-field" data-md-field>
+                        <div class="md-tabs" role="tablist">
+                            <button type="button" class="md-tab" data-md-tab="edit" role="tab">Write</button>
+                            <button type="button" class="md-tab" data-md-tab="preview" role="tab">Preview</button>
+                            <span class="md-help text-xs text-secondary">Use fenced ```code``` blocks for repro steps.</span>
+                        </div>
+                        {{ form.proof_of_concept }}
+                        <div class="md-preview-pane prose"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="{{ form.affected_hosts.id_for_label }}">Additional affected hosts</label>
@@ -194,7 +210,15 @@
 
             <div class="form-group">
                 <label for="{{ form.remediation.id_for_label }}">Remediation</label>
-                {{ form.remediation }}
+                <div class="md-field" data-md-field>
+                    <div class="md-tabs" role="tablist">
+                        <button type="button" class="md-tab" data-md-tab="edit" role="tab">Write</button>
+                        <button type="button" class="md-tab" data-md-tab="preview" role="tab">Preview</button>
+                        <span class="md-help text-xs text-secondary">Markdown supported.</span>
+                    </div>
+                    {{ form.remediation }}
+                    <div class="md-preview-pane prose"></div>
+                </div>
             </div>
         </div>
 
@@ -232,6 +256,10 @@
 {% endblock %}
 
 {% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+window.MARKDOWN_PREVIEW_URL = "{% url 'vulns:markdown_preview' %}";
+</script>
+<script src="{% static 'js/markdown_preview.js' %}" nonce="{{ request.csp_nonce }}"></script>
 <script nonce="{{ request.csp_nonce }}">
 (function() {
     // ── Template picker auto-fill ──

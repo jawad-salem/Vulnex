@@ -131,3 +131,52 @@ class GlobalSearchTests(TestCase):
         self.client.login(username='cli3', password='testpass1')
         resp = self.client.get(reverse('dashboard:search') + '?q=injection')
         self.assertNotContains(resp, 'SQL injection in login form')
+
+
+class NavActiveTagTests(TestCase):
+    """The {% nav_active %} sidebar-highlight tag (dashboard.templatetags)."""
+
+    def _ctx(self, app_name, url_name):
+        from types import SimpleNamespace
+        rm = SimpleNamespace(app_name=app_name, url_name=url_name)
+        return {'request': SimpleNamespace(resolver_match=rm)}
+
+    def test_app_match_and_mismatch(self):
+        from dashboard.templatetags.nav_tags import nav_active
+        self.assertEqual(nav_active(self._ctx('dashboard', 'home'), app='dashboard'), 'active')
+        self.assertEqual(nav_active(self._ctx('vulns', 'list'), app='dashboard'), '')
+
+    def test_urls_membership(self):
+        from dashboard.templatetags.nav_tags import nav_active
+        urls = 'user_list,user_create,user_edit,user_delete'
+        self.assertEqual(nav_active(self._ctx('accounts', 'user_edit'), urls=urls), 'active')
+
+    def test_urls_does_not_overmatch_sibling_accounts_page(self):
+        # The old inline `app=='accounts' and url=='user_list' or url=='user_create'...`
+        # conditional lit up Users for any accounts page via operator precedence.
+        from dashboard.templatetags.nav_tags import nav_active
+        urls = 'user_list,user_create,user_edit,user_delete'
+        self.assertEqual(nav_active(self._ctx('accounts', 'audit_log'), urls=urls), '')
+        self.assertEqual(nav_active(self._ctx('accounts', 'profile'), urls=urls), '')
+
+    def test_exclude_vetoes_match(self):
+        from dashboard.templatetags.nav_tags import nav_active
+        self.assertEqual(
+            nav_active(self._ctx('engagements', 'client_list'),
+                       app='engagements', exclude='client_list,client_detail'), '')
+        self.assertEqual(
+            nav_active(self._ctx('engagements', 'list'),
+                       app='engagements', exclude='client_list,client_detail'), 'active')
+
+    def test_app_and_contains_combine(self):
+        from dashboard.templatetags.nav_tags import nav_active
+        self.assertEqual(
+            nav_active(self._ctx('reports', 'template_form'), app='reports', contains='template'), 'active')
+        # Engagement reports dashboard must NOT highlight the admin templates item.
+        self.assertEqual(
+            nav_active(self._ctx('reports', 'dashboard'), app='reports', contains='template'), '')
+
+    def test_no_resolver_match_is_safe(self):
+        from types import SimpleNamespace
+        from dashboard.templatetags.nav_tags import nav_active
+        self.assertEqual(nav_active({'request': SimpleNamespace(resolver_match=None)}, app='x'), '')

@@ -47,6 +47,16 @@ desktop.ini
 *.orig
 *.rej
 
+# Runtime / scratch artifacts (server logs, manual exports, scratch notes)
+*.err
+*.out
+error.txt
+EVALUATION.md
+vulnex_mindmap.txt
+# Exported report PDFs dropped in the repo root (real reports live in
+# protected_media/, which is already ignored above).
+/*.pdf
+
 # Local / project-specific
 .claude/
 data/

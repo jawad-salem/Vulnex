@@ -117,6 +117,13 @@ def _pinned_http_get(hostname: str, ip: str, path: str, use_https: bool, timeout
     """
     port = 443 if use_https else 80
     if use_https:
+        # Cert verification is intentionally disabled: this is a recon probe
+        # fingerprinting arbitrary external targets that routinely have
+        # self-signed/expired/hostname-mismatched certs. We are not establishing
+        # a trusted channel — only reading a banner/status — and we already
+        # connect to a pre-validated IP (see _validate_target) to block DNS
+        # rebinding. Verification here would just make the scanner fail on the
+        # very hosts it most needs to inspect.
         ctx = ssl._create_unverified_context()
         conn = http.client.HTTPSConnection(ip, port, timeout=timeout, context=ctx)
     else:

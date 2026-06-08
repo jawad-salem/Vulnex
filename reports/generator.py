@@ -25,7 +25,7 @@ from reportlab.platypus import (
 from reportlab.lib.enums import TA_CENTER
 from reportlab.graphics.shapes import Drawing, Circle, String, Line, PolyLine
 
-from vulns.templatetags.vulns_extras import markdown_to_platypus
+from reports.markdown import markdown_to_platypus
 
 
 def _esc(text):

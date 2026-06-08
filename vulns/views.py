@@ -14,14 +14,16 @@ from .forms import (
     FindingForm, EvidenceForm, ToolImportForm, RetestForm,
     FindingCommentForm, FindingMergeForm, CsvImportForm,
 )
-from .parsers import (
-    parse_burp_xml,
-    parse_nessus_xml,
-    parse_nikto_json,
-    parse_nuclei_json,
-    parse_semgrep_json,
-    parse_zap_json,
+from .services.imports import (
+    PARSERS,
+    IMPORT_PREVIEW_LIMIT,
+    CSV_IMPORT_COLUMNS,
+    CSV_IMPORT_REQUIRED,
+    classify_import,
+    commit_import,
+    parse_csv_findings,
 )
+from .services.merge import merge_findings
 from accounts.decorators import engagement_access, engagement_edit_required
 from accounts.models import AuditLog
 from recon.models import DiscoveredHost
@@ -218,52 +220,6 @@ def finding_detail(request, pk):
     return render(request, 'vulns/detail.html', context)
 
 
-def _merge_into(source: Finding, target: Finding, actor) -> dict:
-    """Move source's evidence + comments into target, append source's body
-    fields as a labelled section, then delete source. Returns a small summary
-    suitable for the audit log details payload.
-
-    Caller must check both belong to the same engagement and that ``actor``
-    has permission. The whole operation runs in a single transaction.
-    """
-    from django.db import transaction
-
-    moved_evidence = source.evidence.count()
-    moved_comments = source.comments.count()
-
-    sections = []
-    label = f'Merged from "{source.title}" ({source.get_severity_display()})'
-    if source.description:
-        sections.append(f'### {label} — Description\n\n{source.description}')
-    if source.proof_of_concept:
-        sections.append(f'### {label} — Proof of concept\n\n{source.proof_of_concept}')
-    if source.remediation:
-        sections.append(f'### {label} — Remediation\n\n{source.remediation}')
-    extra = '\n\n'.join(sections)
-
-    with transaction.atomic():
-        if extra:
-            target.description = (
-                (target.description or '').rstrip() + '\n\n' + extra
-            ).strip()
-        # Reparent evidence and comments. Bulk update keeps queries to one each.
-        source.evidence.update(finding=target)
-        source.comments.update(finding=target)
-        target.save()
-        source_id = source.pk
-        source_title = source.title
-        source.delete()
-
-    return {
-        'source_id': str(source_id),
-        'source_title': source_title,
-        'target_id': str(target.pk),
-        'target_title': target.title,
-        'moved_evidence': moved_evidence,
-        'moved_comments': moved_comments,
-    }
-
-
 @login_required
 def finding_merge(request, pk):
     """Lead/Reviewer-only action: merge ``pk`` (source) into a chosen target.
@@ -285,7 +241,7 @@ def finding_merge(request, pk):
                 # ModelChoiceField queryset already enforces this, but
                 # belt-and-braces in case of a tampered request.
                 return HttpResponseForbidden('Cross-engagement merge denied.')
-            details = _merge_into(source, target, request.user)
+            details = merge_findings(source, target, request.user)
             AuditLog.record(
                 actor=request.user,
                 action=AuditLog.Action.FINDING_MERGE,
@@ -585,48 +541,6 @@ def request_changes(request, pk):
     return redirect('vulns:detail', pk=pk)
 
 
-_PARSERS = {
-    'nuclei': parse_nuclei_json,
-    'nikto': parse_nikto_json,
-    'burp': parse_burp_xml,
-    'nessus': parse_nessus_xml,
-    'zap': parse_zap_json,
-    'semgrep': parse_semgrep_json,
-}
-
-_IMPORT_PREVIEW_LIMIT = 1000
-
-
-def _classify_import(engagement, findings_data):
-    """Split parser output into (new_items, duplicate_items) using the
-    (title, host, port, endpoint, parameter) dedup key against existing
-    findings. Returns lists of plain dicts so they're JSON-serialisable
-    for session storage.
-    """
-    existing_keys = set(
-        engagement.findings.values_list(
-            'title', 'host', 'port', 'endpoint', 'parameter',
-        )
-    )
-    new_items, dup_items = [], []
-    seen_in_batch = set()
-    for fd in findings_data:
-        dedup_key = (
-            fd.get('title', ''),
-            fd.get('host', ''),
-            fd.get('port'),
-            fd.get('endpoint', ''),
-            fd.get('parameter', ''),
-        )
-        # JSON-friendly version (tuples can't survive session round-trip)
-        if dedup_key in existing_keys or dedup_key in seen_in_batch:
-            dup_items.append(fd)
-        else:
-            seen_in_batch.add(dedup_key)
-            new_items.append(fd)
-    return new_items, dup_items
-
-
 @login_required
 @engagement_edit_required
 def tool_import(request, engagement_pk):
@@ -640,7 +554,7 @@ def tool_import(request, engagement_pk):
             return redirect('vulns:import', engagement_pk=engagement.pk)
         tool = pending['tool']
         new_items = pending['new']
-        created = _commit_import(engagement, request.user, tool, new_items)
+        created = commit_import(engagement, request.user,tool, new_items)
         ActivityLog.objects.create(
             engagement=engagement, user=request.user,
             action=f'Imported {created} findings from {tool.capitalize()}',
@@ -660,18 +574,18 @@ def tool_import(request, engagement_pk):
             preview = form.cleaned_data.get('preview', False)
             content = request.FILES['file'].read()
             try:
-                findings_data = _PARSERS[tool](content)
+                findings_data = PARSERS[tool](content)
             except Exception as e:
                 messages.error(request, f'Import failed: {str(e)}')
                 return redirect('vulns:import', engagement_pk=engagement_pk)
 
-            new_items, dup_items = _classify_import(engagement, findings_data)
+            new_items, dup_items = classify_import(engagement,findings_data)
 
             if preview:
-                if len(new_items) + len(dup_items) > _IMPORT_PREVIEW_LIMIT:
+                if len(new_items) + len(dup_items) > IMPORT_PREVIEW_LIMIT:
                     messages.error(
                         request,
-                        f'Preview supports up to {_IMPORT_PREVIEW_LIMIT} entries. '
+                        f'Preview supports up to {IMPORT_PREVIEW_LIMIT} entries. '
                         f'Re-run without preview, or split the file.',
                     )
                     return redirect('vulns:import', engagement_pk=engagement_pk)
@@ -688,7 +602,7 @@ def tool_import(request, engagement_pk):
                     'dup_items': dup_items,
                 })
 
-            created = _commit_import(engagement, request.user, tool, new_items)
+            created = commit_import(engagement, request.user,tool, new_items)
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
                 action=f'Imported {created} findings from {tool.capitalize()}',
@@ -705,22 +619,6 @@ def tool_import(request, engagement_pk):
     })
 
 
-def _commit_import(engagement, user, tool, new_items):
-    """Bulk-create findings from a pre-classified ``new_items`` payload."""
-    model_fields = {f.name for f in Finding._meta.get_fields()}
-    created = 0
-    for fd in new_items:
-        clean = {k: v for k, v in fd.items() if k in model_fields}
-        Finding.objects.create(
-            engagement=engagement,
-            found_by=user,
-            tool_source=tool.capitalize(),
-            **clean,
-        )
-        created += 1
-    return created
-
-
 EXPORT_FIELDS = [
     'title', 'severity', 'cvss_score', 'status', 'host', 'port', 'url',
     'endpoint', 'http_method', 'parameter', 'description',
@@ -729,115 +627,6 @@ EXPORT_FIELDS = [
     'due_date', 'sla_status',
 ]
 
-# Columns the CSV importer accepts. Subset of EXPORT_FIELDS — derived/audit
-# columns (cvss_vector_string, created_at, due_date, sla_status) are dropped
-# even if present so we don't tempt operators into setting them by hand.
-CSV_IMPORT_COLUMNS = {
-    'title', 'severity', 'cvss_score', 'status', 'host', 'port', 'url',
-    'endpoint', 'http_method', 'parameter', 'description',
-    'proof_of_concept', 'remediation', 'cwe_id', 'tool_source',
-    'affected_hosts', 'references',
-}
-CSV_IMPORT_REQUIRED = {'title', 'severity'}
-CSV_IMPORT_DROPPED = {'cvss_vector_string', 'created_at', 'due_date', 'sla_status'}
-
-
-def _parse_csv_findings(content):
-    """Parse a CSV upload into ``(rows, row_errors, header_errors)``.
-
-    ``rows`` are dicts ready for ``_classify_import`` / ``_commit_import``.
-    ``row_errors`` is a list of ``{'row': N, 'error': str}`` for rows that
-    failed validation (skipped from the import). ``header_errors`` is a list
-    of fatal header-level errors that abort the import entirely.
-    """
-    valid_severities = {s for s, _ in Finding.Severity.choices}
-    valid_statuses = {s for s, _ in Finding.Status.choices}
-    header_errors = []
-
-    try:
-        text = content.decode('utf-8-sig')  # tolerate BOM from Excel exports
-    except UnicodeDecodeError:
-        return [], [], ['CSV must be UTF-8 encoded.']
-
-    reader = csv.DictReader(text.splitlines())
-    if reader.fieldnames is None:
-        return [], [], ['CSV is empty or has no header row.']
-
-    headers = {h.strip() for h in reader.fieldnames if h}
-    missing_required = CSV_IMPORT_REQUIRED - headers
-    if missing_required:
-        header_errors.append(
-            f'Missing required column(s): {", ".join(sorted(missing_required))}.'
-        )
-    unknown = headers - CSV_IMPORT_COLUMNS - CSV_IMPORT_DROPPED
-    if unknown:
-        header_errors.append(
-            f'Unknown column(s): {", ".join(sorted(unknown))}. '
-            f'Allowed: {", ".join(sorted(CSV_IMPORT_COLUMNS))}.'
-        )
-    if header_errors:
-        return [], [], header_errors
-
-    rows = []
-    row_errors = []
-    for idx, raw in enumerate(reader, start=2):  # row 1 is the header
-        row = {
-            (k.strip() if k else ''): (v.strip() if isinstance(v, str) else v)
-            for k, v in raw.items()
-            if k and k.strip() in CSV_IMPORT_COLUMNS
-        }
-        title = row.get('title', '')
-        severity = row.get('severity', '').lower()
-        if not title:
-            row_errors.append({'row': idx, 'error': 'title is required'})
-            continue
-        if severity not in valid_severities:
-            row_errors.append({
-                'row': idx,
-                'error': f'severity "{row.get("severity", "")}" is invalid '
-                         f'(allowed: {", ".join(sorted(valid_severities))})',
-            })
-            continue
-        row['severity'] = severity
-
-        status = (row.get('status') or '').lower()
-        if status:
-            if status not in valid_statuses:
-                row_errors.append({
-                    'row': idx,
-                    'error': f'status "{row.get("status", "")}" is invalid '
-                             f'(allowed: {", ".join(sorted(valid_statuses))})',
-                })
-                continue
-            row['status'] = status
-        else:
-            row.pop('status', None)
-
-        port_str = row.get('port', '')
-        if port_str:
-            try:
-                row['port'] = int(port_str)
-            except ValueError:
-                row_errors.append({'row': idx, 'error': f'port "{port_str}" is not a number'})
-                continue
-        else:
-            row.pop('port', None)
-
-        cvss_str = row.get('cvss_score', '')
-        if cvss_str:
-            try:
-                row['cvss_score'] = float(cvss_str)
-            except ValueError:
-                row_errors.append({'row': idx, 'error': f'cvss_score "{cvss_str}" is not a number'})
-                continue
-        else:
-            row.pop('cvss_score', None)
-
-        rows.append(row)
-
-    return rows, row_errors, []
-
-
 @login_required
 @engagement_edit_required
 def finding_import_csv(request, engagement_pk):
@@ -845,7 +634,7 @@ def finding_import_csv(request, engagement_pk):
 
     Header validation is strict; per-row errors are surfaced in the preview
     and those rows are skipped on commit. Dedup against existing engagement
-    findings reuses ``_classify_import``.
+    findings reuses ``classify_import``.
     """
     engagement = request.engagement
 
@@ -856,7 +645,7 @@ def finding_import_csv(request, engagement_pk):
             messages.error(request, 'CSV import preview expired. Please re-upload.')
             return redirect('vulns:import_csv', engagement_pk=engagement.pk)
         new_items = pending['new']
-        created = _commit_import(engagement, request.user, 'csv', new_items)
+        created = commit_import(engagement, request.user,'csv', new_items)
         ActivityLog.objects.create(
             engagement=engagement, user=request.user,
             action=f'Imported {created} findings from CSV',
@@ -875,7 +664,7 @@ def finding_import_csv(request, engagement_pk):
         if form.is_valid():
             preview = form.cleaned_data.get('preview', True)
             content = request.FILES['file'].read()
-            rows, row_errors, header_errors = _parse_csv_findings(content)
+            rows, row_errors, header_errors = parse_csv_findings(content)
 
             if header_errors:
                 for err in header_errors:
@@ -886,13 +675,13 @@ def finding_import_csv(request, engagement_pk):
                     'required': sorted(CSV_IMPORT_REQUIRED),
                 })
 
-            new_items, dup_items = _classify_import(engagement, rows)
+            new_items, dup_items = classify_import(engagement,rows)
 
             if preview:
-                if len(new_items) + len(dup_items) > _IMPORT_PREVIEW_LIMIT:
+                if len(new_items) + len(dup_items) > IMPORT_PREVIEW_LIMIT:
                     messages.error(
                         request,
-                        f'Preview supports up to {_IMPORT_PREVIEW_LIMIT} rows. '
+                        f'Preview supports up to {IMPORT_PREVIEW_LIMIT} rows. '
                         f'Re-run without preview, or split the file.',
                     )
                     return redirect('vulns:import_csv', engagement_pk=engagement.pk)
@@ -920,7 +709,7 @@ def finding_import_csv(request, engagement_pk):
                         f'… and {len(row_errors) - 10} more row error(s) skipped.',
                     )
 
-            created = _commit_import(engagement, request.user, 'csv', new_items)
+            created = commit_import(engagement, request.user,'csv', new_items)
             ActivityLog.objects.create(
                 engagement=engagement, user=request.user,
                 action=f'Imported {created} findings from CSV',
