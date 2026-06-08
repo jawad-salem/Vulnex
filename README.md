@@ -13,7 +13,7 @@
 
 Most open-source tools in this space are one slice — reporting (Dradis, PwnDoc) or vulnerability databases (DefectDojo). Vulnex is the full loop in one app:
 
-- **End-to-end workflow** — engagement → recon → methodology checklists → findings → peer review → PDF/DOCX report → retest tracking.
+- **End-to-end workflow** — engagement → recon → methodology checklists → findings → peer review → PDF report → retest tracking.
 - **Scanner-agnostic ingestion** — Nuclei, Nikto, Burp, Nessus, ZAP, Semgrep, Nmap XML, plus CSV bulk import. Automatic dedup against existing findings.
 - **Hardened by default** — TOTP MFA, login lockout, CSP, encrypted credential vault with a dedicated `VAULT_MASTER_KEY`, authenticated evidence downloads, full audit log.
 - **Red-team aware** — Kill-chain diagram editor on red-team engagements (a small DAG you draw to narrate the path you walked, embedded in the PDF). Not a BloodHound replacement — narrative, not enumeration.
@@ -134,7 +134,7 @@ For the request lifecycle, data model, report-generation pipeline, web-vs-API au
 
 ## Roadmap
 
-Detailed in [`NEXT_STEPS.md`](NEXT_STEPS.md). Highlights of what's still open:
+Highlights of what's still open:
 
 - **OWASP Top 10 + MITRE ATT&CK tagging** (1.1) — taxonomy fields with chips, filters, and PDF rendering.
 - **DOCX export + report versioning** (1.2) — Word output and per-regeneration version history.
@@ -146,7 +146,7 @@ Detailed in [`NEXT_STEPS.md`](NEXT_STEPS.md). Highlights of what's still open:
 
 ## Contributing
 
-Bug reports, ideas, and pull requests welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for dev setup, code style, branch and commit conventions, and what's in / out of scope. Be aware of the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Security issues go private — see [`SECURITY.md`](SECURITY.md).
+Bug reports, ideas, and pull requests are welcome — open an issue or a PR. See [Local development](#local-development-no-docker) below for setup. Please report security issues privately rather than in a public issue.
 
 ### Local development (no Docker)
 
@@ -165,13 +165,11 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### Running the suite
+### Running the tests
 
 ```bash
 python manage.py test
 python manage.py check --deploy
-bandit -r . -x tests,migrations,staticfiles,.venv
-pip-audit -r requirements.txt
 ```
 
 ## Project structure
@@ -205,7 +203,7 @@ Vulnex/
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated host allowlist. |
 | `DJANGO_USE_HTTPS` | `False` | Enables HSTS and `Secure` cookies when `True`. |
 | `DATABASE_URL` | (compose injects Postgres) | Database URL; SQLite if unset. |
-| `VAULT_MASTER_KEY` | — | **Required in production.** Fernet key (44-char base64) for the credential vault. See [SECURITY.md](SECURITY.md). |
+| `VAULT_MASTER_KEY` | — | **Required in production.** Fernet key (44-char base64) for the credential vault. |
 | `SITE_URL` | `http://localhost:8000` | Base URL for invitation links. |
 | `SEED_DEMO` | `1` | Run `seed_demo` on first boot. Set to `0` for a clean install. |
 | `DJANGO_BOOTSTRAP_USERNAME` / `_PASSWORD` / `_EMAIL` | `admin` / `admin1` / `admin@example.com` | Superuser created on first boot if no superuser exists. |
