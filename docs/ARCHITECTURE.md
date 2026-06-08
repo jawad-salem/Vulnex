@@ -142,7 +142,7 @@ Three supported topologies, all running the same image:
 - **Native** — `python manage.py runserver` against a host-installed Postgres + Redis. Used during development.
 - **Fly.io public demo** — `fly.toml` defines a `web` process (gunicorn) and a `worker` process (`celery -A vulnex worker -B`) on the same image. Postgres is `fly postgres`, broker is Upstash Redis. `SHOWCASE_MODE=True` and the hourly reset job are what make this safe to expose.
 
-The CI/CD pipeline (GitHub Actions, `.github/workflows/`) runs lint + test + security on every push and publishes the image to GHCR on a `v*` tag.
+A GitHub Actions release workflow (`.github/workflows/release.yml`) publishes the Docker image to GHCR on a `v*` tag.
 
 ## Things this doc doesn't cover
 

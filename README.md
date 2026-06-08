@@ -4,8 +4,6 @@
 
 ![Vulnex dashboard](docs/screenshots/Screenshot%202026-04-10%20034638.png)
 
-[![CI](https://github.com/jawad-salem/Vulnex/actions/workflows/ci.yml/badge.svg)](https://github.com/jawad-salem/Vulnex/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/jawad-salem/Vulnex/branch/main/graph/badge.svg)](https://codecov.io/gh/jawad-salem/Vulnex)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Django 5.x](https://img.shields.io/badge/django-5.x-092e20.svg)](https://www.djangoproject.com/)
