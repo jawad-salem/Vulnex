@@ -1,7 +1,0 @@
-# Development and CI tooling — installed in addition to requirements.txt
-# in the CI workflow. Not needed for production runtime.
-
-ruff>=0.5
-bandit>=1.7
-pip-audit>=2.7
-coverage>=7.4
