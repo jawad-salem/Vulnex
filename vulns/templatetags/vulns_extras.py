@@ -1,7 +1,7 @@
 """Markdown rendering for user-authored text (comments, finding bodies).
 
-Pipeline: raw → markdown → bleach allowlist → safe HTML. The allowlist comes
-from NEXT_STEPS 2.5/2.6 — basic inline formatting, code blocks, tables, no
+Pipeline: raw → markdown → bleach allowlist → safe HTML. The allowlist is
+intentionally minimal — basic inline formatting, code blocks, tables, no
 scripts/styles/iframes.
 
 The PDF generator reuses ``render_markdown`` and lowers the resulting HTML into
