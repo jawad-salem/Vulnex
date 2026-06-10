@@ -53,6 +53,7 @@ desktop.ini
 error.txt
 EVALUATION.md
 vulnex_mindmap.txt
+API_NOTES.md
 # Exported report PDFs dropped in the repo root (real reports live in
 # protected_media/, which is already ignored above).
 /*.pdf
