@@ -2,7 +2,7 @@
 
 > Open-source pentest workbench — engagement → recon → findings → review → PDF report → retest, in a single Django app.
 
-![Vulnex dashboard](docs/screenshots/Screenshot%202026-04-10%20034638.png)
+![Vulnex dashboard](docs/screenshots/01-dashboard.png)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
@@ -59,44 +59,44 @@ Sign in with any of the demo accounts above. Toggle showcase mode locally with `
 ## Feature tour
 
 ### Dashboard
-Severity counts, SLA-overdue widget, "assigned to me" widget, top-engagement charts.
+Risk score, active-engagement and finding counts, SLA-overdue and "assigned to me" widgets, severity/status charts, and an urgent-findings table.
 
-![Dashboard](docs/screenshots/Screenshot%202026-04-10%20034638.png)
+![Dashboard](docs/screenshots/01-dashboard.png)
 
-### Engagement detail
-Phase stepper, scope/RoE, members, recon hosts, finding rollup, quick actions.
+### Client overview
+Per-client rollup — findings by severity, SLA status, and every engagement for that client.
 
-![Engagement detail](docs/screenshots/Screenshot%202026-04-10%20034650.png)
+![Client overview](docs/screenshots/02-client-detail.png)
 
-### Findings list
-Severity chips, review-state badges, SLA pills, assignee filter, dedup-aware import.
+### Engagement setup
+Create an engagement with type, status, scope, and rules of engagement.
 
-![Findings list](docs/screenshots/Screenshot%202026-04-10%20034736.png)
+![Engagement setup](docs/screenshots/03-engagement-form.png)
 
-### Finding detail with CVSS preview
-Live CVSS v3.1 calculator, structured location fields, Markdown body, evidence, threaded comments.
+### Finding detail
+Severity and CVSS, review/approval workflow, SLA, retest tracking, evidence, threaded comments, and structured location — organised across tabs.
 
-![Finding detail](docs/screenshots/Screenshot%202026-04-10%20034743.png)
+![Finding detail](docs/screenshots/04-finding-detail.png)
 
-### Reconnaissance
-Built-in scanners (port, subdomain, tech, DNS, WHOIS, dirbrute), Celery-backed scheduling, Nmap XML import.
+### Evidence
+Authenticated evidence uploads per finding, plus Markdown-supported threaded comments (internal-only or client-visible).
 
-![Reconnaissance](docs/screenshots/Screenshot%202026-04-10%20034757.png)
+![Evidence](docs/screenshots/05-finding-evidence.png)
 
-### Methodology checklist
-OWASP-seeded checklists, per-engagement progress tracking, status pills.
+### Report templates
+Brand kits for generated PDFs — logo, colours, boilerplate, and per-client default templates.
 
-![Methodology](docs/screenshots/Screenshot%202026-04-10%20034808.png)
+![Report templates](docs/screenshots/06-report-templates.png)
 
-### Report generation
-PDF templates with brand kit (logo, colours, preamble, disclaimer), per-client default templates, cover preview.
+### Users & roles
+Role-based access — admin, pentester, reviewer, client — with per-engagement membership.
 
-![Report generation](docs/screenshots/Screenshot%202026-04-10%20034815.png)
+![Users](docs/screenshots/07-users.png)
 
-### Kill-chain diagram (red-team)
-DAG editor — entrypoints, hosts, identities, assets, objectives connected by techniques with optional ATT&CK IDs. Embedded into the technical PDF.
+### Audit log
+Append-only record of admin actions and security events — logins, MFA changes, report generation, user creation.
 
-![Attack path](docs/screenshots/Screenshot%202026-04-10%20034828.png)
+![Audit log](docs/screenshots/08-audit-log.png)
 
 ## Architecture
 
