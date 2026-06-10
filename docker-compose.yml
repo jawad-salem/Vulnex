@@ -24,6 +24,12 @@ services:
   web:
     build: .
     image: vulnex:local
+    # Disable IPv6 in the container. On some VM/Docker networks the container
+    # has no IPv6 route, so outbound connections to dual-stack hosts (e.g.
+    # smtp.gmail.com) try IPv6 first and fail with "Network is unreachable".
+    # Forcing IPv4-only resolves it.
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
     ports:
       - "8000:8000"
     environment:
