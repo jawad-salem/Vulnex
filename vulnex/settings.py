@@ -54,7 +54,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django_otp.middleware.OTPMiddleware',
     'accounts.middleware.MFARequiredMiddleware',
-    'vulnex.showcase.ShowcaseModeMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'accounts.middleware.PermissionsPolicyMiddleware',
@@ -85,7 +84,6 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'engagements.context_processors.engagement_role',
-                'vulnex.showcase.showcase_context',
             ],
         },
     },
@@ -312,29 +310,3 @@ SEVERITY_THRESHOLDS = {
     'low': 0.1,
     'info': 0.0,
 }
-
-# ── Showcase mode (public live demo) ──
-# When SHOWCASE_MODE=True:
-#  * the database is wiped and re-seeded hourly via Celery beat
-#    (vulnex.showcase_tasks.reset_showcase_database),
-#  * outbound email is silenced (locmem backend),
-#  * a banner is rendered on every page,
-#  * new admin user creation and new API key issuance are blocked at the
-#    middleware layer.
-SHOWCASE_MODE = os.environ.get('SHOWCASE_MODE', 'False').lower() == 'true'
-
-if SHOWCASE_MODE:
-    # Force outbound email into a memory queue so demo invitations / password
-    # resets never reach a real inbox.
-    EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
-
-    # Hourly reset job. The DatabaseScheduler in INSTALLED_APPS picks this up
-    # via django-celery-beat on first boot.
-    from celery.schedules import crontab as _crontab
-    CELERY_BEAT_SCHEDULE = {
-        **(globals().get('CELERY_BEAT_SCHEDULE') or {}),
-        'showcase-hourly-reset': {
-            'task': 'vulnex.showcase.reset_showcase_database',
-            'schedule': _crontab(minute=0),  # top of every hour
-        },
-    }

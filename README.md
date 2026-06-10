@@ -45,17 +45,6 @@ Open <http://localhost:8000> after `web` finishes boot. The entrypoint migrates,
 
 > The shipped `.env.example` runs with `DJANGO_DEBUG=True` and a known-bad `DJANGO_SECRET_KEY` so a fresh clone boots without configuration. Rotate every secret before exposing the instance to the public internet.
 
-### Live demo
-
-Public live demo: <https://vulnex-demo.fly.dev> (URL pending first deploy — see [`fly.toml`](fly.toml) for the bring-up commands). The instance runs in **showcase mode**:
-
-- "Public demo · resets hourly · do not enter real data" banner on every page.
-- Database wiped and re-seeded every hour by a Celery beat job (`vulnex.showcase.reset_showcase_database`) — anything you enter disappears at the top of the next hour.
-- Outbound email is silenced (locmem backend), so password resets / invitations never reach a real inbox.
-- New admin-account creation and API-key issuance are blocked at the middleware layer.
-
-Sign in with any of the demo accounts above. Toggle showcase mode locally with `SHOWCASE_MODE=True` in `.env` — note that the hourly reset requires a real Celery broker (Redis), not the in-memory default.
-
 ## Feature tour
 
 ### Dashboard
@@ -120,7 +109,7 @@ Append-only record of admin actions and security events — logins, MFA changes,
 
 ## Architecture
 
-Vulnex is a vanilla Django 5 app with one Postgres database, Redis as the Celery broker, and a single Gunicorn web service. Each domain lives in its own app: `accounts` (auth, MFA, audit log), `engagements` (scope, members, attack paths), `vulns` (findings, evidence, comments, imports), `recon` (scanners, hosts, scheduled scans), `methodology` (checklists), `reports` (templates, PDF generator), `credentials` (Fernet vault), `api` (DRF). HTML is server-rendered with a small amount of vanilla JS for live widgets (CVSS calculator, attack-path SVG renderer, Markdown preview); no SPA framework. Long-running work — recon scans, retest reminders, the showcase-mode hourly reset — runs in Celery workers backed by Redis.
+Vulnex is a vanilla Django 5 app with one Postgres database, Redis as the Celery broker, and a single Gunicorn web service. Each domain lives in its own app: `accounts` (auth, MFA, audit log), `engagements` (scope, members, attack paths), `vulns` (findings, evidence, comments, imports), `recon` (scanners, hosts, scheduled scans), `methodology` (checklists), `reports` (templates, PDF generator), `credentials` (Fernet vault), `api` (DRF). HTML is server-rendered with a small amount of vanilla JS for live widgets (CVSS calculator, attack-path SVG renderer, Markdown preview); no SPA framework. Long-running work — recon scans and retest reminders — runs in Celery workers backed by Redis.
 
 For the request lifecycle, data model, report-generation pipeline, web-vs-API auth split, and deployment topologies, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 

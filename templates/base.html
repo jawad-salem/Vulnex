@@ -8,13 +8,7 @@
     <link rel="stylesheet" href="/static/css/main.css">
     {% block extra_css %}{% endblock %}
 </head>
-<body{% if showcase_mode %} class="showcase-mode"{% endif %}>
-    {% if showcase_mode %}
-    <div class="showcase-banner" role="status" aria-live="polite">
-        <span class="showcase-banner-dot" aria-hidden="true"></span>
-        {{ showcase_banner }}
-    </div>
-    {% endif %}
+<body>
     {% if user.is_authenticated %}
     <div class="layout">
         <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">

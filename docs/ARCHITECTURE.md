@@ -11,7 +11,7 @@ That choice exists because pentesting workflows are read-heavy, form-driven, and
 ## App layout
 
 ```
-vulnex/                    # Django project (settings, root URLs, Celery, showcase mode)
+vulnex/                    # Django project (settings, root URLs, Celery)
 ├── accounts/              # Custom User, MFA, audit log, API keys, role middleware
 ├── engagements/           # Client → Engagement → Members → Notes → Activity log
 │                          # Attack-path DAG (path / node / edge) lives here too
@@ -29,10 +29,9 @@ vulnex/                    # Django project (settings, root URLs, Celery, showca
 └── docs/                  # API.md, ARCHITECTURE.md (this file), screenshots
 ```
 
-Two cross-cutting modules live at project level rather than in an app:
+One cross-cutting module lives at project level rather than in an app:
 
-- `vulnex/celery.py` — Celery app, autodiscovery, and explicit import of `vulnex.showcase_tasks` (which is *not* in `INSTALLED_APPS` and would otherwise be missed).
-- `vulnex/showcase.py` — `ShowcaseModeMiddleware` and the template context processor for the public Fly.io demo banner.
+- `vulnex/celery.py` — the Celery app and task autodiscovery.
 
 ## Data model
 
@@ -73,8 +72,7 @@ flowchart LR
     C2 --> C3[Auth]
     C3 --> C4[django-otp]
     C4 --> C5[MFARequiredMiddleware]
-    C5 --> C6[ShowcaseModeMiddleware]
-    C6 --> C7[CSP / clickjacking / permissions-policy]
+    C5 --> C7[CSP / clickjacking / permissions-policy]
     C7 --> C8[django-axes]
     C8 --> D[URLConf]
     D --> E[App view]
@@ -88,7 +86,6 @@ flowchart LR
 The middleware order is load-bearing — see `vulnex/settings.py:48` for the canonical list. A few specifics:
 
 - **`MFARequiredMiddleware`** redirects an authenticated user with a confirmed TOTP device but no verified session to the verification step. It does *not* force enrollment for users who never set up TOTP — that's policy.
-- **`ShowcaseModeMiddleware`** only fires when `SHOWCASE_MODE=True`. It 403s POSTs to `(accounts, user_create)` and `(accounts, api_key_create)` so the public demo can't be used to mint admin accounts.
 - **`django-axes` is last on purpose** so failed logins from earlier middleware are still observed for lockout.
 - **CSP nonces** are emitted by `csp.middleware.CSPMiddleware` and consumed by every `<script nonce="{{ request.csp_nonce }}">` in `templates/base.html`. Adding inline JS without a nonce will silently break under CSP.
 
@@ -127,26 +124,20 @@ A few non-obvious things:
 
 ## Background work (Celery + Redis)
 
-Two recurring kinds of jobs:
-
-1. **Recon scans** scheduled via `recon.ScheduledScan` and dispatched as Celery tasks. The scan runs in the worker, writes `DiscoveredHost` rows, and updates the scan record. The web app polls the scan's status field for the dashboard.
-2. **Showcase-mode hourly reset** — `vulnex.showcase_tasks.reset_showcase_database` runs at the top of every hour on the public demo. It flushes the database, recreates the bootstrap superuser, and re-seeds templates / methodologies / demo data. This requires a real Celery broker (Upstash Redis on Fly.io); the in-memory broker silently no-ops.
-
-`vulnex/celery.py` deliberately imports `vulnex.showcase_tasks` after `autodiscover_tasks()` because the module lives at project level rather than in an app, so autodiscovery would not find it.
+Recon scans are scheduled via `recon.ScheduledScan` and dispatched as Celery tasks. The scan runs in the worker, writes `DiscoveredHost` rows, and updates the scan record. The web app polls the scan's status field for the dashboard.
 
 ## Deployment shape
 
-Three supported topologies, all running the same image:
+Two supported topologies, both running the same image:
 
 - **Local Docker Compose** — `docker compose up`. Web (gunicorn) + db (postgres:16) + redis + celery worker + celery beat, all on a single network, with healthchecks and named volumes for static/media/protected-media/postgres.
 - **Native** — `python manage.py runserver` against a host-installed Postgres + Redis. Used during development.
-- **Fly.io public demo** — `fly.toml` defines a `web` process (gunicorn) and a `worker` process (`celery -A vulnex worker -B`) on the same image. Postgres is `fly postgres`, broker is Upstash Redis. `SHOWCASE_MODE=True` and the hourly reset job are what make this safe to expose.
 
 A GitHub Actions release workflow (`.github/workflows/release.yml`) publishes the Docker image to GHCR on a `v*` tag.
 
 ## Things this doc doesn't cover
 
-- **Frontend interaction details** — read `templates/base.html` and `static/css/main.css`. The base template owns the sidebar, mobile toggle, toast handling, keyboard shortcuts (`/`, `n`, `f`, `r`), and the showcase banner.
+- **Frontend interaction details** — read `templates/base.html` and `static/css/main.css`. The base template owns the sidebar, mobile toggle, toast handling, and keyboard shortcuts (`/`, `n`, `f`, `r`).
 - **Per-app URL maps** — `<app>/urls.py` in each app. The root URLConf is `vulnex/urls.py`.
 - **REST API surface** — `docs/API.md`, plus the live OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/`.
 - **Database migration history** — `<app>/migrations/`. There are no squashed migrations; every change is preserved.
