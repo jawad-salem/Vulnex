@@ -147,7 +147,10 @@ EMAIL_BACKEND = os.environ.get(
 )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
-EMAIL_USE_TLS = True
+# Port 587 uses STARTTLS (EMAIL_USE_TLS). If your network blocks 587, use
+# Gmail's SSL port 465: EMAIL_PORT=465, EMAIL_USE_SSL=True, EMAIL_USE_TLS=False.
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'False').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Vulnex <noreply@vulnex.local>')
