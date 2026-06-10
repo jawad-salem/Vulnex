@@ -40,6 +40,15 @@ services:
       DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-admin1}
       DJANGO_BOOTSTRAP_EMAIL: ${DJANGO_BOOTSTRAP_EMAIL:-admin@example.com}
       SEED_DEMO: ${SEED_DEMO:-1}
+      # Email — pulled from the host .env (compose reads ./.env for ${...}).
+      # Without these the container falls back to the console backend and
+      # "sends" mail to its own logs instead of a real inbox.
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: "${DEFAULT_FROM_EMAIL:-Vulnex <noreply@vulnex.local>}"
     volumes:
       - static_data:/app/staticfiles
       - media_data:/app/media
