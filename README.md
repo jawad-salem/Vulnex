@@ -181,6 +181,7 @@ cp .env.example .env
 python manage.py migrate
 python manage.py seed_templates
 python manage.py seed_methodologies
+python manage.py seed_demo          # optional: demo client, engagements, findings, and demo-* accounts
 python manage.py createsuperuser
 python manage.py runserver
 ```
