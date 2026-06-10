@@ -73,30 +73,50 @@ Create an engagement with type, status, scope, and rules of engagement.
 
 ![Engagement setup](docs/screenshots/03-engagement-form.png)
 
+### Reconnaissance
+Built-in scanners (port, subdomain, tech, DNS, dirbrute) with single or chained multi-scan, Celery-backed scheduling, discovered-host tracking, and Nmap XML import.
+
+![Reconnaissance](docs/screenshots/04-recon.png)
+
+### Methodology checklist
+OWASP WSTG-seeded checklists with per-engagement progress tracking and status dropdowns.
+
+![Methodology](docs/screenshots/05-methodology.png)
+
+### Findings list
+Severity chips, CVSS, review-state badges, SLA due dates, severity/status/assignee filters, dedup-aware import, and CSV/JSON export.
+
+![Findings list](docs/screenshots/06-findings-list.png)
+
 ### Finding detail
 Severity and CVSS, review/approval workflow, SLA, retest tracking, evidence, threaded comments, and structured location — organised across tabs.
 
-![Finding detail](docs/screenshots/04-finding-detail.png)
+![Finding detail](docs/screenshots/07-finding-detail.png)
 
 ### Evidence
 Authenticated evidence uploads per finding, plus Markdown-supported threaded comments (internal-only or client-visible).
 
-![Evidence](docs/screenshots/05-finding-evidence.png)
+![Evidence](docs/screenshots/08-finding-evidence.png)
+
+### Kill-chain diagram (red-team)
+DAG editor — entrypoints, hosts, identities, assets, objectives connected by techniques with optional ATT&CK IDs. Embedded into the technical PDF.
+
+![Kill-chain diagram](docs/screenshots/09-kill-chain.png)
 
 ### Report templates
 Brand kits for generated PDFs — logo, colours, boilerplate, and per-client default templates.
 
-![Report templates](docs/screenshots/06-report-templates.png)
+![Report templates](docs/screenshots/10-report-templates.png)
 
 ### Users & roles
 Role-based access — admin, pentester, reviewer, client — with per-engagement membership.
 
-![Users](docs/screenshots/07-users.png)
+![Users](docs/screenshots/11-users.png)
 
 ### Audit log
 Append-only record of admin actions and security events — logins, MFA changes, report generation, user creation.
 
-![Audit log](docs/screenshots/08-audit-log.png)
+![Audit log](docs/screenshots/12-audit-log.png)
 
 ## Architecture
 
