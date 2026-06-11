@@ -3039,6 +3039,53 @@ select.form-input option {
     box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* ── Auth page polish (login / MFA) ── */
+.auth-page {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(60% 50% at 50% -5%, rgba(91, 141, 255, 0.10), transparent 60%),
+        radial-gradient(50% 50% at 100% 100%, rgba(46, 230, 166, 0.06), transparent 55%),
+        var(--bg-primary);
+}
+.auth-page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--border-light) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border-light) 1px, transparent 1px);
+    background-size: 38px 38px;
+    -webkit-mask-image: radial-gradient(circle at 50% 40%, #000, transparent 70%);
+            mask-image: radial-gradient(circle at 50% 40%, #000, transparent 70%);
+    opacity: 0.5;
+    pointer-events: none;
+}
+.auth-card {
+    position: relative;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+.auth-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(90deg, var(--critical), var(--high), var(--medium), var(--low), var(--info));
+}
+.auth-logo {
+    display: inline-grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 12px;
+    border-radius: 14px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), #7b5cff);
+    box-shadow: 0 8px 22px rgba(91, 141, 255, 0.35);
+}
+.auth-brand h1 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em; }
+
 /* ── Severity row accent (findings / lists) ── */
 .sev-row td:first-child { box-shadow: inset 3px 0 0 var(--border); }
 .sev-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--critical); }
