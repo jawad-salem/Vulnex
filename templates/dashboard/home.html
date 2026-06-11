@@ -2,146 +2,189 @@
 {% load humanize %}
 {% block title %}Dashboard — Vulnex{% endblock %}
 {% block content %}
+<div class="dash">
 <div class="page-header">
     <div>
         <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">Welcome back, {{ user.first_name|default:user.username }}</p>
+        <p class="page-subtitle">Portfolio overview · welcome back, {{ user.first_name|default:user.username }}</p>
     </div>
     {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Risk Score</div>
-        <div class="stat-value" style="color:{{ risk_color }}">{{ overall_risk_score }}</div>
-        <div class="stat-sublabel" style="color:{{ risk_color }}">{{ risk_label }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Active engagements</div>
-        <div class="stat-value">{{ active_engagements }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Total findings</div>
-        <div class="stat-value">{{ total_findings }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Critical / High</div>
-        <div class="stat-value critical">{{ severity_counts.critical }}</div>
-        <div class="stat-sublabel high">{{ severity_counts.high }} high</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Overdue findings</div>
-        <div class="stat-value{% if overdue_count %} critical{% endif %}">{{ overdue_count }}</div>
-        <div class="stat-sublabel{% if due_soon_count %} high{% endif %}">{{ due_soon_count }} due soon</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Assigned to me</div>
-        <div class="stat-value">{{ my_assigned_count }}</div>
-        <div class="stat-sublabel{% if my_assigned_overdue %} critical{% endif %}">{{ my_assigned_overdue }} overdue</div>
-    </div>
-</div>
-
-<!-- Charts row -->
 {% if total_findings > 0 %}
-<div class="grid-2 mb-4">
-    <div class="card">
-        <h2 class="card-title mb-3">Severity distribution</h2>
-        <div class="chart-container">
-            <canvas id="severityChart"></canvas>
-        </div>
+<!-- ── Severity spectrum hero ── -->
+<section class="spectrum">
+    <div class="spectrum-top">
+        <span class="spectrum-lab">Severity Spectrum</span>
+        <span class="spectrum-tot">{{ total_findings }}<small>total findings</small></span>
     </div>
-    <div class="card">
-        <h2 class="card-title mb-3">Finding status</h2>
-        <div class="chart-container">
-            <canvas id="statusChart"></canvas>
-        </div>
+    <div class="spec-bar">
+        {% if severity_counts.critical %}<div class="spec-seg s-crit" style="flex:{{ severity_counts.critical }}"><span class="n">{{ severity_counts.critical }}</span><span class="k">Critical</span></div>{% endif %}
+        {% if severity_counts.high %}<div class="spec-seg s-high" style="flex:{{ severity_counts.high }}"><span class="n">{{ severity_counts.high }}</span><span class="k">High</span></div>{% endif %}
+        {% if severity_counts.medium %}<div class="spec-seg s-med" style="flex:{{ severity_counts.medium }}"><span class="n">{{ severity_counts.medium }}</span><span class="k">Medium</span></div>{% endif %}
+        {% if severity_counts.low %}<div class="spec-seg s-low" style="flex:{{ severity_counts.low }}"><span class="n">{{ severity_counts.low }}</span><span class="k">Low</span></div>{% endif %}
+        {% if severity_counts.info %}<div class="spec-seg s-info" style="flex:{{ severity_counts.info }}"><span class="n">{{ severity_counts.info }}</span><span class="k">Info</span></div>{% endif %}
     </div>
-</div>
-<div class="grid-2 mb-4">
-    <div class="card">
-        <h2 class="card-title mb-3">Findings over time</h2>
-        <div class="chart-container-wide">
-            <canvas id="timelineChart"></canvas>
-        </div>
-    </div>
-    <div class="card">
-        <h2 class="card-title mb-3">Top engagements</h2>
-        <div class="chart-container-wide">
-            <canvas id="engChart"></canvas>
-        </div>
-    </div>
-</div>
+</section>
 {% endif %}
 
-{% if overdue_findings %}
-<div class="card mb-4">
-    <div class="card-header">
-        <h2 class="card-title">Overdue findings</h2>
-        <span class="text-xs text-muted">{{ overdue_count }} past due</span>
+<!-- ── KPI cards ── -->
+<div class="dash-kpis">
+    <div class="dkpi">
+        <div class="dkpi-top"><span class="dkpi-lab">Active Engagements</span>
+            <span class="dkpi-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span></div>
+        <div class="dkpi-v">{{ active_engagements }}</div>
+        <div class="dkpi-d">across the portfolio</div>
     </div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>Due</th><th>Overdue</th></tr></thead>
-            <tbody>
-            {% for f in overdue_findings %}
-            <tr>
-                <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
-                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
-                <td class="text-sm text-secondary">{{ f.due_date|date:"M d, Y" }}</td>
-                <td><span class="badge badge-overdue">{{ f.overdue_days }}d</span></td>
-            </tr>
+    <div class="dkpi is-crit">
+        <div class="dkpi-top"><span class="dkpi-lab">Critical Open</span>
+            <span class="dkpi-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></span></div>
+        <div class="dkpi-v">{{ severity_counts.critical }}</div>
+        <div class="dkpi-d"><b{% if severity_counts.high %} class="bad"{% endif %}>{{ severity_counts.high }}</b> high severity</div>
+    </div>
+    <div class="dkpi is-warn">
+        <div class="dkpi-top"><span class="dkpi-lab">Overdue SLA</span>
+            <span class="dkpi-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span></div>
+        <div class="dkpi-v">{{ overdue_count }}</div>
+        <div class="dkpi-d"><b{% if due_soon_count %} class="bad"{% endif %}>{{ due_soon_count }}</b> due ≤ 3 days</div>
+    </div>
+    <div class="dkpi">
+        <div class="dkpi-top"><span class="dkpi-lab">My Queue</span>
+            <span class="dkpi-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span></div>
+        <div class="dkpi-v">{{ my_assigned_count }}</div>
+        <div class="dkpi-d"><b{% if my_assigned_overdue %} class="bad"{% endif %}>{{ my_assigned_overdue }}</b> overdue</div>
+    </div>
+</div>
+
+<!-- ── Two-column body ── -->
+<div class="dash-cols">
+    <!-- LEFT -->
+    <div>
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Priority Findings</span><span class="badge-soft">open · critical + high</span></div>
+            {% if urgent_findings %}
+            <div class="table-wrap"><table>
+                <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>CVSS</th></tr></thead>
+                <tbody>
+                {% for f in urgent_findings %}
+                <tr>
+                    <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:54 }}</a>{% if f.host %}<div class="f-meta">{{ f.host }}{% if f.cwe_id %} · {{ f.cwe_id }}{% endif %}</div>{% endif %}</td>
+                    <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                    <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
+                    <td class="text-mono">{{ f.cvss_score|floatformat:1 }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <div class="empty-state compact"><p class="text-secondary">No open critical or high findings. 🎉</p></div>
+            {% endif %}
+        </div>
+
+        {% if overdue_findings %}
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Overdue Findings</span><span class="badge-soft">{{ overdue_count }} past due</span></div>
+            <div class="table-wrap"><table>
+                <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>Overdue</th></tr></thead>
+                <tbody>
+                {% for f in overdue_findings %}
+                <tr>
+                    <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
+                    <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                    <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:18 }}</a></td>
+                    <td><span class="badge badge-overdue">{{ f.overdue_days }}d</span></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+        </div>
+        {% endif %}
+
+        {% if total_findings > 0 %}
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Findings Over Time</span><span class="badge-soft">last 30 days</span></div>
+            <div style="padding:14px 16px"><div class="chart-container-wide"><canvas id="timelineChart"></canvas></div></div>
+        </div>
+        {% endif %}
+
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Top Engagements</span><span class="badge-soft">by findings</span></div>
+            {% if top_engagements %}
+            {% for e in top_engagements %}
+            <div class="erow">
+                <span class="rk">{{ forloop.counter|stringformat:"02d" }}</span>
+                <div class="info">
+                    <div class="nm"><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></div>
+                    <div class="ty">{{ e.get_engagement_type_display }} · {{ e.get_status_display }}</div>
+                </div>
+                <div class="barw"><i style="width:{% widthratio e.fcount top_eng_max 100 %}%"></i></div>
+                <div class="ct">{{ e.fcount }}</div>
+            </div>
             {% endfor %}
-            </tbody>
-        </table>
+            {% else %}
+            <div class="empty-state compact"><p class="text-secondary">No findings logged yet.</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Risk Index</span><span class="badge-soft">CVSS-weighted</span></div>
+            <div class="risk-row">
+                <div class="risk-gauge" style="--p:{{ overall_risk_score }};--rc:{{ risk_color }}"><b style="color:{{ risk_color }}">{{ overall_risk_score }}</b></div>
+                <div class="risk-meta">
+                    <div class="lvl" style="color:{{ risk_color }}">{{ risk_label }}</div>
+                    <p>{% if severity_counts.critical %}Driven by {{ severity_counts.critical }} critical finding{{ severity_counts.critical|pluralize }} across the portfolio.{% else %}No critical findings open right now.{% endif %}</p>
+                </div>
+            </div>
+        </div>
+
+        {% if total_findings > 0 %}
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Finding Status</span><span class="badge-soft">lifecycle</span></div>
+            <div style="padding:6px 4px">
+                <div class="statline"><span class="dot" style="background:var(--critical)"></span><span class="nm">Open</span><span class="track"><i style="width:{% widthratio status_counts.open status_max 100 %}%;background:var(--critical)"></i></span><span class="n">{{ status_counts.open }}</span></div>
+                <div class="statline"><span class="dot" style="background:var(--high)"></span><span class="nm">Confirmed</span><span class="track"><i style="width:{% widthratio status_counts.confirmed status_max 100 %}%;background:var(--high)"></i></span><span class="n">{{ status_counts.confirmed }}</span></div>
+                <div class="statline"><span class="dot" style="background:var(--success)"></span><span class="nm">Remediated</span><span class="track"><i style="width:{% widthratio status_counts.remediated status_max 100 %}%;background:var(--success)"></i></span><span class="n">{{ status_counts.remediated }}</span></div>
+                <div class="statline"><span class="dot" style="background:var(--info)"></span><span class="nm">False Positive</span><span class="track"><i style="width:{% widthratio status_counts.false_positive status_max 100 %}%;background:var(--info)"></i></span><span class="n">{{ status_counts.false_positive }}</span></div>
+                <div class="statline"><span class="dot" style="background:var(--medium)"></span><span class="nm">Accepted</span><span class="track"><i style="width:{% widthratio status_counts.accepted status_max 100 %}%;background:var(--medium)"></i></span><span class="n">{{ status_counts.accepted }}</span></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="dcard">
+            <div class="dcard-h"><span class="t">Recent Activity</span><span class="badge-soft">latest</span></div>
+            {% if recent_activity %}
+            <div class="dfeed">
+                {% for a in recent_activity|slice:":8" %}
+                <div class="fi"><span class="d"></span><span class="tx"><b>{{ a.user.username|default:"system" }}</b> {{ a.action|truncatechars:64 }}</span><span class="tm">{{ a.timestamp|timesince }}</span></div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state compact"><p class="text-secondary">No activity yet.</p></div>
+            {% endif %}
+        </div>
     </div>
 </div>
-{% endif %}
 
-{% if urgent_findings %}
-<div class="card mb-4">
-    <div class="card-header">
-        <h2 class="card-title">Urgent findings</h2>
-    </div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>CVSS</th></tr></thead>
-            <tbody>
-            {% for f in urgent_findings %}
-            <tr>
-                <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
-                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
-                <td class="text-mono">{{ f.cvss_score|floatformat:1 }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
-
-<div class="card mb-4">
-    <div class="card-header">
-        <h2 class="card-title">Recent engagements</h2>
-        <a href="{% url 'engagements:list' %}" class="btn btn-sm">View all</a>
-    </div>
+<!-- ── Recent engagements ── -->
+<div class="dcard" style="margin-top:2px">
+    <div class="dcard-h"><span class="t">Recent Engagements</span><a href="{% url 'engagements:list' %}" class="badge-soft">View all</a></div>
     {% if recent_engagements %}
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
-            <tbody>
-            {% for e in recent_engagements %}
-            <tr>
-                <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
-                <td>{{ e.client_name }}</td>
-                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
-                <td class="text-mono">{{ e.finding_count }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <div class="table-wrap"><table>
+        <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
+        <tbody>
+        {% for e in recent_engagements %}
+        <tr>
+            <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
+            <td>{{ e.client_name }}</td>
+            <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+            <td class="text-mono">{{ e.finding_count }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
     {% else %}
     <div class="empty-state">
         <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
@@ -150,104 +193,44 @@
     </div>
     {% endif %}
 </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 {% if total_findings > 0 %}
-{{ severity_counts|json_script:"chart-severity-data" }}
-{{ status_counts|json_script:"chart-status-data" }}
 {{ timeline_labels|json_script:"chart-timeline-labels" }}
 {{ timeline_data|json_script:"chart-timeline-data" }}
-{{ top_eng_labels|json_script:"chart-eng-labels" }}
-{{ top_eng_data|json_script:"chart-eng-data" }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script nonce="{{ request.csp_nonce }}">
 (function() {
-    var fontColor = '#8b949e';
-    var gridColor = 'rgba(48, 54, 61, 0.6)';
-
-    Chart.defaults.color = fontColor;
-    Chart.defaults.font.family = "'Segoe UI', sans-serif";
+    Chart.defaults.color = '#94a1b2';
+    Chart.defaults.font.family = "'Public Sans', sans-serif";
     Chart.defaults.font.size = 12;
-    Chart.defaults.plugins.legend.labels.boxWidth = 12;
-    Chart.defaults.plugins.legend.labels.padding = 16;
+    var gridColor = 'rgba(34, 42, 56, 0.7)';
 
-    // Severity donut
-    var sevData = JSON.parse(document.getElementById('chart-severity-data').textContent);
-    new Chart(document.getElementById('severityChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
-            datasets: [{
-                data: [sevData.critical, sevData.high, sevData.medium, sevData.low, sevData.info],
-                backgroundColor: [
-                    'rgba(240, 88, 83, 0.8)',
-                    'rgba(240, 146, 54, 0.8)',
-                    'rgba(227, 179, 65, 0.8)',
-                    'rgba(88, 166, 255, 0.8)',
-                    'rgba(139, 148, 158, 0.8)'
-                ],
-                borderColor: '#1f2638',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    // Status donut
-    var statusData = JSON.parse(document.getElementById('chart-status-data').textContent);
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Open', 'Confirmed', 'Remediated', 'False Positive', 'Accepted'],
-            datasets: [{
-                data: [statusData.open, statusData.confirmed, statusData.remediated, statusData.false_positive, statusData.accepted],
-                backgroundColor: [
-                    'rgba(240, 88, 83, 0.8)',
-                    'rgba(240, 146, 54, 0.8)',
-                    'rgba(63, 185, 80, 0.8)',
-                    'rgba(139, 148, 158, 0.8)',
-                    'rgba(227, 179, 65, 0.8)'
-                ],
-                borderColor: '#1f2638',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    // Timeline line chart
     var timeLabels = JSON.parse(document.getElementById('chart-timeline-labels').textContent);
     var timeData = JSON.parse(document.getElementById('chart-timeline-data').textContent);
-    if (timeLabels.length > 0) {
-        new Chart(document.getElementById('timelineChart'), {
+    var el = document.getElementById('timelineChart');
+    if (el && timeLabels.length > 0) {
+        var ctx = el.getContext('2d');
+        var grad = ctx.createLinearGradient(0, 0, 0, 220);
+        grad.addColorStop(0, 'rgba(91, 141, 255, 0.28)');
+        grad.addColorStop(1, 'rgba(91, 141, 255, 0.01)');
+        new Chart(el, {
             type: 'line',
             data: {
                 labels: timeLabels,
                 datasets: [{
                     label: 'Findings',
                     data: timeData,
-                    borderColor: '#7a60e0',
-                    backgroundColor: 'rgba(122, 96, 224, 0.1)',
+                    borderColor: '#5b8dff',
+                    backgroundColor: grad,
                     fill: true,
-                    tension: 0.3,
-                    pointBackgroundColor: '#7a60e0',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    tension: 0.35,
+                    pointBackgroundColor: '#5b8dff',
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -257,36 +240,6 @@
                 scales: {
                     x: { grid: { color: gridColor }, ticks: { maxTicksLimit: 8 } },
                     y: { grid: { color: gridColor }, beginAtZero: true, ticks: { stepSize: 1 } }
-                }
-            }
-        });
-    }
-
-    // Top engagements bar chart
-    var engLabels = JSON.parse(document.getElementById('chart-eng-labels').textContent);
-    var engData = JSON.parse(document.getElementById('chart-eng-data').textContent);
-    if (engLabels.length > 0) {
-        new Chart(document.getElementById('engChart'), {
-            type: 'bar',
-            data: {
-                labels: engLabels,
-                datasets: [{
-                    label: 'Findings',
-                    data: engData,
-                    backgroundColor: 'rgba(122, 96, 224, 0.6)',
-                    borderColor: '#7a60e0',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: gridColor }, beginAtZero: true, ticks: { stepSize: 1 } },
-                    y: { grid: { display: false } }
                 }
             }
         });

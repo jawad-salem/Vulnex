@@ -151,49 +151,79 @@
     <!-- Evidence tab -->
     <div class="tab-panel" id="tab-evidence" role="tabpanel">
         <div class="card">
-            <div class="card-header">
+            <div class="ev-toolbar">
                 <h2 class="card-title">Evidence</h2>
-                <span class="text-xs text-muted">{{ evidence|length }} item{{ evidence|length|pluralize }}</span>
+                <span class="ev-count">{{ evidence|length }} item{{ evidence|length|pluralize }}</span>
             </div>
             {% if evidence %}
-            {% for ev in evidence %}
-            <div class="evidence-item">
-                {% if ev.is_image %}
-                <img src="{% url 'vulns:evidence_download' ev.pk %}" alt="{{ ev.caption }}">
-                {% else %}
-                <div class="evidence-file">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <a href="{% url 'vulns:evidence_download' ev.pk %}">{{ ev.file.name|cut:"evidence/" }}</a>
-                </div>
-                {% endif %}
-                {% if ev.caption %}<div class="evidence-caption">{{ ev.caption }}</div>{% endif %}
+            <div class="ev-gallery">
+                {% for ev in evidence %}
+                <figure class="ev-card">
+                    {% if ev.is_image %}
+                    <a class="ev-thumb" href="{% url 'vulns:evidence_download' ev.pk %}"
+                       data-lightbox data-cap="{{ ev.caption|default:ev.file.name|basename }}">
+                        <img src="{% url 'vulns:evidence_download' ev.pk %}" alt="{{ ev.caption|default:'Evidence' }}" loading="lazy">
+                        <span class="ev-zoom"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg></span>
+                    </a>
+                    {% else %}
+                    <div class="ev-thumb ev-thumb--file">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span class="ext">{{ ev.file.name|file_ext }}</span>
+                    </div>
+                    {% endif %}
+                    <figcaption class="ev-body">
+                        <span class="ev-name">{{ ev.caption|default:ev.file.name|basename }}</span>
+                        <span class="ev-meta">
+                            {% if ev.uploaded_by %}<span class="av" style="background:{{ ev.uploaded_by.avatar_color }}">{{ ev.uploaded_by.initials }}</span>{% endif %}
+                            <span>{{ ev.uploaded_at|date:"M d, Y" }}</span>
+                        </span>
+                    </figcaption>
+                    <div class="ev-actions">
+                        <a href="{% url 'vulns:evidence_download' ev.pk %}" download>Download</a>
+                        <a href="{% url 'vulns:evidence_download' ev.pk %}" target="_blank" rel="noopener">Open</a>
+                    </div>
+                </figure>
+                {% endfor %}
             </div>
-            {% endfor %}
             {% else %}
             <div class="empty-state compact">
-                <p class="text-secondary text-sm">No evidence uploaded yet.</p>
+                <div class="empty-state__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15l-5-5L5 21"/><path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg></div>
+                <p class="empty-state__title">No evidence yet</p>
+                <p class="empty-state__subtitle">Screenshots, request/response captures, and proof files attached to this finding will appear here as a gallery.</p>
             </div>
             {% endif %}
         </div>
 
         {% if can_edit %}
         <div class="card mt-4">
-            <h2 class="card-title mb-3">Upload evidence</h2>
-            <form method="post" enctype="multipart/form-data">
+            <h2 class="card-title mb-3">Add evidence</h2>
+            <form method="post" enctype="multipart/form-data" id="evidenceForm">
                 {% csrf_token %}
                 <input type="hidden" name="upload_evidence" value="1">
-                <div class="form-group">
-                    <label>File</label>
+                <label class="ev-drop" id="evDrop">
+                    <span class="ev-drop-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                    <span class="ev-drop-text">
+                        <b>Click to choose a file</b> or drop it here
+                        <small>PNG, JPG, PDF, logs — attached to this finding</small>
+                        <span class="ev-file-name" id="evFileName" hidden></span>
+                    </span>
                     {{ evidence_form.file }}
-                </div>
-                <div class="form-group">
-                    <label>Caption</label>
+                </label>
+                <div class="form-group mt-3">
+                    <label>Caption <span class="text-muted">(optional)</span></label>
                     {{ evidence_form.caption }}
                 </div>
-                <button type="submit" class="btn btn-primary">Upload</button>
+                <button type="submit" class="btn btn-primary">Upload evidence</button>
             </form>
         </div>
         {% endif %}
+
+        <!-- Lightbox -->
+        <div class="ev-lightbox" id="evLightbox" role="dialog" aria-modal="true">
+            <button class="ev-lightbox-close" id="evLightboxClose" aria-label="Close">&times;</button>
+            <img src="" alt="Evidence preview" id="evLightboxImg">
+            <div class="ev-lightbox-cap" id="evLightboxCap" hidden></div>
+        </div>
     </div>
 
     <!-- CVSS tab -->
@@ -526,6 +556,58 @@
     var hash = (location.hash || '').replace('#', '');
     if (hash && document.getElementById('tab-' + hash)) {
         activate(hash);
+    }
+
+    // ── Evidence lightbox ──
+    var lb = document.getElementById('evLightbox');
+    if (lb) {
+        var lbImg = document.getElementById('evLightboxImg');
+        var lbCap = document.getElementById('evLightboxCap');
+        var closeLb = function() { lb.classList.remove('open'); lbImg.src = ''; };
+        document.querySelectorAll('[data-lightbox]').forEach(function(a) {
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                lbImg.src = this.getAttribute('href');
+                var cap = this.getAttribute('data-cap') || '';
+                lbCap.textContent = cap;
+                lbCap.hidden = !cap;
+                lb.classList.add('open');
+            });
+        });
+        document.getElementById('evLightboxClose').addEventListener('click', closeLb);
+        lb.addEventListener('click', function(e) { if (e.target === lb) closeLb(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && lb.classList.contains('open')) closeLb();
+        });
+    }
+
+    // ── Evidence dropzone: filename echo + drag highlight ──
+    var drop = document.getElementById('evDrop');
+    if (drop) {
+        var fileInput = drop.querySelector('input[type="file"]');
+        var nameEl = document.getElementById('evFileName');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files && fileInput.files.length) {
+                    nameEl.textContent = '✓ ' + fileInput.files[0].name;
+                    nameEl.hidden = false;
+                } else {
+                    nameEl.hidden = true;
+                }
+            });
+            ['dragenter', 'dragover'].forEach(function(ev) {
+                drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.add('is-drag'); });
+            });
+            ['dragleave', 'drop'].forEach(function(ev) {
+                drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.remove('is-drag'); });
+            });
+            drop.addEventListener('drop', function(e) {
+                if (e.dataTransfer && e.dataTransfer.files.length) {
+                    fileInput.files = e.dataTransfer.files;
+                    fileInput.dispatchEvent(new Event('change'));
+                }
+            });
+        }
     }
 })();
 </script>
