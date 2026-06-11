@@ -3039,3 +3039,11 @@ select.form-input option {
     box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* ── Severity row accent (findings / lists) ── */
+.sev-row td:first-child { box-shadow: inset 3px 0 0 var(--border); }
+.sev-row--critical td:first-child { box-shadow: inset 3px 0 0 var(--critical); }
+.sev-row--high td:first-child { box-shadow: inset 3px 0 0 var(--high); }
+.sev-row--medium td:first-child { box-shadow: inset 3px 0 0 var(--medium); }
+.sev-row--low td:first-child { box-shadow: inset 3px 0 0 var(--low); }
+.sev-row--info td:first-child { box-shadow: inset 3px 0 0 var(--info); }
+

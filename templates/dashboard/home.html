@@ -67,7 +67,7 @@
                 <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>CVSS</th></tr></thead>
                 <tbody>
                 {% for f in urgent_findings %}
-                <tr>
+                <tr class="sev-row sev-row--{{ f.severity }}">
                     <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:54 }}</a>{% if f.host %}<div class="f-meta">{{ f.host }}{% if f.cwe_id %} · {{ f.cwe_id }}{% endif %}</div>{% endif %}</td>
                     <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
                     <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
@@ -88,7 +88,7 @@
                 <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>Overdue</th></tr></thead>
                 <tbody>
                 {% for f in overdue_findings %}
-                <tr>
+                <tr class="sev-row sev-row--{{ f.severity }}">
                     <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
                     <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
                     <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:18 }}</a></td>

@@ -225,7 +225,7 @@
                     </thead>
                     <tbody>
                     {% for f in findings %}
-                    <tr>
+                    <tr class="sev-row sev-row--{{ f.severity }}">
                         <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:50 }}</strong></a></td>
                         <td class="text-mono text-sm">{{ f.host|default:"—" }}{% if f.port %}<span class="text-muted">:{{ f.port }}</span>{% endif %}</td>
                         <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
