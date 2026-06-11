@@ -936,14 +936,37 @@ select.form-input.form-input--compact {
     display: grid;
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
     margin-bottom: 16px;
 }
 .overview-grid > .overview-card {
     margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
 }
+/* Scope panel grows to match the Quick-actions column so a short scope
+   reads as a deliberate "scope.txt" panel instead of leaving a dead gap. */
+.overview-card > .mono-block,
+.overview-card > .scope-empty {
+    flex: 1;
+}
+.overview-card > .mono-block.scope-list {
+    display: flex;
+    flex-direction: column;
+}
+.scope-list-cursor {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-light);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}
+.scope-list-cursor::before { content: '$ '; color: var(--accent-light); font-weight: 700; }
 @media (max-width: 900px) {
     .overview-grid { grid-template-columns: 1fr; }
+    .overview-card > .mono-block.scope-list { min-height: 0; }
 }
 
 /* ── Quick actions (overview) ── */

@@ -111,10 +111,11 @@
                     {% endif %}
                 </div>
                 {% if engagement.scope_targets %}
-                <div class="mono-block">
+                <div class="mono-block scope-list">
                     {% for target in engagement.scope_targets %}
                     <div class="scope-target">{{ target }}</div>
                     {% endfor %}
+                    <div class="scope-list-cursor">{{ engagement.scope_targets|length }} target{{ engagement.scope_targets|length|pluralize }} authorized<span class="scope-empty-cursor"></span></div>
                 </div>
                 {% else %}
                 <div class="scope-empty">
