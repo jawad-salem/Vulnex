@@ -3070,9 +3070,11 @@ select.form-input option {
     align-items: start;
 }
 .finding-overview__main { min-width: 0; }
+.finding-overview__side { position: sticky; top: 16px; }
 .finding-overview__side .card { margin-bottom: 0; }
 @media (max-width: 960px) {
     .finding-overview { grid-template-columns: 1fr; }
+    .finding-overview__side { position: static; }
 }
 
 /* Inline CVSS vector chips (replaces the old CVSS tab) */
