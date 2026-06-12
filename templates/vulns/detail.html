@@ -102,50 +102,99 @@
 
     <!-- Overview tab -->
     <div class="tab-panel active" id="tab-overview" role="tabpanel">
-        <div class="card">
-            <h2 class="card-title mb-3">Description</h2>
-            <div class="prose">{{ finding.description|markdown }}</div>
-        </div>
+        <div class="finding-overview">
+            <div class="finding-overview__main">
+                <div class="card">
+                    <h2 class="card-title mb-3">Description</h2>
+                    <div class="prose">{{ finding.description|markdown }}</div>
+                </div>
 
-        {% if finding.proof_of_concept %}
-        <div class="card mt-4">
-            <h2 class="card-title mb-3">Proof of concept</h2>
-            <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
-        </div>
-        {% endif %}
-
-        {% if finding.remediation %}
-        <div class="card mt-4">
-            <h2 class="card-title mb-3">Remediation</h2>
-            <div class="prose">{{ finding.remediation|markdown }}</div>
-        </div>
-        {% endif %}
-
-        {% if finding.affected_hosts %}
-        <div class="card mt-4">
-            <h2 class="card-title mb-3">Affected hosts</h2>
-            <div class="mono-block">
-                {% for host in finding.affected_hosts.splitlines %}
-                {% if host.strip %}<div class="scope-target">{{ host }}</div>{% endif %}
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if finding.references %}
-        <div class="card mt-4">
-            <h2 class="card-title mb-3">References</h2>
-            <div class="text-sm">
-                {% for ref in finding.references.splitlines %}
-                {% if ref.strip %}
-                <div style="padding:4px 0" class="text-break">
-                    {% if "http" in ref %}<a href="{{ ref.strip }}">{{ ref.strip }}</a>{% else %}{{ ref.strip }}{% endif %}
+                {% if finding.proof_of_concept %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">Proof of concept</h2>
+                    <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
                 </div>
                 {% endif %}
-                {% endfor %}
+
+                {% if finding.remediation %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">Remediation</h2>
+                    <div class="prose">{{ finding.remediation|markdown }}</div>
+                </div>
+                {% endif %}
+
+                {% if finding.affected_hosts %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">Affected hosts</h2>
+                    <div class="mono-block">
+                        {% for host in finding.affected_hosts.splitlines %}
+                        {% if host.strip %}<div class="scope-target">{{ host }}</div>{% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if finding.references %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">References</h2>
+                    <div class="text-sm">
+                        {% for ref in finding.references.splitlines %}
+                        {% if ref.strip %}
+                        <div style="padding:4px 0" class="text-break">
+                            {% if "http" in ref %}<a href="{{ ref.strip }}">{{ ref.strip }}</a>{% else %}{{ ref.strip }}{% endif %}
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
+
+            <aside class="finding-overview__side">
+                {% if finding.host or finding.url or finding.endpoint or finding.parameter %}
+                <div class="card">
+                    <h2 class="card-title mb-3">Affected asset</h2>
+                    <div class="detail-list">
+                        {% if finding.host %}<div class="detail-row"><span class="detail-label">Host</span><span class="text-mono">{{ finding.host }}{% if finding.port %}:{{ finding.port }}{% endif %}</span></div>{% endif %}
+                        {% if finding.url %}<div class="detail-row flex-col items-start gap-1"><span class="detail-label">URL</span><span class="text-mono text-sm text-break">{{ finding.url }}</span></div>{% endif %}
+                        {% if finding.endpoint %}<div class="detail-row"><span class="detail-label">Endpoint</span><span class="text-mono">{{ finding.endpoint }}</span></div>{% endif %}
+                        {% if finding.http_method %}<div class="detail-row"><span class="detail-label">Method</span><span class="badge badge-info text-mono">{{ finding.http_method }}</span></div>{% endif %}
+                        {% if finding.parameter %}<div class="detail-row"><span class="detail-label">Parameter</span><span class="text-mono" style="color:var(--warning)">{{ finding.parameter }}</span></div>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card{% if finding.host or finding.url or finding.endpoint or finding.parameter %} mt-4{% endif %}">
+                    <h2 class="card-title mb-3">Quick actions</h2>
+                    <div class="qa-list">
+                        {% if can_edit %}
+                        <button type="button" class="qa-link" data-goto-tab="evidence">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15l-5-5L5 21"/><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
+                            Add evidence
+                        </button>
+                        {% endif %}
+                        <button type="button" class="qa-link" data-goto-tab="comments">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                            Add comment
+                        </button>
+                        <button type="button" class="qa-link" data-goto-tab="cvss">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
+                            View CVSS breakdown
+                        </button>
+                        {% if can_edit %}
+                        <a class="qa-link" href="{% url 'vulns:edit' finding.pk %}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg>
+                            Edit finding
+                        </a>
+                        {% endif %}
+                        <a class="qa-link" href="{% url 'reports:dashboard' finding.engagement.pk %}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            Generate report
+                        </a>
+                    </div>
+                </div>
+            </aside>
         </div>
-        {% endif %}
     </div>
 
     <!-- Evidence tab -->
@@ -557,6 +606,22 @@
     if (hash && document.getElementById('tab-' + hash)) {
         activate(hash);
     }
+
+    // ── Quick-action buttons jump to a tab ──
+    document.querySelectorAll('[data-goto-tab]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var name = this.dataset.gotoTab;
+            if (!document.getElementById('tab-' + name)) return;
+            activate(name);
+            history.replaceState(null, '', '#' + name);
+            var panel = document.getElementById('tab-' + name);
+            if (panel) {
+                var focusable = panel.querySelector('input, textarea, button[type="submit"]');
+                if (focusable) { try { focusable.focus({ preventScroll: true }); } catch (e) {} }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+    });
 
     // ── Evidence lightbox ──
     var lb = document.getElementById('evLightbox');

@@ -3062,6 +3062,46 @@ select.form-input option {
     box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
+/* ── Finding detail: two-column overview with action rail ── */
+.finding-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 312px;
+    gap: 16px;
+    align-items: start;
+}
+.finding-overview__main { min-width: 0; }
+.finding-overview__side .card { margin-bottom: 0; }
+.finding-overview__side { position: sticky; top: 16px; }
+@media (max-width: 960px) {
+    .finding-overview { grid-template-columns: 1fr; }
+    .finding-overview__side { position: static; }
+}
+.qa-list { display: flex; flex-direction: column; gap: 2px; }
+.qa-link {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: background 0.14s, color 0.14s, transform 0.14s;
+}
+.qa-link svg { color: var(--accent); flex-shrink: 0; transition: transform 0.14s; }
+.qa-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    transform: translateX(2px);
+}
+.qa-link:hover svg { color: var(--accent-light); }
+
 /* ── Auth page polish (login / MFA) ── */
 .auth-page {
     position: relative;
