@@ -93,14 +93,11 @@
     <div class="tab-nav" role="tablist">
         <button class="tab-btn active" data-tab="overview" role="tab">Overview</button>
         <button class="tab-btn" data-tab="evidence" role="tab">Evidence{% if evidence %} <span class="tab-count">{{ evidence|length }}</span>{% endif %}</button>
-        <button class="tab-btn" data-tab="cvss" role="tab">CVSS</button>
-        <button class="tab-btn" data-tab="retest" role="tab">Retest</button>
-        {% if not is_client %}<button class="tab-btn" data-tab="review" role="tab">Review</button>{% endif %}
-        <button class="tab-btn" data-tab="comments" role="tab">Comments{% if comments %} <span class="tab-count">{{ comments|length }}</span>{% endif %}</button>
-        <button class="tab-btn" data-tab="details" role="tab">Details</button>
+        <button class="tab-btn" data-tab="discussion" role="tab">Discussion{% if comments %} <span class="tab-count">{{ comments|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="timeline" role="tab">Timeline{% if timeline %} <span class="tab-count">{{ timeline|length }}</span>{% endif %}</button>
     </div>
 
-    <!-- Overview tab -->
+    <!-- ── Overview tab ── -->
     <div class="tab-panel active" id="tab-overview" role="tabpanel">
         <div class="finding-overview">
             <div class="finding-overview__main">
@@ -122,6 +119,25 @@
                     <div class="prose">{{ finding.remediation|markdown }}</div>
                 </div>
                 {% endif %}
+
+                <!-- Inline CVSS (replaces the old CVSS tab) -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h2 class="card-title">CVSS v3.1</h2>
+                        <span class="text-mono font-semibold" style="font-size:20px;color:{{ finding.severity_color }}">{{ finding.cvss_score|floatformat:1 }}</span>
+                    </div>
+                    <div class="mono-block text-break mb-3">{{ finding.cvss_vector_string }}</div>
+                    <div class="cvss-chips">
+                        <span class="cvss-chip"><b>AV</b>{{ finding.get_attack_vector_display }}</span>
+                        <span class="cvss-chip"><b>AC</b>{{ finding.get_attack_complexity_display }}</span>
+                        <span class="cvss-chip"><b>PR</b>{{ finding.get_privileges_required_display }}</span>
+                        <span class="cvss-chip"><b>UI</b>{{ finding.get_user_interaction_display }}</span>
+                        <span class="cvss-chip"><b>S</b>{{ finding.get_scope_display }}</span>
+                        <span class="cvss-chip"><b>C</b>{{ finding.get_confidentiality_impact_display }}</span>
+                        <span class="cvss-chip"><b>I</b>{{ finding.get_integrity_impact_display }}</span>
+                        <span class="cvss-chip"><b>A</b>{{ finding.get_availability_impact_display }}</span>
+                    </div>
+                </div>
 
                 {% if finding.affected_hosts %}
                 <div class="card mt-4">
@@ -164,7 +180,20 @@
                 </div>
                 {% endif %}
 
-                <div class="card{% if finding.host or finding.url or finding.endpoint or finding.parameter %} mt-4{% endif %}">
+                {% if attack_paths %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">Used in attack path{{ attack_paths|length|pluralize }}</h2>
+                    {% for path in attack_paths %}
+                    <a class="attack-path-link" href="{% url 'engagements:attack_path_detail' finding.engagement.pk path.pk %}">
+                        <span class="attack-path-link__ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><line x1="7.5" y1="7.5" x2="11" y2="16.5"/><line x1="16.5" y1="7.5" x2="13" y2="16.5"/><line x1="8" y1="6" x2="16" y2="6"/></svg></span>
+                        <span class="attack-path-link__name">{{ path.name }}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="attack-path-link__arrow"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="card mt-4">
                     <h2 class="card-title mb-3">Quick actions</h2>
                     <div class="qa-list">
                         {% if can_edit %}
@@ -173,13 +202,13 @@
                             Add evidence
                         </button>
                         {% endif %}
-                        <button type="button" class="qa-link" data-goto-tab="comments">
+                        <button type="button" class="qa-link" data-goto-tab="discussion">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                             Add comment
                         </button>
-                        <button type="button" class="qa-link" data-goto-tab="cvss">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
-                            View CVSS breakdown
+                        <button type="button" class="qa-link" data-goto-tab="timeline">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                            View timeline
                         </button>
                         {% if can_edit %}
                         <a class="qa-link" href="{% url 'vulns:edit' finding.pk %}">
@@ -193,11 +222,84 @@
                         </a>
                     </div>
                 </div>
+
+                {% if not is_client %}
+                <!-- Review workflow (moved from its own tab into the action rail) -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h2 class="card-title">Review</h2>
+                        <span class="badge badge-{{ finding.review_state }}">{{ finding.get_review_state_display }}</span>
+                    </div>
+                    {% if finding.reviewed_by %}
+                    <p class="text-xs text-muted mb-3">Last reviewed by {{ finding.reviewed_by }}{% if finding.reviewed_at %} · {{ finding.reviewed_at|date:"M d, Y" }}{% endif %}</p>
+                    {% endif %}
+                    {% if finding.review_state == 'changes_requested' and finding.review_notes %}
+                    <div class="review-feedback mb-3">{{ finding.review_notes|linebreaksbr }}</div>
+                    {% endif %}
+
+                    {% if finding.review_state == 'draft' or finding.review_state == 'changes_requested' %}
+                        {% if can_edit %}
+                        <form method="post" action="{% url 'vulns:submit_review' finding.pk %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-full">Submit for review</button>
+                        </form>
+                        {% else %}
+                        <p class="text-xs text-muted">Awaiting submission by a pentester.</p>
+                        {% endif %}
+                    {% elif finding.review_state == 'in_review' %}
+                        {% if can_review %}
+                        <form method="post" action="{% url 'vulns:approve' finding.pk %}" class="mb-3">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-full">Approve</button>
+                        </form>
+                        <form method="post" action="{% url 'vulns:request_changes' finding.pk %}">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label>Request changes</label>
+                                <textarea name="review_notes" rows="3" class="form-input" required placeholder="What needs to change?"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger btn-full">Request changes</button>
+                        </form>
+                        {% else %}
+                        <p class="text-xs text-muted">Waiting on a lead or reviewer.</p>
+                        {% endif %}
+                    {% elif finding.review_state == 'approved' %}
+                        <p class="text-sm" style="color:var(--success)">Approved &amp; visible to the client.</p>
+                    {% endif %}
+                </div>
+
+                <!-- Retest workflow (moved from its own tab into the action rail) -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h2 class="card-title">Retest</h2>
+                        <span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span>
+                    </div>
+                    {% if finding.retest_date or finding.retested_by %}
+                    <p class="text-xs text-muted mb-3">
+                        {% if finding.retest_date %}{{ finding.retest_date|date:"M d, Y" }}{% endif %}
+                        {% if finding.retested_by %} · by {{ finding.retested_by }}{% endif %}
+                    </p>
+                    {% endif %}
+                    {% if finding.retest_notes %}
+                    <div class="prose text-sm mb-3">{{ finding.retest_notes|linebreaksbr }}</div>
+                    {% endif %}
+                    {% if can_edit %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="record_retest" value="1">
+                        <div class="form-group"><label>Status</label>{{ retest_form.retest_status }}</div>
+                        <div class="form-group"><label>Date</label>{{ retest_form.retest_date }}</div>
+                        <div class="form-group"><label>Notes</label>{{ retest_form.retest_notes }}</div>
+                        <button type="submit" class="btn btn-primary btn-full">Save retest</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
             </aside>
         </div>
     </div>
 
-    <!-- Evidence tab -->
+    <!-- ── Evidence tab ── -->
     <div class="tab-panel" id="tab-evidence" role="tabpanel">
         <div class="card">
             <div class="ev-toolbar">
@@ -238,7 +340,7 @@
             <div class="empty-state compact">
                 <div class="empty-state__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15l-5-5L5 21"/><path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><circle cx="8.5" cy="8.5" r="1.5"/></svg></div>
                 <p class="empty-state__title">No evidence yet</p>
-                <p class="empty-state__subtitle">Screenshots, request/response captures, and proof files attached to this finding will appear here as a gallery.</p>
+                <p class="empty-state__subtitle">Screenshots, request/response captures, and proof files attached to this finding appear here as a gallery.</p>
             </div>
             {% endif %}
         </div>
@@ -275,205 +377,43 @@
         </div>
     </div>
 
-    <!-- CVSS tab -->
-    <div class="tab-panel" id="tab-cvss" role="tabpanel">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">CVSS v3.1</h2>
-                <span class="text-mono font-semibold" style="font-size:20px;color:{{ finding.severity_color }}">{{ finding.cvss_score|floatformat:1 }}</span>
-            </div>
-            <div class="mono-block text-break mb-3">{{ finding.cvss_vector_string }}</div>
-            <div class="cvss-grid">
-                <div class="cvss-item">
-                    <span class="detail-label">Attack Vector</span>
-                    <span>{{ finding.get_attack_vector_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Attack Complexity</span>
-                    <span>{{ finding.get_attack_complexity_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Privileges Required</span>
-                    <span>{{ finding.get_privileges_required_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">User Interaction</span>
-                    <span>{{ finding.get_user_interaction_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Scope</span>
-                    <span>{{ finding.get_scope_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Confidentiality</span>
-                    <span>{{ finding.get_confidentiality_impact_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Integrity</span>
-                    <span>{{ finding.get_integrity_impact_display }}</span>
-                </div>
-                <div class="cvss-item">
-                    <span class="detail-label">Availability</span>
-                    <span>{{ finding.get_availability_impact_display }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Retest tab -->
-    <div class="tab-panel" id="tab-retest" role="tabpanel">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Verification / retest</h2>
-                <span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span>
-            </div>
-            {% if finding.retest_date or finding.retest_notes or finding.retested_by %}
-            <div class="detail-list mb-3">
-                {% if finding.retest_date %}
-                <div class="detail-row">
-                    <span class="detail-label">Last retested</span>
-                    <span>{{ finding.retest_date|date:"M d, Y" }}</span>
-                </div>
-                {% endif %}
-                {% if finding.retested_by %}
-                <div class="detail-row">
-                    <span class="detail-label">Retested by</span>
-                    <span>{{ finding.retested_by }}</span>
-                </div>
-                {% endif %}
-                {% if finding.retest_notes %}
-                <div class="detail-row flex-col items-start gap-1">
-                    <span class="detail-label">Notes</span>
-                    <div class="prose text-sm">{{ finding.retest_notes|linebreaksbr }}</div>
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            <p class="text-secondary text-sm mb-3">This finding has not been retested yet.</p>
-            {% endif %}
-
-            {% if can_edit %}
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="record_retest" value="1">
-                <div class="form-group">
-                    <label>Retest status</label>
-                    {{ retest_form.retest_status }}
-                </div>
-                <div class="form-group">
-                    <label>Date</label>
-                    {{ retest_form.retest_date }}
-                </div>
-                <div class="form-group">
-                    <label>Notes</label>
-                    {{ retest_form.retest_notes }}
-                </div>
-                <button type="submit" class="btn btn-primary">Save retest</button>
-            </form>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if not is_client %}
-    <!-- Review tab -->
-    <div class="tab-panel" id="tab-review" role="tabpanel">
-        <div class="card">
-            <div class="card-header">
-                <h2 class="card-title">Review &amp; approval</h2>
-                <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
-            </div>
-
-            {% if finding.reviewed_by or finding.reviewed_at %}
-            <div class="detail-list mb-3">
-                {% if finding.reviewed_by %}
-                <div class="detail-row">
-                    <span class="detail-label">Last reviewed by</span>
-                    <span>{{ finding.reviewed_by }}</span>
-                </div>
-                {% endif %}
-                {% if finding.reviewed_at %}
-                <div class="detail-row">
-                    <span class="detail-label">Reviewed at</span>
-                    <span>{{ finding.reviewed_at|date:"M d, Y H:i" }}</span>
-                </div>
-                {% endif %}
-                {% if finding.review_notes %}
-                <div class="detail-row flex-col items-start gap-1">
-                    <span class="detail-label">Reviewer notes</span>
-                    <div class="prose text-sm">{{ finding.review_notes|linebreaksbr }}</div>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-
-            {% if finding.review_state == 'draft' or finding.review_state == 'changes_requested' %}
-                {% if finding.review_state == 'changes_requested' %}
-                <p class="text-sm text-secondary mb-3">Address the reviewer feedback above, then re-submit for review.</p>
-                {% else %}
-                <p class="text-sm text-secondary mb-3">Drafts are not shown to clients. Submit for review once the finding is ready.</p>
-                {% endif %}
-                {% if can_edit %}
-                <form method="post" action="{% url 'vulns:submit_review' finding.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Submit for review</button>
-                </form>
-                {% else %}
-                <p class="text-sm text-muted">Only leads and pentesters can submit findings for review.</p>
-                {% endif %}
-            {% elif finding.review_state == 'in_review' %}
-                <p class="text-sm text-secondary mb-3">Waiting on a lead or reviewer to approve or request changes.</p>
-                {% if can_review %}
-                <form method="post" action="{% url 'vulns:approve' finding.pk %}" style="display:inline-block">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">Approve</button>
-                </form>
-                <form method="post" action="{% url 'vulns:request_changes' finding.pk %}" class="mt-3">
-                    {% csrf_token %}
-                    <div class="form-group">
-                        <label>Request changes — what needs to be fixed?</label>
-                        <textarea name="review_notes" rows="3" class="form-input" required placeholder="Missing PoC, wrong CVSS, needs more evidence…"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-danger">Request changes</button>
-                </form>
-                {% else %}
-                <p class="text-sm text-muted">Only leads and reviewers can approve or request changes.</p>
-                {% endif %}
-            {% elif finding.review_state == 'approved' %}
-                <p class="text-sm" style="color:var(--success)">This finding is approved and visible to the client.</p>
-            {% endif %}
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Comments tab -->
-    <div class="tab-panel" id="tab-comments" role="tabpanel">
+    <!-- ── Discussion tab ── -->
+    <div class="tab-panel" id="tab-discussion" role="tabpanel">
         <div class="card">
             <h2 class="card-title mb-3">Discussion</h2>
             {% if comments %}
-            <ul class="comment-thread">
+            <ul class="discussion">
                 {% for c in comments %}
-                <li class="comment {% if c.parent_id %}comment--reply{% endif %} {% if c.internal_only %}comment--internal{% endif %} {% if c.is_review_feedback %}comment--review{% endif %}">
-                    <header class="comment-head">
-                        <span class="comment-author">{{ c.author|default:"(deleted user)" }}</span>
-                        <span class="comment-time">{{ c.created_at|date:"M d, Y H:i" }}{% if c.edited_at %} &middot; edited{% endif %}</span>
-                        {% if c.internal_only %}<span class="badge badge-warn">internal</span>{% endif %}
-                        {% if c.is_review_feedback %}<span class="badge badge-info">review feedback</span>{% endif %}
-                    </header>
-                    <div class="comment-body">{{ c.body|markdown }}</div>
-                    {% if c.user_can_edit or c.user_can_delete %}
-                    <footer class="comment-actions">
-                        {% if c.user_can_edit %}<a class="text-xs" href="{% url 'vulns:comment_edit' c.pk %}">Edit</a>{% endif %}
-                        {% if c.user_can_delete %}<a class="text-xs text-danger" href="{% url 'vulns:comment_delete' c.pk %}">Delete</a>{% endif %}
-                    </footer>
-                    {% endif %}
+                <li class="dcomment{% if c.parent_id %} dcomment--reply{% endif %}{% if c.internal_only %} dcomment--internal{% endif %}{% if c.is_review_feedback %} dcomment--review{% endif %}">
+                    <div class="dcomment__avatar" style="background:{% if c.author %}{{ c.author.avatar_color }}{% else %}var(--text-muted){% endif %}">{% if c.author %}{{ c.author.initials }}{% else %}?{% endif %}</div>
+                    <div class="dcomment__body">
+                        <div class="dcomment__head">
+                            <span class="dcomment__author">{{ c.author|default:"(deleted user)" }}</span>
+                            {% if c.author %}<span class="dcomment__role">{{ c.author.get_role_display }}</span>{% endif %}
+                            <span class="dcomment__time">{{ c.created_at|timesince }} ago{% if c.edited_at %} · edited{% endif %}</span>
+                            {% if c.internal_only %}<span class="badge badge-warn">Internal</span>{% endif %}
+                            {% if c.is_review_feedback %}<span class="badge badge-info">Review</span>{% endif %}
+                        </div>
+                        <div class="dcomment__text prose">{{ c.body|markdown }}</div>
+                        {% if c.user_can_edit or c.user_can_delete %}
+                        <div class="dcomment__actions">
+                            {% if c.user_can_edit %}<a class="text-xs" href="{% url 'vulns:comment_edit' c.pk %}">Edit</a>{% endif %}
+                            {% if c.user_can_delete %}<a class="text-xs text-danger" href="{% url 'vulns:comment_delete' c.pk %}">Delete</a>{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
                 </li>
                 {% endfor %}
             </ul>
             {% else %}
-            <p class="text-sm text-secondary">No comments yet.</p>
+            <div class="empty-state compact">
+                <div class="empty-state__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+                <p class="empty-state__title">No comments yet</p>
+                <p class="empty-state__subtitle">Coordinate reproduction steps, reviewer feedback, and client questions here.</p>
+            </div>
             {% endif %}
 
-            <form method="post" class="mt-4">
+            <form method="post" class="dcomment-form mt-4">
                 {% csrf_token %}
                 <input type="hidden" name="post_comment" value="1">
                 <div class="form-group">
@@ -482,97 +422,43 @@
                     {% if comment_form.body.errors %}<span class="form-error">{{ comment_form.body.errors|join:", " }}</span>{% endif %}
                     <span class="form-help">Markdown supported. Links, lists, tables, fenced code blocks.</span>
                 </div>
-                {% if comment_form.internal_only %}
-                <label class="checkbox-row">
-                    {{ comment_form.internal_only }} Internal only (hidden from Client role)
-                </label>
-                {% endif %}
-                {% if comment_form.is_review_feedback %}
-                <label class="checkbox-row">
-                    {{ comment_form.is_review_feedback }} Mark as review feedback
-                </label>
-                {% endif %}
+                <div class="dcomment-form__opts">
+                    {% if comment_form.internal_only %}
+                    <label class="checkbox-row">{{ comment_form.internal_only }} Internal only (hidden from Client role)</label>
+                    {% endif %}
+                    {% if comment_form.is_review_feedback %}
+                    <label class="checkbox-row">{{ comment_form.is_review_feedback }} Mark as review feedback</label>
+                    {% endif %}
+                </div>
                 <button type="submit" class="btn btn-primary">Post comment</button>
             </form>
         </div>
     </div>
 
-    <!-- Details tab -->
-    <div class="tab-panel" id="tab-details" role="tabpanel">
-        <div class="grid-2">
-            {% if finding.host or finding.url or finding.endpoint %}
-            <div class="card">
-                <h2 class="card-title mb-3">Location</h2>
-                <div class="detail-list">
-                    {% if finding.host %}
-                    <div class="detail-row">
-                        <span class="detail-label">Host</span>
-                        <span class="text-mono">{{ finding.host }}</span>
+    <!-- ── Timeline tab ── -->
+    <div class="tab-panel" id="tab-timeline" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Activity timeline</h2>
+            {% if timeline %}
+            <ol class="timeline">
+                {% for e in timeline %}
+                <li class="tl-item tl-{{ e.kind }}">
+                    <span class="tl-dot" aria-hidden="true"></span>
+                    <div class="tl-card">
+                        <div class="tl-head">
+                            <span class="tl-title">{{ e.title }}</span>
+                            <span class="tl-time">{{ e.ts|date:"M d, Y · H:i" }}</span>
+                        </div>
+                        <div class="tl-meta">
+                            {% if e.who %}{{ e.who }}{% else %}<span class="text-muted">system</span>{% endif %}{% if e.meta %} · {{ e.meta }}{% endif %}
+                        </div>
                     </div>
-                    {% endif %}
-                    {% if finding.port %}
-                    <div class="detail-row">
-                        <span class="detail-label">Port</span>
-                        <span class="text-mono">{{ finding.port }}</span>
-                    </div>
-                    {% endif %}
-                    {% if finding.url %}
-                    <div class="detail-row flex-col items-start gap-1">
-                        <span class="detail-label">URL</span>
-                        <span class="text-mono text-sm text-break">{{ finding.url }}</span>
-                    </div>
-                    {% endif %}
-                    {% if finding.endpoint %}
-                    <div class="detail-row">
-                        <span class="detail-label">Endpoint</span>
-                        <span class="text-mono">{{ finding.endpoint }}</span>
-                    </div>
-                    {% endif %}
-                    {% if finding.http_method %}
-                    <div class="detail-row">
-                        <span class="detail-label">Method</span>
-                        <span class="badge badge-info text-mono">{{ finding.http_method }}</span>
-                    </div>
-                    {% endif %}
-                    {% if finding.parameter %}
-                    <div class="detail-row">
-                        <span class="detail-label">Parameter</span>
-                        <span class="text-mono" style="color:var(--warning)">{{ finding.parameter }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <div class="empty-state compact"><p class="text-secondary text-sm">No activity recorded yet.</p></div>
             {% endif %}
-
-            <div class="card">
-                <h2 class="card-title mb-3">Metadata</h2>
-                <div class="detail-list">
-                    <div class="detail-row">
-                        <span class="detail-label">Found by</span>
-                        <span>{{ finding.found_by|default:"—" }}</span>
-                    </div>
-                    {% if finding.tool_source %}
-                    <div class="detail-row">
-                        <span class="detail-label">Tool</span>
-                        <span class="text-mono">{{ finding.tool_source }}</span>
-                    </div>
-                    {% endif %}
-                    {% if finding.cwe_id %}
-                    <div class="detail-row">
-                        <span class="detail-label">CWE</span>
-                        <span class="text-mono">{{ finding.cwe_id }}</span>
-                    </div>
-                    {% endif %}
-                    <div class="detail-row">
-                        <span class="detail-label">Created</span>
-                        <span>{{ finding.created_at|date:"M d, Y H:i" }}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Updated</span>
-                        <span>{{ finding.updated_at|date:"M d, Y H:i" }}</span>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </div>
@@ -586,12 +472,8 @@
     var panels = document.querySelectorAll('.tab-panel');
 
     function activate(name) {
-        tabs.forEach(function(t) {
-            t.classList.toggle('active', t.dataset.tab === name);
-        });
-        panels.forEach(function(p) {
-            p.classList.toggle('active', p.id === 'tab-' + name);
-        });
+        tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+        panels.forEach(function(p) { p.classList.toggle('active', p.id === 'tab-' + name); });
     }
 
     tabs.forEach(function(t) {
@@ -607,7 +489,7 @@
         activate(hash);
     }
 
-    // ── Quick-action buttons jump to a tab ──
+    // Quick-action buttons jump to a tab (and focus its first input).
     document.querySelectorAll('[data-goto-tab]').forEach(function(btn) {
         btn.addEventListener('click', function() {
             var name = this.dataset.gotoTab;
@@ -646,7 +528,7 @@
         });
     }
 
-    // ── Evidence dropzone: filename echo + drag highlight ──
+    // ── Evidence dropzone ──
     var drop = document.getElementById('evDrop');
     if (drop) {
         var fileInput = drop.querySelector('input[type="file"]');
@@ -656,9 +538,7 @@
                 if (fileInput.files && fileInput.files.length) {
                     nameEl.textContent = '✓ ' + fileInput.files[0].name;
                     nameEl.hidden = false;
-                } else {
-                    nameEl.hidden = true;
-                }
+                } else { nameEl.hidden = true; }
             });
             ['dragenter', 'dragover'].forEach(function(ev) {
                 drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.add('is-drag'); });
