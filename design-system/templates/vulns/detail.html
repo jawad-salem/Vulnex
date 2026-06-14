@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+{% load vulns_extras %}
+{% block title %}{{ finding.title }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' finding.engagement.pk %}">{{ finding.engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'vulns:list' finding.engagement.pk %}">Findings</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">{{ finding.title|truncatechars:30 }}</span>
+</nav>
+{% endblock %}
+{% block content %}
+
+<!-- ── Hero ── -->
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        <h1 class="eng-hero-title">{{ finding.title }}</h1>
+        <div class="eng-hero-meta">
+            <span class="eng-meta-item eng-meta-client">
+                <a href="{% url 'engagements:detail' finding.engagement.pk %}">{{ finding.engagement.name }}</a>
+            </span>
+            {% if finding.host %}<span class="eng-meta-item text-mono">{{ finding.host }}{% if finding.port %}:{{ finding.port }}{% endif %}</span>{% endif %}
+            {% if finding.cwe_id %}<span class="eng-meta-item text-mono">{{ finding.cwe_id }}</span>{% endif %}
+            <span class="eng-meta-item">{{ finding.created_at|date:"M d, Y" }}</span>
+        </div>
+    </div>
+    <div class="eng-hero-actions">
+        <span class="badge badge-{{ finding.severity }} badge-lg">{{ finding.get_severity_display }}</span>
+        <span class="badge badge-{{ finding.status }} badge-lg">{{ finding.get_status_display }}</span>
+        {% if not is_client %}
+        <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
+        {% endif %}
+        {% if can_edit %}
+        <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
+        <a href="{% url 'vulns:delete' finding.pk %}" class="btn btn-danger">Delete</a>
+        {% endif %}
+        {% if can_review %}
+        <a href="{% url 'vulns:merge' finding.pk %}" class="btn">Merge into…</a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ── KPI strip ── -->
+<div class="kpi-strip">
+    <div class="kpi-item">
+        <div class="kpi-label">CVSS Score</div>
+        <div class="kpi-value" style="color:{{ finding.severity_color }}">{{ finding.cvss_score|floatformat:1 }}</div>
+        <div class="kpi-sub" style="color:{{ finding.severity_color }}">{{ finding.get_severity_display }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Status</div>
+        <div class="kpi-value" style="font-size:18px">{{ finding.get_status_display }}</div>
+        <div class="kpi-sub">{{ finding.updated_at|date:"M d" }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">SLA</div>
+        {% if finding.sla_status == 'closed' %}
+        <div class="kpi-value" style="font-size:16px;color:var(--success)">Closed</div>
+        <div class="kpi-sub">No SLA</div>
+        {% elif finding.sla_status == 'overdue' %}
+        <div class="kpi-value" style="font-size:18px;color:var(--critical)">Overdue</div>
+        <div class="kpi-sub" style="color:var(--critical)">{{ finding.overdue_days }} day{{ finding.overdue_days|pluralize }} past due</div>
+        {% elif finding.sla_status == 'due_soon' %}
+        <div class="kpi-value" style="font-size:18px;color:var(--warning)">{{ finding.days_until_due }} day{{ finding.days_until_due|pluralize }}</div>
+        <div class="kpi-sub">Due {{ finding.due_date|date:"M d" }}</div>
+        {% else %}
+        <div class="kpi-value" style="font-size:18px">{{ finding.days_until_due }} days</div>
+        <div class="kpi-sub">Due {{ finding.due_date|date:"M d" }}</div>
+        {% endif %}
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Evidence</div>
+        <div class="kpi-value">{{ evidence|length }}</div>
+        <div class="kpi-sub">item{{ evidence|length|pluralize }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Found by</div>
+        <div class="kpi-value" style="font-size:16px">{{ finding.found_by|default:"—" }}</div>
+        <div class="kpi-sub">{{ finding.tool_source|default:"manual" }}</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Assigned to</div>
+        <div class="kpi-value" style="font-size:16px">{% if finding.assigned_to %}{{ finding.assigned_to }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</div>
+        <div class="kpi-sub">{% if finding.assigned_to %}Owner{% else %}No owner yet{% endif %}</div>
+    </div>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+    <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" data-tab="overview" role="tab">Overview</button>
+        <button class="tab-btn" data-tab="evidence" role="tab">Evidence{% if evidence %} <span class="tab-count">{{ evidence|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="cvss" role="tab">CVSS</button>
+        <button class="tab-btn" data-tab="retest" role="tab">Retest</button>
+        {% if not is_client %}<button class="tab-btn" data-tab="review" role="tab">Review</button>{% endif %}
+        <button class="tab-btn" data-tab="comments" role="tab">Comments{% if comments %} <span class="tab-count">{{ comments|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="details" role="tab">Details</button>
+    </div>
+
+    <!-- Overview tab -->
+    <div class="tab-panel active" id="tab-overview" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Description</h2>
+            <div class="prose">{{ finding.description|markdown }}</div>
+        </div>
+
+        {% if finding.proof_of_concept %}
+        <div class="card mt-4">
+            <h2 class="card-title mb-3">Proof of concept</h2>
+            <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
+        </div>
+        {% endif %}
+
+        {% if finding.remediation %}
+        <div class="card mt-4">
+            <h2 class="card-title mb-3">Remediation</h2>
+            <div class="prose">{{ finding.remediation|markdown }}</div>
+        </div>
+        {% endif %}
+
+        {% if finding.affected_hosts %}
+        <div class="card mt-4">
+            <h2 class="card-title mb-3">Affected hosts</h2>
+            <div class="mono-block">
+                {% for host in finding.affected_hosts.splitlines %}
+                {% if host.strip %}<div class="scope-target">{{ host }}</div>{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if finding.references %}
+        <div class="card mt-4">
+            <h2 class="card-title mb-3">References</h2>
+            <div class="text-sm">
+                {% for ref in finding.references.splitlines %}
+                {% if ref.strip %}
+                <div style="padding:4px 0" class="text-break">
+                    {% if "http" in ref %}<a href="{{ ref.strip }}">{{ ref.strip }}</a>{% else %}{{ ref.strip }}{% endif %}
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Evidence tab -->
+    <div class="tab-panel" id="tab-evidence" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Evidence</h2>
+                <span class="text-xs text-muted">{{ evidence|length }} item{{ evidence|length|pluralize }}</span>
+            </div>
+            {% if evidence %}
+            {% for ev in evidence %}
+            <div class="evidence-item">
+                {% if ev.is_image %}
+                <img src="{% url 'vulns:evidence_download' ev.pk %}" alt="{{ ev.caption }}">
+                {% else %}
+                <div class="evidence-file">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <a href="{% url 'vulns:evidence_download' ev.pk %}">{{ ev.file.name|cut:"evidence/" }}</a>
+                </div>
+                {% endif %}
+                {% if ev.caption %}<div class="evidence-caption">{{ ev.caption }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No evidence uploaded yet.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if can_edit %}
+        <div class="card mt-4">
+            <h2 class="card-title mb-3">Upload evidence</h2>
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="upload_evidence" value="1">
+                <div class="form-group">
+                    <label>File</label>
+                    {{ evidence_form.file }}
+                </div>
+                <div class="form-group">
+                    <label>Caption</label>
+                    {{ evidence_form.caption }}
+                </div>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- CVSS tab -->
+    <div class="tab-panel" id="tab-cvss" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">CVSS v3.1</h2>
+                <span class="text-mono font-semibold" style="font-size:20px;color:{{ finding.severity_color }}">{{ finding.cvss_score|floatformat:1 }}</span>
+            </div>
+            <div class="mono-block text-break mb-3">{{ finding.cvss_vector_string }}</div>
+            <div class="cvss-grid">
+                <div class="cvss-item">
+                    <span class="detail-label">Attack Vector</span>
+                    <span>{{ finding.get_attack_vector_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Attack Complexity</span>
+                    <span>{{ finding.get_attack_complexity_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Privileges Required</span>
+                    <span>{{ finding.get_privileges_required_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">User Interaction</span>
+                    <span>{{ finding.get_user_interaction_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Scope</span>
+                    <span>{{ finding.get_scope_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Confidentiality</span>
+                    <span>{{ finding.get_confidentiality_impact_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Integrity</span>
+                    <span>{{ finding.get_integrity_impact_display }}</span>
+                </div>
+                <div class="cvss-item">
+                    <span class="detail-label">Availability</span>
+                    <span>{{ finding.get_availability_impact_display }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Retest tab -->
+    <div class="tab-panel" id="tab-retest" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Verification / retest</h2>
+                <span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span>
+            </div>
+            {% if finding.retest_date or finding.retest_notes or finding.retested_by %}
+            <div class="detail-list mb-3">
+                {% if finding.retest_date %}
+                <div class="detail-row">
+                    <span class="detail-label">Last retested</span>
+                    <span>{{ finding.retest_date|date:"M d, Y" }}</span>
+                </div>
+                {% endif %}
+                {% if finding.retested_by %}
+                <div class="detail-row">
+                    <span class="detail-label">Retested by</span>
+                    <span>{{ finding.retested_by }}</span>
+                </div>
+                {% endif %}
+                {% if finding.retest_notes %}
+                <div class="detail-row flex-col items-start gap-1">
+                    <span class="detail-label">Notes</span>
+                    <div class="prose text-sm">{{ finding.retest_notes|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-secondary text-sm mb-3">This finding has not been retested yet.</p>
+            {% endif %}
+
+            {% if can_edit %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="record_retest" value="1">
+                <div class="form-group">
+                    <label>Retest status</label>
+                    {{ retest_form.retest_status }}
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    {{ retest_form.retest_date }}
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    {{ retest_form.retest_notes }}
+                </div>
+                <button type="submit" class="btn btn-primary">Save retest</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not is_client %}
+    <!-- Review tab -->
+    <div class="tab-panel" id="tab-review" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Review &amp; approval</h2>
+                <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
+            </div>
+
+            {% if finding.reviewed_by or finding.reviewed_at %}
+            <div class="detail-list mb-3">
+                {% if finding.reviewed_by %}
+                <div class="detail-row">
+                    <span class="detail-label">Last reviewed by</span>
+                    <span>{{ finding.reviewed_by }}</span>
+                </div>
+                {% endif %}
+                {% if finding.reviewed_at %}
+                <div class="detail-row">
+                    <span class="detail-label">Reviewed at</span>
+                    <span>{{ finding.reviewed_at|date:"M d, Y H:i" }}</span>
+                </div>
+                {% endif %}
+                {% if finding.review_notes %}
+                <div class="detail-row flex-col items-start gap-1">
+                    <span class="detail-label">Reviewer notes</span>
+                    <div class="prose text-sm">{{ finding.review_notes|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if finding.review_state == 'draft' or finding.review_state == 'changes_requested' %}
+                {% if finding.review_state == 'changes_requested' %}
+                <p class="text-sm text-secondary mb-3">Address the reviewer feedback above, then re-submit for review.</p>
+                {% else %}
+                <p class="text-sm text-secondary mb-3">Drafts are not shown to clients. Submit for review once the finding is ready.</p>
+                {% endif %}
+                {% if can_edit %}
+                <form method="post" action="{% url 'vulns:submit_review' finding.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Submit for review</button>
+                </form>
+                {% else %}
+                <p class="text-sm text-muted">Only leads and pentesters can submit findings for review.</p>
+                {% endif %}
+            {% elif finding.review_state == 'in_review' %}
+                <p class="text-sm text-secondary mb-3">Waiting on a lead or reviewer to approve or request changes.</p>
+                {% if can_review %}
+                <form method="post" action="{% url 'vulns:approve' finding.pk %}" style="display:inline-block">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Approve</button>
+                </form>
+                <form method="post" action="{% url 'vulns:request_changes' finding.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label>Request changes — what needs to be fixed?</label>
+                        <textarea name="review_notes" rows="3" class="form-input" required placeholder="Missing PoC, wrong CVSS, needs more evidence…"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger">Request changes</button>
+                </form>
+                {% else %}
+                <p class="text-sm text-muted">Only leads and reviewers can approve or request changes.</p>
+                {% endif %}
+            {% elif finding.review_state == 'approved' %}
+                <p class="text-sm" style="color:var(--success)">This finding is approved and visible to the client.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Comments tab -->
+    <div class="tab-panel" id="tab-comments" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Discussion</h2>
+            {% if comments %}
+            <ul class="comment-thread">
+                {% for c in comments %}
+                <li class="comment {% if c.parent_id %}comment--reply{% endif %} {% if c.internal_only %}comment--internal{% endif %} {% if c.is_review_feedback %}comment--review{% endif %}">
+                    <header class="comment-head">
+                        <span class="comment-author">{{ c.author|default:"(deleted user)" }}</span>
+                        <span class="comment-time">{{ c.created_at|date:"M d, Y H:i" }}{% if c.edited_at %} &middot; edited{% endif %}</span>
+                        {% if c.internal_only %}<span class="badge badge-warn">internal</span>{% endif %}
+                        {% if c.is_review_feedback %}<span class="badge badge-info">review feedback</span>{% endif %}
+                    </header>
+                    <div class="comment-body">{{ c.body|markdown }}</div>
+                    {% if c.user_can_edit or c.user_can_delete %}
+                    <footer class="comment-actions">
+                        {% if c.user_can_edit %}<a class="text-xs" href="{% url 'vulns:comment_edit' c.pk %}">Edit</a>{% endif %}
+                        {% if c.user_can_delete %}<a class="text-xs text-danger" href="{% url 'vulns:comment_delete' c.pk %}">Delete</a>{% endif %}
+                    </footer>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-secondary">No comments yet.</p>
+            {% endif %}
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="post_comment" value="1">
+                <div class="form-group">
+                    <label for="id_body">Add a comment</label>
+                    {{ comment_form.body }}
+                    {% if comment_form.body.errors %}<span class="form-error">{{ comment_form.body.errors|join:", " }}</span>{% endif %}
+                    <span class="form-help">Markdown supported. Links, lists, tables, fenced code blocks.</span>
+                </div>
+                {% if comment_form.internal_only %}
+                <label class="checkbox-row">
+                    {{ comment_form.internal_only }} Internal only (hidden from Client role)
+                </label>
+                {% endif %}
+                {% if comment_form.is_review_feedback %}
+                <label class="checkbox-row">
+                    {{ comment_form.is_review_feedback }} Mark as review feedback
+                </label>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Post comment</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Details tab -->
+    <div class="tab-panel" id="tab-details" role="tabpanel">
+        <div class="grid-2">
+            {% if finding.host or finding.url or finding.endpoint %}
+            <div class="card">
+                <h2 class="card-title mb-3">Location</h2>
+                <div class="detail-list">
+                    {% if finding.host %}
+                    <div class="detail-row">
+                        <span class="detail-label">Host</span>
+                        <span class="text-mono">{{ finding.host }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.port %}
+                    <div class="detail-row">
+                        <span class="detail-label">Port</span>
+                        <span class="text-mono">{{ finding.port }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.url %}
+                    <div class="detail-row flex-col items-start gap-1">
+                        <span class="detail-label">URL</span>
+                        <span class="text-mono text-sm text-break">{{ finding.url }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.endpoint %}
+                    <div class="detail-row">
+                        <span class="detail-label">Endpoint</span>
+                        <span class="text-mono">{{ finding.endpoint }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.http_method %}
+                    <div class="detail-row">
+                        <span class="detail-label">Method</span>
+                        <span class="badge badge-info text-mono">{{ finding.http_method }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.parameter %}
+                    <div class="detail-row">
+                        <span class="detail-label">Parameter</span>
+                        <span class="text-mono" style="color:var(--warning)">{{ finding.parameter }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="card">
+                <h2 class="card-title mb-3">Metadata</h2>
+                <div class="detail-list">
+                    <div class="detail-row">
+                        <span class="detail-label">Found by</span>
+                        <span>{{ finding.found_by|default:"—" }}</span>
+                    </div>
+                    {% if finding.tool_source %}
+                    <div class="detail-row">
+                        <span class="detail-label">Tool</span>
+                        <span class="text-mono">{{ finding.tool_source }}</span>
+                    </div>
+                    {% endif %}
+                    {% if finding.cwe_id %}
+                    <div class="detail-row">
+                        <span class="detail-label">CWE</span>
+                        <span class="text-mono">{{ finding.cwe_id }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="detail-row">
+                        <span class="detail-label">Created</span>
+                        <span>{{ finding.created_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Updated</span>
+                        <span>{{ finding.updated_at|date:"M d, Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+    var tabs = document.querySelectorAll('.tab-btn');
+    var panels = document.querySelectorAll('.tab-panel');
+
+    function activate(name) {
+        tabs.forEach(function(t) {
+            t.classList.toggle('active', t.dataset.tab === name);
+        });
+        panels.forEach(function(p) {
+            p.classList.toggle('active', p.id === 'tab-' + name);
+        });
+    }
+
+    tabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+            var name = this.dataset.tab;
+            activate(name);
+            history.replaceState(null, '', '#' + name);
+        });
+    });
+
+    var hash = (location.hash || '').replace('#', '');
+    if (hash && document.getElementById('tab-' + hash)) {
+        activate(hash);
+    }
+})();
+</script>
+{% endblock %}

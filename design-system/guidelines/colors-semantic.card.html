@@ -1,0 +1,37 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Semantic & text" subtitle="Status colors and the three-step text hierarchy" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { background: var(--bg-primary); padding: 20px; display:flex; gap: 24px; }
+  .group { flex: 1; }
+  .glabel { font-size: 10px; text-transform: uppercase; letter-spacing:.5px; color: var(--text-muted); font-weight:600; margin-bottom: 10px; }
+  .items { display:flex; gap: 8px; }
+  .item { flex:1; display:flex; flex-direction:column; gap:6px; align-items:center; }
+  .dot { width: 22px; height: 22px; border-radius: var(--radius-full); }
+  .t { font-size:10px; font-family: var(--font-mono); color: var(--text-secondary); }
+  .text-stack { display:flex; flex-direction:column; gap: 8px; }
+  .ti { font-size: 14px; }
+</style>
+</head>
+<body>
+  <div class="group">
+    <div class="glabel">Semantic status</div>
+    <div class="items">
+      <div class="item"><div class="dot" style="background:#3fb950"></div><div class="t">success</div></div>
+      <div class="item"><div class="dot" style="background:#e3b341"></div><div class="t">warning</div></div>
+      <div class="item"><div class="dot" style="background:#f05853"></div><div class="t">danger</div></div>
+    </div>
+  </div>
+  <div class="group">
+    <div class="glabel">Text hierarchy</div>
+    <div class="text-stack">
+      <div class="ti" style="color:#e6edf3">Primary — #e6edf3</div>
+      <div class="ti" style="color:#8b949e">Secondary — #8b949e</div>
+      <div class="ti" style="color:#484f58">Muted — #484f58</div>
+    </div>
+  </div>
+</body>
+</html>

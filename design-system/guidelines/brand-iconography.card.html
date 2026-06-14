@@ -1,0 +1,35 @@
+<!-- @dsCard group="Brand" viewport="700x150" name="Iconography" subtitle="Lucide / Feather stroke icons — 2px, 24 grid, currentColor" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { background: var(--bg-primary); padding: 22px; color: var(--text-secondary); }
+  .row { display:flex; gap: 22px; flex-wrap:wrap; align-items:center; }
+  .ic { display:flex; flex-direction:column; align-items:center; gap:7px; }
+  .ic svg { width: 22px; height: 22px; }
+  .ic .n { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+  .accent { color: var(--accent-light); }
+  .note { font-size: 11px; color: var(--text-muted); margin-bottom: 16px; }
+  .note code { font-size: 10px; }
+</style>
+</head>
+<body>
+  <div class="note">Stroke icons from <code>lucide</code> (loaded via CDN here) — 2px stroke, <code>fill:none</code>, inherit <code>currentColor</code>.</div>
+  <div class="row">
+    <div class="ic accent"><i data-lucide="shield"></i><span class="n">shield</span></div>
+    <div class="ic"><i data-lucide="layout-grid"></i><span class="n">dashboard</span></div>
+    <div class="ic"><i data-lucide="briefcase"></i><span class="n">engagements</span></div>
+    <div class="ic"><i data-lucide="building-2"></i><span class="n">clients</span></div>
+    <div class="ic"><i data-lucide="users"></i><span class="n">users</span></div>
+    <div class="ic"><i data-lucide="radar"></i><span class="n">recon</span></div>
+    <div class="ic"><i data-lucide="search"></i><span class="n">search</span></div>
+    <div class="ic"><i data-lucide="file-text"></i><span class="n">reports</span></div>
+    <div class="ic"><i data-lucide="git-branch"></i><span class="n">attack-path</span></div>
+    <div class="ic"><i data-lucide="log-out"></i><span class="n">logout</span></div>
+  </div>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>lucide.createIcons({ attrs: { 'stroke-width': 2 } });</script>
+</body>
+</html>

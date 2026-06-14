@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Users — Vulnex{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-subtitle">{{ users|length }} user{{ users|length|pluralize }}</p>
+    </div>
+    <a href="{% url 'accounts:user_create' %}" class="btn btn-primary">+ Create user</a>
+</div>
+
+<div class="card">
+    {% if users %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Engagements</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in users %}
+            <tr>
+                <td>
+                    <div class="user-cell">
+                        <div class="avatar-sm" style="background:{{ u.avatar_color }}">{{ u.initials }}</div>
+                        <div>
+                            <div class="user-cell-name">{{ u.get_full_name|default:u.username }}</div>
+                            <div class="user-cell-meta">{{ u.username }}</div>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-mono text-sm">{{ u.email|default:"—" }}</td>
+                <td><span class="badge badge-{% if u.role == 'admin' %}completed{% elif u.role == 'pentester' %}low{% elif u.role == 'reviewer' %}medium{% else %}info{% endif %}">{{ u.get_role_display }}</span></td>
+                <td>
+                    {% if u.is_active %}
+                    <span class="badge badge-completed">Active</span>
+                    {% else %}
+                    <span class="badge badge-cancelled">Inactive</span>
+                    {% endif %}
+                </td>
+                <td class="text-mono">{{ u.memberships.count }}</td>
+                <td class="text-right">
+                    <div class="btn-group">
+                        <a href="{% url 'accounts:user_edit' u.pk %}" class="btn btn-sm">Edit</a>
+                        {% if u != request.user %}
+                        <a href="{% url 'accounts:user_delete' u.pk %}" class="btn btn-sm btn-danger">Delete</a>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No users found.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

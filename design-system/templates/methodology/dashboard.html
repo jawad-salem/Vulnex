@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load methodology_tags %}
+{% block title %}Methodology — {{ engagement.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Methodology</span>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Methodology</h1>
+        <p class="page-subtitle">
+            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+            &middot; Testing checklists
+        </p>
+    </div>
+</div>
+
+{% for methodology in methodologies %}
+<div class="card mb-4">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">{{ methodology.name }}</h2>
+            {% if methodology.description %}
+            <p class="text-sm text-secondary mt-1">{{ methodology.description|truncatechars:120 }}</p>
+            {% endif %}
+        </div>
+        <form method="post" action="{% url 'methodology:apply' engagement.pk methodology.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm">Apply checklist</button>
+        </form>
+    </div>
+
+    {% for category in methodology.categories.all %}
+    <div class="mb-4">
+        <h3 class="detail-label" style="padding-bottom:6px;border-bottom:1px solid var(--border-light);margin-bottom:8px">
+            {{ category.name }}
+        </h3>
+        {% for item in category.items.all %}
+        {% with ec=checklist_progress|get_checklist:item.pk %}
+        <div class="checklist-item flex items-start gap-3 flex-wrap" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
+            <div style="flex:1;min-width:0">
+                <div class="flex items-center gap-2">
+                    {% if item.reference_id %}
+                    <span class="text-mono text-xs" style="color:var(--accent-light);background:var(--accent-bg);padding:1px 6px;border-radius:4px;flex-shrink:0">{{ item.reference_id }}</span>
+                    {% endif %}
+                    <span class="text-sm{% if ec and ec.status == 'completed' %} text-muted{% endif %}" {% if ec and ec.status == 'completed' %}style="text-decoration:line-through"{% endif %}>{{ item.title }}</span>
+                </div>
+                {% if item.description %}
+                <p class="text-sm text-secondary mt-1">{{ item.description|truncatechars:100 }}</p>
+                {% endif %}
+                {% if ec and ec.notes %}
+                <p class="text-xs text-muted mt-1" style="font-style:italic">{{ ec.notes }}</p>
+                {% endif %}
+            </div>
+            <form method="post" action="{% url 'methodology:update_item' engagement.pk item.pk %}" class="flex gap-1 items-center" style="flex-shrink:0">
+                {% csrf_token %}
+                <select name="status" class="form-input form-input--compact methodology-status-select" data-autosubmit>
+                    <option value="not_started" {% if not ec or ec.status == "not_started" %}selected{% endif %}>Not Started</option>
+                    <option value="in_progress" {% if ec and ec.status == "in_progress" %}selected{% endif %}>In Progress</option>
+                    <option value="completed" {% if ec and ec.status == "completed" %}selected{% endif %}>Completed</option>
+                    <option value="not_applicable" {% if ec and ec.status == "not_applicable" %}selected{% endif %}>N/A</option>
+                </select>
+            </form>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+{% empty %}
+<div class="card">
+    <div class="empty-state">
+        <p>No methodologies available.</p>
+        <p class="text-sm text-secondary">Create methodologies in the admin panel to use testing checklists.</p>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}

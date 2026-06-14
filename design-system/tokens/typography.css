@@ -1,0 +1,45 @@
+/* ── Vulnex · Typography tokens ─────────────────────────────────────
+   Native UI sans for product chrome; a developer monospace for any
+   "machine" text — hosts, ports, CVSS vectors, scan counts, scores.
+   Mono is a load-bearing brand signal here, not just for code.
+   ------------------------------------------------------------------- */
+:root {
+    /* ── Families ── */
+    --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans: var(--font);
+
+    /* ── Type scale (px — the product is a fixed 14px-base dark UI) ── */
+    --text-2xs: 10px;   /* sidebar section labels, manifest tags    */
+    --text-xs: 11px;    /* table headers, badges, meta              */
+    --text-sm: 12px;    /* sub-copy, captions, form labels          */
+    --text-base: 13px;  /* default body / controls                 */
+    --text-md: 14px;    /* body emphasis, card titles, nav          */
+    --text-lg: 15px;    /* card titles                             */
+    --text-xl: 18px;    /* prose h1                                */
+    --text-2xl: 22px;   /* page titles                            */
+    --text-3xl: 28px;   /* hero titles, big stat values           */
+    --text-display: 72px; /* error codes                          */
+
+    /* ── Weights ── */
+    --weight-normal: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+
+    /* ── Line heights ── */
+    --leading-tight: 1.25;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.7;
+
+    /* ── Letter spacing (uppercase eyebrows / labels) ── */
+    --tracking-label: 0.3px;
+    --tracking-eyebrow: 0.5px;
+    --tracking-mono: 0.12em;
+
+    /* ── Semantic aliases ── */
+    --text-page-title: var(--text-2xl);
+    --text-hero: var(--text-3xl);
+    --text-card-title: var(--text-lg);
+    --text-body-size: var(--text-base);
+}

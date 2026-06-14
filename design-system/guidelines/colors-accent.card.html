@@ -1,0 +1,25 @@
+<!-- @dsCard group="Colors" viewport="700x160" name="Brand accent" subtitle="A single violet — primary actions, active nav, links, focus rings" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { background: var(--bg-primary); padding: 20px; display:flex; gap: 14px; align-items: stretch; }
+  .big { flex: 1.4; border-radius: var(--radius-lg); background: var(--accent); display:flex; flex-direction:column; justify-content:flex-end; padding: 14px; }
+  .big .name { color:#fff; font-weight:700; font-size:14px; }
+  .big .hex { color:rgba(255,255,255,.8); font-family:var(--font-mono); font-size:11px; }
+  .col { flex:1; display:flex; flex-direction:column; gap: 10px; }
+  .sw { flex:1; border-radius: var(--radius); padding: 10px 12px; display:flex; flex-direction:column; justify-content:flex-end; border:1px solid var(--border-light); }
+  .name { font-size:11px; font-weight:600; }
+  .hex { font-family: var(--font-mono); font-size:10px; opacity:.85; margin-top:2px; }
+</style>
+</head>
+<body>
+  <div class="big"><div class="name">accent</div><div class="hex">#7a60e0</div></div>
+  <div class="col">
+    <div class="sw" style="background:#a28ff0; color:#0d1117"><div class="name">accent-light</div><div class="hex">#a28ff0</div></div>
+    <div class="sw" style="background:var(--accent-bg); color:var(--accent-light)"><div class="name">accent-bg</div><div class="hex">rgba(122,96,224,.12)</div></div>
+  </div>
+</body>
+</html>

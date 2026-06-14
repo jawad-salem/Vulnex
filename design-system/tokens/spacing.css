@@ -1,0 +1,43 @@
+/* ── Vulnex · Spacing, radii, elevation ─────────────────────────────
+   The product is border-driven: depth comes from 1px borders and
+   subtle background steps, NOT big drop shadows. Shadows appear only
+   on focus rings, active phase dots, and floating popovers.
+   ------------------------------------------------------------------- */
+:root {
+    /* ── Radii ── */
+    --radius: 8px;       /* buttons, inputs, chips, nav items      */
+    --radius-lg: 12px;   /* cards, panels, stat cards              */
+    --radius-sm: 4px;    /* code chips, scope targets, tags        */
+    --radius-pill: 20px; /* badges                                 */
+    --radius-full: 50%;  /* avatars, dots                          */
+
+    /* ── Spacing scale (matches utility classes) ── */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* ── Common paddings ── */
+    --card-pad: 20px;        /* card / panel interior              */
+    --control-pad-y: 8px;    /* button / input vertical            */
+    --control-pad-x: 16px;   /* button horizontal                  */
+    --layout-pad: 24px 32px; /* main content gutter                */
+    --sidebar-width: 240px;
+
+    /* ── Borders ── */
+    --border-width: 1px;
+    --border-accent-width: 3px; /* active nav / quote left rail    */
+
+    /* ── Elevation (used sparingly) ── */
+    --focus-ring: 0 0 0 3px var(--accent-bg);
+    --shadow-phase: 0 0 0 4px rgba(122, 96, 224, 0.2); /* active dot glow */
+    --shadow-popover: 0 14px 30px rgba(0, 0, 0, 0.55); /* floating panels */
+
+    /* ── Motion ── */
+    --transition-fast: 0.15s; /* @kind other */
+    --transition-base: 0.2s; /* @kind other */
+    --ease: ease; /* @kind other */
+}

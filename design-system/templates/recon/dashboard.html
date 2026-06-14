@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block title %}Recon — {{ engagement.name }} — Vulnex{% endblock %}
+{% block breadcrumbs %}
+<nav class="breadcrumbs">
+    <a href="{% url 'engagements:list' %}">Engagements</a>
+    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
+    <span class="bc-sep">&#8250;</span>
+    <span class="bc-current">Recon</span>
+</nav>
+{% endblock %}
+{% block content %}
+
+<!-- ── Hero ── -->
+<div class="eng-hero">
+    <div class="eng-hero-main">
+        <h1 class="eng-hero-title">Reconnaissance</h1>
+        <div class="eng-hero-meta">
+            <span class="eng-meta-item eng-meta-client">
+                <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
+            </span>
+        </div>
+    </div>
+    <div class="eng-hero-actions">
+        <a href="{% url 'recon:host_add' engagement.pk %}" class="btn btn-primary">+ Add host</a>
+    </div>
+</div>
+
+<!-- ── KPI strip ── -->
+<div class="kpi-strip">
+    <div class="kpi-item">
+        <div class="kpi-label">Hosts</div>
+        <div class="kpi-value">{{ hosts|length }}</div>
+        <div class="kpi-sub">discovered</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Scans</div>
+        <div class="kpi-value">{{ scans|length }}</div>
+        <div class="kpi-sub">total</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Pipelines</div>
+        <div class="kpi-value">{{ pipeline_count }}</div>
+        <div class="kpi-sub">multi-scan</div>
+    </div>
+    <div class="kpi-item">
+        <div class="kpi-label">Scheduled</div>
+        <div class="kpi-value">{{ scheduled_scans|length }}</div>
+        <div class="kpi-sub">recurring</div>
+    </div>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+    <div class="tab-nav" role="tablist">
+        <button class="tab-btn active" data-tab="overview" role="tab">Overview</button>
+        <button class="tab-btn" data-tab="hosts" role="tab">Hosts{% if hosts %} <span class="tab-count">{{ hosts|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="scans" role="tab">Scans{% if scans %} <span class="tab-count">{{ scans|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="schedule" role="tab">Schedule{% if scheduled_scans %} <span class="tab-count">{{ scheduled_scans|length }}</span>{% endif %}</button>
+        <button class="tab-btn" data-tab="import" role="tab">Import</button>
+    </div>
+
+    <!-- Overview tab -->
+    <div class="tab-panel active" id="tab-overview" role="tabpanel">
+        <div class="grid-2">
+            <div class="card">
+                <h2 class="card-title mb-4">New scan</h2>
+                <form method="post" action="{% url 'recon:start_scan' engagement.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="{{ scan_form.scan_type.id_for_label }}">Scan type</label>
+                        {{ scan_form.scan_type }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ scan_form.target.id_for_label }}">Target</label>
+                        {{ scan_form.target }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Start scan</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2 class="card-title mb-4">Multi-scan</h2>
+                <form method="post" action="{% url 'recon:start_pipeline' engagement.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="{{ pipeline_form.preset.id_for_label }}">Scan type</label>
+                        {{ pipeline_form.preset }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ pipeline_form.target.id_for_label }}">Target</label>
+                        {{ pipeline_form.target }}
+                    </div>
+                    <div id="pipeline-desc" class="text-xs text-secondary mb-3" style="min-height:18px"></div>
+                    <button type="submit" class="btn btn-primary">Run multi-scan</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2 class="card-title">Recent scans</h2>
+            </div>
+            {% if recent_scan_groups %}
+            <div class="scan-feed">
+                {% for group in recent_scan_groups %}
+                {% if group.kind == 'pipeline' %}
+                <details class="scan-feed__pipeline" {% if forloop.first %}open{% endif %}>
+                    <summary class="scan-feed__pipeline-head">
+                        <span class="scan-feed__pipeline-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h6M14 6h6M4 12h16M4 18h10M18 18h2"/><circle cx="12" cy="6" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+                        </span>
+                        <div class="scan-feed__pipeline-meta">
+                            <div class="scan-feed__pipeline-title">
+                                <a href="{% url 'recon:pipeline_detail' engagement.pk group.pipeline.pk %}">{{ group.pipeline.name }}</a>
+                                <span class="badge badge-{{ group.pipeline.status }}">{{ group.pipeline.get_status_display }}</span>
+                            </div>
+                            <div class="scan-feed__pipeline-sub text-mono">
+                                <span>{{ group.pipeline.target|truncatechars:40 }}</span>
+                                <span class="scan-feed__dot">·</span>
+                                <span>{{ group.scans|length }} scan{{ group.scans|length|pluralize }}</span>
+                                <span class="scan-feed__dot">·</span>
+                                <span>{{ group.pipeline.created_at|date:"M d, H:i" }}</span>
+                            </div>
+                        </div>
+                        <svg class="scan-feed__chevron" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
+                    </summary>
+                    <div class="scan-feed__pipeline-children">
+                        {% for scan in group.scans %}
+                        <a href="{% url 'recon:scan_detail' scan.pk %}" class="scan-feed__child">
+                            <span class="scan-feed__child-rail" aria-hidden="true"></span>
+                            <span class="scan-feed__child-type">{{ scan.get_scan_type_display }}</span>
+                            <span class="scan-feed__child-target text-mono">{{ scan.target|truncatechars:30 }}</span>
+                            <span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span>
+                            <span class="scan-feed__child-count text-mono">{{ scan.result_count }}</span>
+                            <span class="scan-feed__child-time text-mono">{{ scan.created_at|date:"H:i" }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% else %}
+                <a href="{% url 'recon:scan_detail' group.scan.pk %}" class="scan-feed__row">
+                    <span class="scan-feed__row-type">{{ group.scan.get_scan_type_display }}</span>
+                    <span class="scan-feed__row-target text-mono">{{ group.scan.target|truncatechars:30 }}</span>
+                    <span class="badge badge-{{ group.scan.status }}">{{ group.scan.get_status_display }}</span>
+                    <span class="scan-feed__row-count text-mono">{{ group.scan.result_count }}</span>
+                    <span class="scan-feed__row-time text-mono">{{ group.scan.created_at|date:"M d, H:i" }}</span>
+                </a>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No scans yet. Start one above.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Hosts tab -->
+    <div class="tab-panel" id="tab-hosts" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Discovered hosts</h2>
+                <span class="text-xs text-muted">{{ hosts|length }} total</span>
+            </div>
+            {% if hosts %}
+            <div class="hosts-grid">
+                {% for host in hosts %}
+                <a href="{% url 'recon:host_detail' engagement.pk host.pk %}" class="host-card">
+                    <div class="flex-between">
+                        <div>
+                            <div class="text-mono font-semibold" style="font-size:13px">{{ host.hostname }}</div>
+                            {% if host.ip_address %}
+                            <div class="text-mono text-xs text-secondary">{{ host.ip_address }}</div>
+                            {% endif %}
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><polyline points="9 18 15 12 9 6"/></svg>
+                    </div>
+                    {% if host.ports %}
+                    <div class="flex gap-1 flex-wrap mt-2">
+                        {% for port in host.ports|slice:":8" %}
+                        <span class="badge badge-info text-mono">
+                            {% if port.port %}{{ port.port }}/{{ port.protocol|default:"tcp" }}{% else %}{{ port }}{% endif %}
+                        </span>
+                        {% endfor %}
+                        {% if host.ports|length > 8 %}
+                        <span class="text-xs text-muted">+{{ host.ports|length|add:"-8" }} more</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if host.technologies %}
+                    <div class="flex gap-1 flex-wrap mt-1">
+                        {% for tech in host.technologies|slice:":5" %}
+                        <span class="tech-tag" title="{{ tech }}">{{ tech }}</span>
+                        {% endfor %}
+                        {% if host.technologies|length > 5 %}
+                        <span class="text-xs text-muted">+{{ host.technologies|length|add:"-5" }} more</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if host.notes %}
+                    <div class="text-xs text-muted mt-1" style="font-style:italic">{{ host.notes|truncatechars:60 }}</div>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                <p>No hosts discovered yet.</p>
+                <p class="text-xs">Run a scan or add a host manually.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Scans tab -->
+    <div class="tab-panel" id="tab-scans" role="tabpanel">
+        {% if pipelines %}
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Pipelines</h2>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Name</th><th>Target</th><th>Status</th><th>Progress</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for p in pipelines %}
+                    <tr>
+                        <td><a href="{% url 'recon:pipeline_detail' engagement.pk p.pk %}">{{ p.name }}</a></td>
+                        <td class="text-mono text-sm">{{ p.target|truncatechars:25 }}</td>
+                        <td><span class="badge badge-{{ p.status }}">{{ p.get_status_display }}</span></td>
+                        <td>
+                            <div class="progress-bar-mini">
+                                <div class="progress-fill" style="width:{{ p.progress_percent }}%"></div>
+                            </div>
+                            <span class="text-xs text-secondary">{{ p.progress_percent }}%</span>
+                        </td>
+                        <td class="text-sm text-secondary">{{ p.created_at|date:"M d, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="card {% if pipelines %}mt-4{% endif %}">
+            <div class="card-header">
+                <h2 class="card-title">Full scan history</h2>
+                <span class="text-xs text-muted">{{ scans|length }} total</span>
+            </div>
+            {% if scans %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>Type</th><th>Target</th><th>Status</th><th>Results</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for scan in scans %}
+                    <tr>
+                        <td><a href="{% url 'recon:scan_detail' scan.pk %}">{{ scan.get_scan_type_display }}</a></td>
+                        <td class="text-mono text-sm">{{ scan.target|truncatechars:30 }}</td>
+                        <td><span class="badge badge-{{ scan.status }}">{{ scan.get_status_display }}</span></td>
+                        <td class="text-mono">{{ scan.result_count }}</td>
+                        <td class="text-sm text-secondary">{{ scan.created_at|date:"M d, H:i" }}</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No scans yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Schedule tab -->
+    <div class="tab-panel" id="tab-schedule" role="tabpanel">
+        <div class="grid-2">
+            <div class="card">
+                <h2 class="card-title mb-4">Schedule recurring scan</h2>
+                <form method="post" action="{% url 'recon:create_scheduled' engagement.pk %}">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="{{ scheduled_form.scan_type.id_for_label }}">Scan type</label>
+                        {{ scheduled_form.scan_type }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ scheduled_form.target.id_for_label }}">Target</label>
+                        {{ scheduled_form.target }}
+                    </div>
+                    <div class="form-group">
+                        <label for="{{ scheduled_form.frequency.id_for_label }}">Frequency</label>
+                        {{ scheduled_form.frequency }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create schedule</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Active schedules</h2>
+                </div>
+                {% if scheduled_scans %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Type</th><th>Target</th><th>Frequency</th><th>Status</th><th>Runs</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                        {% for ss in scheduled_scans %}
+                        <tr>
+                            <td>{{ ss.get_scan_type_display }}</td>
+                            <td class="text-mono text-sm">{{ ss.target|truncatechars:25 }}</td>
+                            <td>{{ ss.get_frequency_display }}</td>
+                            <td>
+                                {% if ss.is_active %}
+                                <span class="badge badge-completed">Active</span>
+                                {% else %}
+                                <span class="badge badge-pending">Paused</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-mono">{{ ss.run_count }}</td>
+                            <td class="text-right">
+                                <form method="post" action="{% url 'recon:toggle_scheduled' engagement.pk ss.pk %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm" title="{% if ss.is_active %}Pause{% else %}Resume{% endif %}">
+                                        {% if ss.is_active %}Pause{% else %}Resume{% endif %}
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'recon:delete_scheduled' engagement.pk ss.pk %}" style="display:inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="empty-state compact">
+                    <div class="empty-state__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+                    </div>
+                    <p class="empty-state__title">No scheduled scans yet</p>
+                    <p class="empty-state__subtitle">Set up a daily or weekly recon sweep to catch new subdomains, ports, or tech changes automatically.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Import tab -->
+    <div class="tab-panel" id="tab-import" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-4">Import Nmap scan</h2>
+            <p class="text-secondary text-sm mb-3">Upload Nmap XML output to bulk-import discovered hosts. Generate the file with <code>nmap -oX scan.xml target</code>.</p>
+            <form method="post" action="{% url 'recon:import_nmap' engagement.pk %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="{{ import_form.file.id_for_label }}">Nmap XML file</label>
+                    {{ import_form.file }}
+                </div>
+                <button type="submit" class="btn btn-primary">Import hosts</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ pipeline_presets|json_script:"pipeline-presets" }}
+<script nonce="{{ request.csp_nonce }}">
+(function() {
+    var presets = JSON.parse(document.getElementById('pipeline-presets').textContent);
+    var select = document.querySelector('[name="preset"]');
+    var desc = document.getElementById('pipeline-desc');
+    if (select && desc) {
+        function update() {
+            var p = presets[select.value];
+            desc.textContent = p ? p.description : '';
+        }
+        select.addEventListener('change', update);
+        update();
+    }
+
+    // ── Tab switching ──
+    var tabs = document.querySelectorAll('.tab-btn');
+    var panels = document.querySelectorAll('.tab-panel');
+    function activate(name) {
+        tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
+        panels.forEach(function(p) { p.classList.toggle('active', p.id === 'tab-' + name); });
+    }
+    tabs.forEach(function(t) {
+        t.addEventListener('click', function() {
+            var name = this.dataset.tab;
+            activate(name);
+            history.replaceState(null, '', '#' + name);
+        });
+    });
+    var hash = (location.hash || '').replace('#', '');
+    if (hash && document.getElementById('tab-' + hash)) activate(hash);
+})();
+</script>
+{% endblock extra_js %}
