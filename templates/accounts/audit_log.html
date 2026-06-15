@@ -4,68 +4,40 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Audit log</h1>
-        <p class="page-subtitle">Platform-wide record of admin actions and security events.</p>
+        <p class="page-subtitle">Immutable record of security-relevant events</p>
     </div>
-    <a href="{% url 'accounts:user_list' %}" class="btn">Users</a>
+    <div class="btn-group">
+        <form method="get" style="margin:0">
+            <select name="action" class="form-input" data-autosubmit>
+                <option value="">All events</option>
+                {% for val, label in action_choices %}
+                <option value="{{ val }}" {% if action_filter == val %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        <a href="?export=csv{% if action_filter %}&action={{ action_filter }}{% endif %}" class="btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+        </a>
+    </div>
 </div>
-
-<form method="get" class="card mb-4 audit-filter-bar">
-    <label class="audit-filter-bar__label text-xs text-muted" for="action-filter">Filter by action</label>
-    <div class="audit-filter-bar__controls">
-        <select name="action" id="action-filter" class="form-input audit-filter-bar__select" data-autosubmit>
-            <option value="">All actions</option>
-            {% for val, label in action_choices %}
-            <option value="{{ val }}" {% if val == action_filter %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        {% if action_filter %}
-        <a href="{% url 'accounts:audit_log' %}" class="btn btn-sm">Clear</a>
-        {% endif %}
-    </div>
-</form>
 
 <div class="card">
     {% if logs %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>When</th>
-                    <th>Actor</th>
-                    <th>Action</th>
-                    <th>Target</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for log in logs %}
-            <tr>
-                <td class="text-mono text-sm" title="{{ log.timestamp|date:'Y-m-d H:i:s' }}">{{ log.timestamp|date:"M d, H:i" }}</td>
-                <td>
-                    {% if log.actor %}
-                    {{ log.actor.get_full_name|default:log.actor.username }}
-                    {% else %}
-                    <span class="text-muted">—</span>
-                    {% endif %}
-                </td>
-                <td><span class="badge badge-{% if 'delete' in log.action or 'failed' in log.action %}critical{% elif 'role' in log.action %}high{% elif 'create' in log.action %}low{% else %}info{% endif %}">{{ log.get_action_display }}</span></td>
-                <td class="text-mono text-sm">{{ log.target|default:"—" }}</td>
-                <td class="text-xs text-muted">
-                    {% for k, v in log.details.items %}{{ k }}: {{ v }}{% if not forloop.last %}, {% endif %}{% endfor %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <div class="audit-feed">
+        {% for log in logs %}
+        <div class="audit-row">
+            <span class="audit-dot audit-dot--{{ log.tone }}"></span>
+            <div class="audit-body">
+                <div class="audit-line"><b>{{ log.actor.username|default:"system" }}</b> <span class="audit-action">{{ log.get_action_display|lower }}</span></div>
+                {% if log.target %}<div class="audit-detail">{{ log.target|truncatechars:90 }}</div>{% endif %}
+            </div>
+            <span class="audit-time">{{ log.timestamp|date:"M j · H:i" }}</span>
+        </div>
+        {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state">
-        <div class="empty-state__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
-        </div>
-        <p class="empty-state__title">No audit entries yet</p>
-        <p class="empty-state__subtitle">Admin actions and security events like logins, role changes, and deletions will appear here.</p>
-    </div>
+    <div class="empty-state compact"><p class="text-secondary text-sm">No events recorded yet.</p></div>
     {% endif %}
 </div>
 {% endblock %}

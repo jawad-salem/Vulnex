@@ -1,4 +1,5 @@
 import base64
+import csv
 import io
 
 import qrcode
@@ -7,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import login as auth_login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django_otp import devices_for_user, user_has_device
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
@@ -213,8 +215,20 @@ def mfa_disable(request):
 @login_required
 @role_required('admin')
 def user_list(request):
-    users = User.objects.all().order_by('role', 'username')
-    return render(request, 'accounts/user_list.html', {'users': users})
+    users = list(User.objects.all().order_by('role', 'username'))
+    mfa_user_ids = set(
+        TOTPDevice.objects.filter(confirmed=True).values_list('user_id', flat=True)
+    )
+    for u in users:
+        u.has_mfa = u.id in mfa_user_ids
+    mfa_enabled = sum(1 for u in users if u.has_mfa)
+    return render(request, 'accounts/user_list.html', {
+        'users': users,
+        'total_users': len(users),
+        'mfa_enabled': mfa_enabled,
+        'without_mfa': len(users) - mfa_enabled,
+        'roles_count': len({u.role for u in users}),
+    })
 
 
 @login_required
@@ -301,14 +315,49 @@ def user_delete(request, pk):
     return render(request, 'accounts/user_confirm_delete.html', {'target_user': target_user})
 
 
+# Maps audit actions to a timeline dot tone for the feed.
+_AUDIT_TONE = {
+    'login_failed': 'danger', 'login_locked': 'danger',
+    'user_delete': 'danger', 'engagement_delete': 'danger',
+    'credential_delete': 'danger', 'credential_reveal': 'warn',
+    'client_deleted': 'danger', 'comment_delete': 'danger',
+    'mfa_disabled': 'warn',
+    'mfa_enabled': 'success', 'login_success': 'success',
+    'user_create': 'success', 'invitation_accepted': 'success',
+    'api_key_issued': 'success', 'client_created': 'success',
+}
+
+
+def _audit_tone(action):
+    return _AUDIT_TONE.get(action, 'accent')
+
+
 @login_required
 @role_required('admin')
 def audit_log(request):
-    logs = AuditLog.objects.select_related('actor').all()
+    logs_qs = AuditLog.objects.select_related('actor').all()
     action_filter = request.GET.get('action')
     if action_filter:
-        logs = logs.filter(action=action_filter)
-    logs = logs[:500]
+        logs_qs = logs_qs.filter(action=action_filter)
+
+    if request.GET.get('export') == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="vulnex_audit_log.csv"'
+        writer = csv.writer(response)
+        writer.writerow(['timestamp', 'actor', 'action', 'target', 'details'])
+        for log in logs_qs[:5000]:
+            writer.writerow([
+                log.timestamp.isoformat(),
+                log.actor.username if log.actor else 'system',
+                log.get_action_display(),
+                log.target,
+                log.details,
+            ])
+        return response
+
+    logs = list(logs_qs[:500])
+    for log in logs:
+        log.tone = _audit_tone(log.action)
     return render(request, 'accounts/audit_log.html', {
         'logs': logs,
         'action_choices': AuditLog.Action.choices,

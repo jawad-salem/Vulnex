@@ -4,64 +4,62 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Users</h1>
-        <p class="page-subtitle">{{ users|length }} user{{ users|length|pluralize }}</p>
+        <p class="page-subtitle">Platform accounts, roles &amp; access</p>
     </div>
-    <a href="{% url 'accounts:user_create' %}" class="btn btn-primary">+ Create user</a>
+    <a href="{% url 'accounts:user_create' %}" class="btn btn-primary">+ Invite user</a>
+</div>
+
+<div class="opstat-strip">
+    <div class="opstat">
+        <div class="opstat-label">Total users</div>
+        <div class="opstat-value">{{ total_users }}</div>
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">MFA enabled</div>
+        <div class="opstat-value" style="color:var(--success)">{{ mfa_enabled }}</div>
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">Without MFA</div>
+        <div class="opstat-value {% if without_mfa %}is-warn{% endif %}">{{ without_mfa }}</div>
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">Roles</div>
+        <div class="opstat-value">{{ roles_count }}</div>
+    </div>
 </div>
 
 <div class="card">
-    {% if users %}
     <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>User</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Status</th>
-                    <th>Engagements</th>
-                    <th></th>
-                </tr>
-            </thead>
+        <table class="op-table">
+            <thead><tr><th>User</th><th>Role</th><th>MFA</th><th>Status</th><th>Last active</th><th></th></tr></thead>
             <tbody>
             {% for u in users %}
-            <tr>
+            <tr class="row-link" data-href="{% url 'accounts:user_edit' u.pk %}">
                 <td>
                     <div class="user-cell">
-                        <div class="avatar-sm" style="background:{{ u.avatar_color }}">{{ u.initials }}</div>
-                        <div>
-                            <div class="user-cell-name">{{ u.get_full_name|default:u.username }}</div>
-                            <div class="user-cell-meta">{{ u.username }}</div>
-                        </div>
+                        <span class="mini-avatar" style="background:{{ u.avatar_color }}">{{ u.initials }}</span>
+                        <span class="op-finding">{{ u.get_full_name|default:u.username }}</span>
                     </div>
                 </td>
-                <td class="text-mono text-sm">{{ u.email|default:"—" }}</td>
-                <td><span class="badge badge-{% if u.role == 'admin' %}completed{% elif u.role == 'pentester' %}low{% elif u.role == 'reviewer' %}medium{% else %}info{% endif %}">{{ u.get_role_display }}</span></td>
+                <td>{{ u.get_role_display }}</td>
                 <td>
-                    {% if u.is_active %}
-                    <span class="badge badge-completed">Active</span>
-                    {% else %}
-                    <span class="badge badge-cancelled">Inactive</span>
-                    {% endif %}
+                    {% if u.has_mfa %}<span class="sig sig--green">Enabled</span>
+                    {% else %}<span class="sig sig--red">Disabled</span>{% endif %}
                 </td>
-                <td class="text-mono">{{ u.memberships.count }}</td>
+                <td>
+                    {% if u.is_active %}<span class="sig sig--green">Active</span>
+                    {% else %}<span class="sig sig--gray">Inactive</span>{% endif %}
+                </td>
+                <td class="text-secondary text-sm">{% if u.last_login %}{{ u.last_login|timesince }} ago{% else %}<span class="text-muted">never</span>{% endif %}</td>
                 <td class="text-right">
-                    <div class="btn-group">
-                        <a href="{% url 'accounts:user_edit' u.pk %}" class="btn btn-sm">Edit</a>
-                        {% if u != request.user %}
-                        <a href="{% url 'accounts:user_delete' u.pk %}" class="btn btn-sm btn-danger">Delete</a>
-                        {% endif %}
-                    </div>
+                    <a href="{% url 'accounts:user_edit' u.pk %}" class="kebab" aria-label="Edit {{ u.username }}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+                    </a>
                 </td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
-    {% else %}
-    <div class="empty-state">
-        <p>No users found.</p>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
