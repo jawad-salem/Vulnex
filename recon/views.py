@@ -18,6 +18,25 @@ def recon_dashboard(request, engagement_pk):
     engagement = request.engagement
     scans = engagement.scans.all().select_related('pipeline')
     hosts = engagement.discovered_hosts.all()
+
+    # Aggregate stats for the recon header strip.
+    open_ports = 0
+    services = set()
+    for h in hosts:
+        for p in (h.ports or []):
+            open_ports += 1
+            if isinstance(p, dict):
+                svc = p.get('service')
+                if svc:
+                    services.add(svc)
+    recon_stats = {
+        'hosts': hosts.count(),
+        'open_ports': open_ports,
+        'services': len(services),
+        'scans_run': scans.count(),
+        'running': scans.filter(status='running').count(),
+    }
+
     scan_form = ReconScanForm()
     import_form = NmapImportForm()
     scheduled_form = ScheduledScanForm()
@@ -61,6 +80,7 @@ def recon_dashboard(request, engagement_pk):
         'pipelines': pipelines,
         'pipeline_count': pipeline_count,
         'pipeline_presets': ScanPipeline.PIPELINE_PRESETS,
+        'recon_stats': recon_stats,
     }
     return render(request, 'recon/dashboard.html', context)
 

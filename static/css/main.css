@@ -3335,3 +3335,49 @@ th { letter-spacing: 0.5px; }
 .eng-detail-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .phase-stepper-card { padding: 8px 16px; }
 
+/* ── Neutral chip (types, tools, ports) ── */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.chip-mono { font-family: var(--font-mono); }
+.chip-teal { color: var(--accent-light); background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* ── Credential vault banner ── */
+.vault-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 13px 16px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.vault-banner svg { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+
+/* ── Recon ── */
+.recon-tech { display: flex; flex-wrap: wrap; gap: 5px; }
+.recon-ports { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.recon-port {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    padding: 2px 7px;
+    border-radius: 5px;
+}
+.recon-more { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+
