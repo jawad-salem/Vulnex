@@ -127,11 +127,18 @@ def engagement_detail(request, pk):
     risk_score = calculate_engagement_risk_score(all_findings)
     risk_label_text, risk_color = _risk_label(risk_score)
 
+    sev_counts = {
+        s: all_findings.filter(severity=s).count()
+        for s in ('critical', 'high', 'medium', 'low', 'info')
+    }
+    finding_total = sum(sev_counts.values())
+    resolved_count = all_findings.filter(status='remediated').count()
+
     context = {
         'engagement': engagement,
         'note_form': note_form,
         'notes': engagement.notes.select_related('author')[:20] if not is_client else [],
-        'findings': all_findings[:10],
+        'findings': all_findings.select_related('engagement')[:10],
         'activity': engagement.activity_logs.select_related('user')[:15] if not is_client else [],
         'members': members,
         'pending_invitations': pending_invitations,
@@ -141,6 +148,9 @@ def engagement_detail(request, pk):
         'risk_score': risk_score,
         'risk_label': risk_label_text,
         'risk_color': risk_color,
+        'sev_counts': sev_counts,
+        'finding_total': finding_total,
+        'resolved_count': resolved_count,
     }
     return render(request, 'engagements/detail.html', context)
 

@@ -3310,3 +3310,28 @@ th { letter-spacing: 0.5px; }
 .gen-card-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 .gen-card .btn { width: 100%; justify-content: center; }
 
+/* ── Engagement detail hero ── */
+.eng-detail-hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+.eng-detail-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.eng-detail-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.eng-detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+}
+.eng-meta-client { color: var(--accent-light); font-weight: 600; }
+.eng-meta-dot { color: var(--text-muted); }
+.eng-detail-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.phase-stepper-card { padding: 8px 16px; }
+
