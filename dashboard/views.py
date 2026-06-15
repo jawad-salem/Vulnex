@@ -2,7 +2,7 @@ from datetime import timedelta
 from django.db import connection
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, Q
+from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from credentials.models import Credential
@@ -117,7 +117,42 @@ def home(request):
         })
     engagement_risks.sort(key=lambda x: x['score'], reverse=True)
 
+    # ── Operator console ──
+    hour = timezone.localtime().hour
+    greeting = (
+        'Good morning' if hour < 12
+        else 'Good afternoon' if hour < 18
+        else 'Good evening'
+    )
+    open_findings_count = open_findings.count()
+    critical_open = open_findings.filter(severity='critical').count()
+    attention_count = open_findings.filter(severity__in=['critical', 'high']).count()
+    awaiting_review = (
+        0 if request.user.is_client
+        else findings.filter(review_state=Finding.ReviewState.IN_REVIEW).count()
+    )
+    in_test_count = engagements.filter(
+        status__in=['recon', 'scanning', 'exploitation', 'post_exploitation']
+    ).count()
+
+    # Triage queue — overdue first, then by CVSS desc.
+    triage_findings = list(
+        open_findings.select_related('engagement', 'assigned_to')
+        .annotate(overdue_rank=Case(
+            When(due_date__lt=today, then=Value(0)),
+            default=Value(1), output_field=IntegerField(),
+        ))
+        .order_by('overdue_rank', '-cvss_score', '-created_at')[:6]
+    )
+
     context = {
+        'greeting': greeting,
+        'open_findings_count': open_findings_count,
+        'critical_open': critical_open,
+        'attention_count': attention_count,
+        'awaiting_review': awaiting_review,
+        'in_test_count': in_test_count,
+        'triage_findings': triage_findings,
         'active_engagements': active_engagements,
         'total_findings': total_findings,
         'severity_counts': severity_counts,

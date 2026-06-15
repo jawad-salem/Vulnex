@@ -2,141 +2,112 @@
 {% load humanize %}
 {% block title %}Dashboard — Vulnex{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div>
-        <h1 class="page-title">Dashboard</h1>
-        <p class="page-subtitle">Welcome back, {{ user.first_name|default:user.username }}</p>
+<div class="op-head">
+    <div class="op-head-main">
+        <div class="op-kicker">Operator Console</div>
+        <h1 class="op-greeting">{{ greeting }}, {{ user.first_name|default:user.username }}</h1>
+        <p class="op-subtitle">{{ active_engagements }} active engagement{{ active_engagements|pluralize }} · {{ attention_count }} finding{{ attention_count|pluralize }} need attention</p>
     </div>
-    {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
-</div>
-
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-label">Risk Score</div>
-        <div class="stat-value" style="color:{{ risk_color }}">{{ overall_risk_score }}</div>
-        <div class="stat-sublabel" style="color:{{ risk_color }}">{{ risk_label }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Active engagements</div>
-        <div class="stat-value">{{ active_engagements }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Total findings</div>
-        <div class="stat-value">{{ total_findings }}</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Critical / High</div>
-        <div class="stat-value critical">{{ severity_counts.critical }}</div>
-        <div class="stat-sublabel high">{{ severity_counts.high }} high</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Overdue findings</div>
-        <div class="stat-value{% if overdue_count %} critical{% endif %}">{{ overdue_count }}</div>
-        <div class="stat-sublabel{% if due_soon_count %} high{% endif %}">{{ due_soon_count }} due soon</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">Assigned to me</div>
-        <div class="stat-value">{{ my_assigned_count }}</div>
-        <div class="stat-sublabel{% if my_assigned_overdue %} critical{% endif %}">{{ my_assigned_overdue }} overdue</div>
+    <div class="op-head-actions">
+        <a href="#recent-activity" class="btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+            Activity
+        </a>
+        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
     </div>
 </div>
 
-<!-- Charts row -->
-{% if total_findings > 0 %}
-<div class="grid-2 mb-4">
-    <div class="card">
-        <h2 class="card-title mb-3">Severity distribution</h2>
-        <div class="chart-container">
-            <canvas id="severityChart"></canvas>
-        </div>
+<!-- ── Stat strip ── -->
+<div class="opstat-strip">
+    <div class="opstat">
+        <div class="opstat-label">Active engagements</div>
+        <div class="opstat-value">{{ active_engagements }}</div>
+        {% if in_test_count %}<div class="opstat-tag">{{ in_test_count }} in test</div>{% endif %}
     </div>
-    <div class="card">
-        <h2 class="card-title mb-3">Finding status</h2>
-        <div class="chart-container">
-            <canvas id="statusChart"></canvas>
-        </div>
+    <div class="opstat">
+        <div class="opstat-label">Open findings</div>
+        <div class="opstat-value">{{ open_findings_count }}</div>
+        <div class="opstat-sub">across all engagements</div>
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">Critical</div>
+        <div class="opstat-value {% if critical_open %}is-critical{% endif %}">{{ critical_open }}</div>
+        <div class="opstat-sub {% if critical_open %}is-critical{% endif %}">{% if critical_open %}requires escalation{% else %}none open{% endif %}</div>
+    </div>
+    {% if not user.is_client %}
+    <div class="opstat">
+        <div class="opstat-label">Awaiting review</div>
+        <div class="opstat-value">{{ awaiting_review }}</div>
+        <div class="opstat-sub">in QA queue</div>
+    </div>
+    {% endif %}
+    <div class="opstat">
+        <div class="opstat-label">SLA overdue</div>
+        <div class="opstat-value {% if overdue_count %}is-warn{% endif %}">{{ overdue_count }}</div>
+        <div class="opstat-sub {% if overdue_count %}is-warn{% endif %}">{% if overdue_count %}past due date{% else %}all on track{% endif %}</div>
     </div>
 </div>
-<div class="grid-2 mb-4">
-    <div class="card">
-        <h2 class="card-title mb-3">Findings over time</h2>
-        <div class="chart-container-wide">
-            <canvas id="timelineChart"></canvas>
-        </div>
-    </div>
-    <div class="card">
-        <h2 class="card-title mb-3">Top engagements</h2>
-        <div class="chart-container-wide">
-            <canvas id="engChart"></canvas>
-        </div>
-    </div>
-</div>
-{% endif %}
 
-{% if overdue_findings %}
-<div class="card mb-4">
+<!-- ── Triage queue ── -->
+<div class="card">
     <div class="card-header">
-        <h2 class="card-title">Overdue findings</h2>
-        <span class="text-xs text-muted">{{ overdue_count }} past due</span>
+        <h2 class="card-title">Triage queue <span class="card-title-sub">highest-risk open findings</span></h2>
+        {% if recent_engagements %}<a href="{% url 'engagements:list' %}" class="card-link">View all →</a>{% endif %}
     </div>
+    {% if triage_findings %}
     <div class="table-wrap">
-        <table>
-            <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>Due</th><th>Overdue</th></tr></thead>
+        <table class="op-table">
+            <thead><tr><th>Finding</th><th>Severity</th><th>CVSS</th><th>SLA</th><th>Assignee</th></tr></thead>
             <tbody>
-            {% for f in overdue_findings %}
+            {% for f in triage_findings %}
             <tr>
-                <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
-                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
-                <td class="text-sm text-secondary">{{ f.due_date|date:"M d, Y" }}</td>
-                <td><span class="badge badge-overdue">{{ f.overdue_days }}d</span></td>
+                <td>
+                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:52 }}</a>
+                    {% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}
+                </td>
+                <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                <td><span class="cvss-num" style="color:{{ f.severity_color }}">{{ f.cvss_score|floatformat:1 }}</span></td>
+                <td>
+                    {% if f.sla_status == 'overdue' %}<span class="sig sig--red">overdue</span>
+                    {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold">due soon</span>
+                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td>
+                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
+    {% else %}
+    <div class="empty-state compact"><p class="text-secondary text-sm">No open findings to triage. 🎉</p></div>
+    {% endif %}
 </div>
-{% endif %}
 
-{% if urgent_findings %}
-<div class="card mb-4">
+<!-- ── Engagements ── -->
+<div class="card">
     <div class="card-header">
-        <h2 class="card-title">Urgent findings</h2>
-    </div>
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Finding</th><th>Severity</th><th>Engagement</th><th>CVSS</th></tr></thead>
-            <tbody>
-            {% for f in urgent_findings %}
-            <tr>
-                <td><a href="{{ f.get_absolute_url }}">{{ f.title|truncatechars:50 }}</a></td>
-                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td><a href="{{ f.engagement.get_absolute_url }}">{{ f.engagement.name|truncatechars:20 }}</a></td>
-                <td class="text-mono">{{ f.cvss_score|floatformat:1 }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-{% endif %}
-
-<div class="card mb-4">
-    <div class="card-header">
-        <h2 class="card-title">Recent engagements</h2>
-        <a href="{% url 'engagements:list' %}" class="btn btn-sm">View all</a>
+        <h2 class="card-title">Engagements</h2>
+        <a href="{% url 'engagements:list' %}" class="card-link">View all →</a>
     </div>
     {% if recent_engagements %}
     <div class="table-wrap">
-        <table>
-            <thead><tr><th>Name</th><th>Client</th><th>Status</th><th>Findings</th></tr></thead>
+        <table class="op-table">
+            <thead><tr><th>Engagement</th><th>Client</th><th>Phase</th><th>Findings</th><th>Window</th></tr></thead>
             <tbody>
             {% for e in recent_engagements %}
             <tr>
-                <td><a href="{{ e.get_absolute_url }}">{{ e.name }}</a></td>
-                <td>{{ e.client_name }}</td>
-                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
+                <td>
+                    <a href="{{ e.get_absolute_url }}" class="op-finding">{{ e.name|truncatechars:40 }}</a>
+                    <div class="op-finding-sub">{{ e.get_engagement_type_display }}</div>
+                </td>
+                <td>{{ e.client_name|default:"—" }}</td>
+                <td><span class="sig {% if e.status == 'exploitation' or e.status == 'post_exploitation' or e.status == 'reporting' %}sig--gold{% elif e.status == 'recon' or e.status == 'scanning' %}sig--blue{% elif e.status == 'completed' %}sig--green{% else %}sig--gray{% endif %}">{{ e.get_status_display }}</span></td>
                 <td class="text-mono">{{ e.finding_count }}</td>
+                <td class="op-window">{% if e.start_date %}{{ e.start_date|date:"M j" }}{% if e.end_date %} – {{ e.end_date|date:"M j, Y" }}{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>
@@ -144,154 +115,51 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
         <p>No engagements yet.</p>
         {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>{% endif %}
     </div>
     {% endif %}
 </div>
-{% endblock %}
 
-{% block extra_js %}
 {% if total_findings > 0 %}
-{{ severity_counts|json_script:"chart-severity-data" }}
-{{ status_counts|json_script:"chart-status-data" }}
-{{ timeline_labels|json_script:"chart-timeline-labels" }}
-{{ timeline_data|json_script:"chart-timeline-data" }}
-{{ top_eng_labels|json_script:"chart-eng-labels" }}
-{{ top_eng_data|json_script:"chart-eng-data" }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script nonce="{{ request.csp_nonce }}">
-(function() {
-    var fontColor = '#8b949e';
-    var gridColor = 'rgba(48, 54, 61, 0.6)';
-
-    Chart.defaults.color = fontColor;
-    Chart.defaults.font.family = "'Segoe UI', sans-serif";
-    Chart.defaults.font.size = 12;
-    Chart.defaults.plugins.legend.labels.boxWidth = 12;
-    Chart.defaults.plugins.legend.labels.padding = 16;
-
-    // Severity donut
-    var sevData = JSON.parse(document.getElementById('chart-severity-data').textContent);
-    new Chart(document.getElementById('severityChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
-            datasets: [{
-                data: [sevData.critical, sevData.high, sevData.medium, sevData.low, sevData.info],
-                backgroundColor: [
-                    'rgba(240, 88, 83, 0.8)',
-                    'rgba(240, 146, 54, 0.8)',
-                    'rgba(227, 179, 65, 0.8)',
-                    'rgba(88, 166, 255, 0.8)',
-                    'rgba(139, 148, 158, 0.8)'
-                ],
-                borderColor: '#1f2638',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    // Status donut
-    var statusData = JSON.parse(document.getElementById('chart-status-data').textContent);
-    new Chart(document.getElementById('statusChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Open', 'Confirmed', 'Remediated', 'False Positive', 'Accepted'],
-            datasets: [{
-                data: [statusData.open, statusData.confirmed, statusData.remediated, statusData.false_positive, statusData.accepted],
-                backgroundColor: [
-                    'rgba(240, 88, 83, 0.8)',
-                    'rgba(240, 146, 54, 0.8)',
-                    'rgba(63, 185, 80, 0.8)',
-                    'rgba(139, 148, 158, 0.8)',
-                    'rgba(227, 179, 65, 0.8)'
-                ],
-                borderColor: '#1f2638',
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '65%',
-            plugins: {
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-
-    // Timeline line chart
-    var timeLabels = JSON.parse(document.getElementById('chart-timeline-labels').textContent);
-    var timeData = JSON.parse(document.getElementById('chart-timeline-data').textContent);
-    if (timeLabels.length > 0) {
-        new Chart(document.getElementById('timelineChart'), {
-            type: 'line',
-            data: {
-                labels: timeLabels,
-                datasets: [{
-                    label: 'Findings',
-                    data: timeData,
-                    borderColor: '#7a60e0',
-                    backgroundColor: 'rgba(122, 96, 224, 0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    pointBackgroundColor: '#7a60e0',
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: gridColor }, ticks: { maxTicksLimit: 8 } },
-                    y: { grid: { color: gridColor }, beginAtZero: true, ticks: { stepSize: 1 } }
-                }
-            }
-        });
-    }
-
-    // Top engagements bar chart
-    var engLabels = JSON.parse(document.getElementById('chart-eng-labels').textContent);
-    var engData = JSON.parse(document.getElementById('chart-eng-data').textContent);
-    if (engLabels.length > 0) {
-        new Chart(document.getElementById('engChart'), {
-            type: 'bar',
-            data: {
-                labels: engLabels,
-                datasets: [{
-                    label: 'Findings',
-                    data: engData,
-                    backgroundColor: 'rgba(122, 96, 224, 0.6)',
-                    borderColor: '#7a60e0',
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { grid: { color: gridColor }, beginAtZero: true, ticks: { stepSize: 1 } },
-                    y: { grid: { display: false } }
-                }
-            }
-        });
-    }
-})();
-</script>
+<!-- ── Severity distribution ── -->
+<div class="card">
+    <div class="card-header"><h2 class="card-title">Severity distribution</h2></div>
+    <div class="sevdist-bar">
+        {% if severity_counts.critical %}<span class="sevdist-seg" style="flex:{{ severity_counts.critical }};background:var(--critical)"></span>{% endif %}
+        {% if severity_counts.high %}<span class="sevdist-seg" style="flex:{{ severity_counts.high }};background:var(--high)"></span>{% endif %}
+        {% if severity_counts.medium %}<span class="sevdist-seg" style="flex:{{ severity_counts.medium }};background:var(--medium)"></span>{% endif %}
+        {% if severity_counts.low %}<span class="sevdist-seg" style="flex:{{ severity_counts.low }};background:var(--low)"></span>{% endif %}
+        {% if severity_counts.info %}<span class="sevdist-seg" style="flex:{{ severity_counts.info }};background:var(--info)"></span>{% endif %}
+    </div>
+    <div class="sevdist-legend">
+        <span class="sevdist-item"><i style="background:var(--critical)"></i>Critical <b>{{ severity_counts.critical }}</b></span>
+        <span class="sevdist-item"><i style="background:var(--high)"></i>High <b>{{ severity_counts.high }}</b></span>
+        <span class="sevdist-item"><i style="background:var(--medium)"></i>Medium <b>{{ severity_counts.medium }}</b></span>
+        <span class="sevdist-item"><i style="background:var(--low)"></i>Low <b>{{ severity_counts.low }}</b></span>
+        <span class="sevdist-item"><i style="background:var(--info)"></i>Info <b>{{ severity_counts.info }}</b></span>
+    </div>
+</div>
 {% endif %}
+
+<!-- ── Recent activity ── -->
+<div class="card" id="recent-activity">
+    <div class="card-header"><h2 class="card-title">Recent activity</h2></div>
+    {% if recent_activity %}
+    <div class="opfeed">
+        {% for a in recent_activity|slice:":8" %}
+        <div class="opfeed-row">
+            <span class="opfeed-dot"></span>
+            <div class="opfeed-body">
+                <div class="opfeed-line"><b>{{ a.user|default:"system" }}</b> <span class="opfeed-action">{{ a.action|truncatechars:80 }}</span></div>
+            </div>
+            <span class="opfeed-time">{{ a.timestamp|timesince }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact"><p class="text-secondary text-sm">No recent activity.</p></div>
+    {% endif %}
+</div>
 {% endblock %}

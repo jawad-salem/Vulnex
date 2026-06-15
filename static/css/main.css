@@ -2909,3 +2909,187 @@ th { letter-spacing: 0.5px; }
      split-color wordmark (.auth-wordmark) sets its own colors, so no
      blanket h1 color override here. — */
 
+/* ════════════════════════════════════════════════════════════════════
+   OPERATOR CONSOLE — dashboard
+   ════════════════════════════════════════════════════════════════════ */
+.op-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+}
+.op-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 6px;
+}
+.op-greeting {
+    font-family: var(--font);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1.1;
+}
+.op-subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 6px; }
+.op-head-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+/* Stat strip */
+.opstat-strip {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    overflow: hidden;
+    margin-bottom: 18px;
+}
+.opstat {
+    padding: 16px 18px;
+    border-right: 1px solid var(--border-light);
+    min-width: 0;
+}
+.opstat:last-child { border-right: 0; }
+.opstat-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+.opstat-value {
+    font-family: var(--font);
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+}
+.opstat-value.is-critical { color: var(--critical); }
+.opstat-value.is-warn { color: var(--high); }
+.opstat-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; }
+.opstat-sub.is-critical { color: var(--critical); }
+.opstat-sub.is-warn { color: var(--high); }
+.opstat-tag {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-bg);
+    padding: 2px 8px;
+    border-radius: 5px;
+}
+@media (max-width: 900px) {
+    .opstat-strip { grid-auto-flow: row; grid-template-columns: repeat(2, 1fr); grid-auto-columns: auto; }
+    .opstat:nth-child(2n) { border-right: 0; }
+    .opstat { border-bottom: 1px solid var(--border-light); }
+}
+
+/* Card header sub-label + link */
+.card-title-sub {
+    font-weight: 400;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin-left: 8px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.card-link { font-size: 12.5px; color: var(--accent); font-weight: 500; white-space: nowrap; }
+.card-link:hover { color: var(--accent-light); }
+
+/* Operator tables */
+.op-table th { padding: 8px 14px; }
+.op-table td { padding: 12px 14px; vertical-align: middle; }
+.op-finding { font-weight: 600; font-size: 13.5px; color: var(--text-primary); }
+.op-finding:hover { color: var(--accent); }
+.op-finding-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.op-window { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
+.cvss-num { font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+
+/* Signal pills (severity / SLA / phase) */
+.sig {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 6px;
+    line-height: 1.45;
+    white-space: nowrap;
+}
+.sig::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.sig--critical { color: var(--critical); background: color-mix(in srgb, var(--critical) 15%, transparent); }
+.sig--high     { color: var(--high);     background: color-mix(in srgb, var(--high) 15%, transparent); }
+.sig--medium   { color: var(--medium);   background: color-mix(in srgb, var(--medium) 15%, transparent); }
+.sig--low      { color: var(--low);      background: color-mix(in srgb, var(--low) 15%, transparent); }
+.sig--info     { color: var(--info);     background: color-mix(in srgb, var(--info) 15%, transparent); }
+.sig--green    { color: var(--success);  background: color-mix(in srgb, var(--success) 15%, transparent); }
+.sig--gold     { color: var(--warning);  background: color-mix(in srgb, var(--warning) 15%, transparent); }
+.sig--red      { color: var(--danger);   background: color-mix(in srgb, var(--danger) 15%, transparent); }
+.sig--blue     { color: var(--low);      background: color-mix(in srgb, var(--low) 15%, transparent); }
+.sig--gray     { color: var(--text-secondary); background: color-mix(in srgb, var(--text-secondary) 13%, transparent); }
+
+/* Mini avatar (table assignee) */
+.mini-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    display: inline-grid;
+    place-items: center;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* Severity distribution */
+.sevdist-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    gap: 3px;
+    margin-bottom: 14px;
+}
+.sevdist-seg { border-radius: 3px; min-width: 6px; }
+.sevdist-legend { display: flex; flex-wrap: wrap; gap: 18px; }
+.sevdist-item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-secondary); }
+.sevdist-item i { width: 9px; height: 9px; border-radius: 3px; }
+.sevdist-item b { color: var(--text-primary); font-weight: 700; }
+
+/* Activity feed */
+.opfeed { display: flex; flex-direction: column; }
+.opfeed-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+}
+.opfeed-row:last-child { border-bottom: 0; }
+.opfeed-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: 6px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.opfeed-body { flex: 1; min-width: 0; }
+.opfeed-line { font-size: 13px; line-height: 1.5; }
+.opfeed-line b { font-weight: 600; color: var(--text-primary); }
+.opfeed-action { color: var(--text-secondary); }
+.opfeed-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; margin-top: 2px; }
+
