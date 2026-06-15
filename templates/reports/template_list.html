@@ -1,66 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Report templates — Vulnex{% endblock %}
-{% block breadcrumbs %}
-<nav class="breadcrumbs">
-    <a href="{% url 'dashboard:home' %}">Dashboard</a>
-    <span class="bc-sep">&#8250;</span>
-    <span class="bc-current">Report templates</span>
-</nav>
-{% endblock %}
+{% block title %}Report kits — Vulnex{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">Report templates</h1>
-        <p class="page-subtitle">Brand kits for generated PDFs — logo, colors, boilerplate.</p>
+        <h1 class="page-title">Report kits</h1>
+        <p class="page-subtitle">Reusable PDF templates &amp; section layouts</p>
     </div>
-    <div>
-        <a href="{% url 'reports:template_create' %}" class="btn btn-primary">+ New template</a>
-    </div>
+    <a href="{% url 'reports:template_create' %}" class="btn btn-primary">+ New kit</a>
 </div>
 
-<div class="card">
-    {% if templates %}
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Primary</th>
-                <th>Accent</th>
-                <th>Default</th>
-                <th>Created</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for t in templates %}
-            <tr>
-                <td><strong>{{ t.name }}</strong></td>
-                <td>
-                    <span class="color-swatch" style="background: {{ t.primary_color }};"></span>
-                    <code class="text-xs">{{ t.primary_color }}</code>
-                </td>
-                <td>
-                    <span class="color-swatch" style="background: {{ t.accent_color }};"></span>
-                    <code class="text-xs">{{ t.accent_color }}</code>
-                </td>
-                <td>
-                    {% if t.is_default %}<span class="badge badge-success">default</span>{% else %}<span class="text-xs text-secondary">—</span>{% endif %}
-                </td>
-                <td class="text-xs text-secondary">{{ t.created_at|date:"M d, Y" }}</td>
-                <td class="text-right">
-                    <a href="{% url 'reports:template_preview' t.pk %}" target="_blank" class="btn btn-sm">Preview</a>
-                    <a href="{% url 'reports:template_edit' t.pk %}" class="btn btn-sm">Edit</a>
-                    <a href="{% url 'reports:template_delete' t.pk %}" class="btn btn-sm btn-danger">Delete</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-        <p>No report templates yet.</p>
-        <p class="text-xs">Create one to brand the PDFs for a client.</p>
+{% if templates %}
+<div class="kit-list">
+    {% for t in templates %}
+    <div class="kit-card" style="--kit-accent:{{ t.primary_color }}">
+        <div class="kit-head">
+            <span class="kit-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="kit-name">{{ t.name }}</span>
+            {% if t.is_default %}<span class="kit-default">Default</span>{% endif %}
+        </div>
+        <div class="kit-sections">
+            <div class="kit-section"><span class="kit-section-no">01</span> Cover</div>
+            <div class="kit-section"><span class="kit-section-no">02</span> Executive summary</div>
+            <div class="kit-section"><span class="kit-section-no">03</span> Scope &amp; methodology</div>
+            <div class="kit-section"><span class="kit-section-no">04</span> All findings</div>
+            <div class="kit-section"><span class="kit-section-no">05</span> Evidence appendix</div>
+        </div>
+        <div class="kit-foot">
+            <a href="{% url 'reports:template_preview' t.pk %}" target="_blank" class="btn btn-sm">Preview</a>
+            <a href="{% url 'reports:template_edit' t.pk %}" class="btn btn-sm kit-edit">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4z"/></svg>
+                Edit layout
+            </a>
+            <a href="{% url 'reports:template_delete' t.pk %}" class="btn btn-sm btn-danger">Delete</a>
+        </div>
     </div>
-    {% endif %}
+    {% endfor %}
 </div>
+{% else %}
+<div class="empty-state">
+    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    <p>No report kits yet.</p>
+    <p class="text-xs">Create one to brand the PDFs for a client.</p>
+    <a href="{% url 'reports:template_create' %}" class="btn btn-primary mt-2">Create your first kit</a>
+</div>
+{% endif %}
 {% endblock %}

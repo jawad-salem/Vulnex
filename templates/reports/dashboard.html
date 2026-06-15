@@ -2,10 +2,8 @@
 {% block title %}Reports — {{ engagement.name }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="{% url 'engagements:list' %}">Engagements</a>
-    <span class="bc-sep">&#8250;</span>
-    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
-    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:24 }}</a>
+    <span class="bc-sep">/</span>
     <span class="bc-current">Reports</span>
 </nav>
 {% endblock %}
@@ -13,104 +11,116 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Reports</h1>
-        <p class="page-subtitle">
-            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
-            &middot; {{ reports|length }} report{{ reports|length|pluralize }}
-        </p>
+        <p class="page-subtitle">{{ engagement.name }} · {{ reports|length }} generated</p>
     </div>
 </div>
 
-<div class="grid-3">
-    <div>
-        {% if report_groups %}
-        {% for group in report_groups %}
-        {% with r=group.primary %}
-        <div class="report-card-stack{% if group.stacked %} is-stacked{% endif %}">
-            <div class="report-card-wrap">
-            <article class="report-card report-card--{{ r.report_type }}" data-type="{{ r.report_type }}">
-                <div class="report-card__bar" aria-hidden="true"></div>
-                <div class="report-card__body">
-                    <div class="report-card__meta">
-                        <span class="report-card__badge">{{ r.get_report_type_display }}</span>
-                        {% if group.stacked %}
-                        <span class="report-card__count" title="{{ group.stacked|length }} more generated within 60s">+{{ group.stacked|length }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="report-card__title">{{ r.get_report_type_display }}</div>
-                    <div class="report-card__foot">
-                        <span class="report-card__time"><span class="report-card__clock">{{ r.created_at|date:"H:i" }}</span> <span class="report-card__date">· {{ r.created_at|date:"M d" }}</span></span>
-                        <span class="report-card__dot">·</span>
-                        <span class="report-card__author">{{ r.generated_by|default:"System" }}</span>
-                    </div>
-                </div>
-                <a href="{% url 'reports:download' r.pk %}" class="btn btn-sm btn-primary report-card__cta">Download PDF</a>
-            </article>
-            </div>
-            {% if group.stacked %}
-            <details class="report-card__stack-list">
-                <summary>Show {{ group.stacked|length }} earlier {{ r.get_report_type_display|lower }}{{ group.stacked|length|pluralize }} in this run</summary>
-                {% for s in group.stacked %}
-                <a href="{% url 'reports:download' s.pk %}" class="report-card__stack-item">
-                    <span class="report-card__stack-time">{{ s.created_at|date:"H:i:s" }}</span>
-                    <span class="report-card__stack-author">· {{ s.generated_by|default:"System" }}</span>
-                    <span class="report-card__stack-dl">Download</span>
-                </a>
-                {% endfor %}
-            </details>
-            {% endif %}
+{% if can_generate %}
+<div class="gen-kicker">Generate new</div>
+{% if templates %}
+<div class="eng-filters mb-3">
+    <label class="detail-label" style="align-self:center">Brand kit</label>
+    <select class="form-input" id="genKitSelect">
+        <option value="">Client default</option>
+        {% for t in templates %}<option value="{{ t.pk }}">{{ t.name }}</option>{% endfor %}
+    </select>
+</div>
+{% endif %}
+<div class="gen-list">
+    <div class="gen-card" style="--gen-accent:var(--accent)">
+        <div class="gen-card-head">
+            <span class="gen-card-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="gen-card-name">Full technical</span>
         </div>
-        {% endwith %}
+        <p class="gen-card-desc">Complete report with executive summary, methodology, every finding, evidence and appendices.</p>
+        <form method="post" action="{% url 'reports:generate' engagement.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="report_type" value="full">
+            <input type="hidden" name="template" value="" class="gen-template-field">
+            <button type="submit" class="btn btn-primary">⬇ Generate PDF</button>
+        </form>
+    </div>
+    <div class="gen-card" style="--gen-accent:var(--warning)">
+        <div class="gen-card-head">
+            <span class="gen-card-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="gen-card-name">Executive summary</span>
+        </div>
+        <p class="gen-card-desc">Risk-focused overview for stakeholders. Severity rollup, business impact, no deep technical detail.</p>
+        <form method="post" action="{% url 'reports:generate' engagement.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="report_type" value="executive">
+            <input type="hidden" name="template" value="" class="gen-template-field">
+            <button type="submit" class="btn btn-primary">⬇ Generate PDF</button>
+        </form>
+    </div>
+    <div class="gen-card" style="--gen-accent:var(--accent)">
+        <div class="gen-card-head">
+            <span class="gen-card-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="gen-card-name">Technical detail</span>
+        </div>
+        <p class="gen-card-desc">Findings, reproduction steps and remediation for the engineering team.</p>
+        <form method="post" action="{% url 'reports:generate' engagement.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="report_type" value="technical">
+            <input type="hidden" name="template" value="" class="gen-template-field">
+            <button type="submit" class="btn btn-primary">⬇ Generate PDF</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<div class="gen-kicker" style="margin-top:24px">Generated reports</div>
+{% if report_groups %}
+{% for group in report_groups %}
+{% with r=group.primary %}
+<div class="report-card-stack{% if group.stacked %} is-stacked{% endif %}">
+    <div class="report-card-wrap">
+    <article class="report-card report-card--{{ r.report_type }}" data-type="{{ r.report_type }}">
+        <div class="report-card__bar" aria-hidden="true"></div>
+        <div class="report-card__body">
+            <div class="report-card__meta">
+                <span class="report-card__badge">{{ r.get_report_type_display }}</span>
+                {% if group.stacked %}<span class="report-card__count" title="{{ group.stacked|length }} more in this run">+{{ group.stacked|length }}</span>{% endif %}
+            </div>
+            <div class="report-card__title">{{ r.title|default:r.get_report_type_display }}</div>
+            <div class="report-card__foot">
+                <span class="report-card__time"><span class="report-card__clock">{{ r.created_at|date:"H:i" }}</span> <span class="report-card__date">· {{ r.created_at|date:"M d" }}</span></span>
+                <span class="report-card__dot">·</span>
+                <span class="report-card__author">{{ r.generated_by|default:"System" }}</span>
+            </div>
+        </div>
+        <a href="{% url 'reports:download' r.pk %}" class="btn btn-sm btn-primary report-card__cta">Download PDF</a>
+    </article>
+    </div>
+    {% if group.stacked %}
+    <details class="report-card__stack-list">
+        <summary>Show {{ group.stacked|length }} earlier in this run</summary>
+        {% for s in group.stacked %}
+        <a href="{% url 'reports:download' s.pk %}" class="report-card__stack-item">
+            <span class="report-card__stack-time">{{ s.created_at|date:"H:i:s" }}</span>
+            <span class="report-card__stack-author">· {{ s.generated_by|default:"System" }}</span>
+            <span class="report-card__stack-dl">Download</span>
+        </a>
         {% endfor %}
-        {% else %}
-        <div class="card">
-            <div class="empty-state">
-                <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <p>No reports generated yet.</p>
-                {% if can_generate %}<p class="text-xs">Generate your first report using the form on the right.</p>{% endif %}
-            </div>
-        </div>
-        {% endif %}
-    </div>
-
-    <div>
-        {% if can_generate %}
-        <div class="card">
-            <h2 class="card-title mb-4">Generate report</h2>
-            <form method="post" action="{% url 'reports:generate' engagement.pk %}">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label for="id_report_type">Report type</label>
-                    {{ generate_form.report_type }}
-                </div>
-                {% if templates %}
-                <div class="form-group">
-                    <label for="id_template">Template</label>
-                    {{ generate_form.template }}
-                    <span class="form-help">{{ generate_form.template.help_text }}</span>
-                </div>
-                {% endif %}
-                <button type="submit" class="btn btn-primary btn-full">Generate PDF</button>
-            </form>
-        </div>
-        {% endif %}
-
-        <div class="card">
-            <h2 class="card-title mb-3">Report types</h2>
-            <div class="detail-list">
-                <div class="detail-row flex-col items-start gap-1">
-                    <span class="detail-label">Full Report</span>
-                    <span class="text-xs text-secondary">Complete report with executive summary, scope, detailed findings, and remediation</span>
-                </div>
-                <div class="detail-row flex-col items-start gap-1">
-                    <span class="detail-label">Executive Summary</span>
-                    <span class="text-xs text-secondary">High-level overview for management — risk posture and key findings</span>
-                </div>
-                <div class="detail-row flex-col items-start gap-1">
-                    <span class="detail-label">Technical Detail</span>
-                    <span class="text-xs text-secondary">Deep technical findings with PoC, CVSS vectors, and remediation steps</span>
-                </div>
-            </div>
-        </div>
-    </div>
+    </details>
+    {% endif %}
 </div>
+{% endwith %}
+{% endfor %}
+{% else %}
+<div class="card"><div class="empty-state compact"><p class="text-secondary text-sm">No reports generated yet.</p></div></div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+(function(){
+    var sel = document.getElementById('genKitSelect');
+    if (!sel) return;
+    function sync(){
+        document.querySelectorAll('.gen-template-field').forEach(function(f){ f.value = sel.value; });
+    }
+    sel.addEventListener('change', sync);
+    sync();
+})();
+</script>
 {% endblock %}
