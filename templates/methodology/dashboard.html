@@ -1,12 +1,9 @@
 {% extends "base.html" %}
-{% load methodology_tags %}
 {% block title %}Methodology — {{ engagement.name }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
-    <a href="{% url 'engagements:list' %}">Engagements</a>
-    <span class="bc-sep">&#8250;</span>
-    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
-    <span class="bc-sep">&#8250;</span>
+    <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:24 }}</a>
+    <span class="bc-sep">/</span>
     <span class="bc-current">Methodology</span>
 </nav>
 {% endblock %}
@@ -14,61 +11,55 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Methodology</h1>
-        <p class="page-subtitle">
-            <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
-            &middot; Testing checklists
-        </p>
+        <p class="page-subtitle">Structured test cases &amp; coverage</p>
     </div>
 </div>
 
-{% for methodology in methodologies %}
-<div class="card mb-4">
-    <div class="card-header">
+{% if overall_total %}
+<div class="card">
+    <div class="cov-head">
+        <span class="cov-label">Overall coverage</span>
+        <span class="cov-count">{{ overall_done }} of {{ overall_total }}</span>
+    </div>
+    <div class="cov-bar"><span class="cov-fill" style="width:{% widthratio overall_done overall_total 100 %}%"></span></div>
+</div>
+{% endif %}
+
+{% for md in methodology_data %}
+<div class="meth-block">
+    <div class="meth-block-head">
         <div>
-            <h2 class="card-title">{{ methodology.name }}</h2>
-            {% if methodology.description %}
-            <p class="text-sm text-secondary mt-1">{{ methodology.description|truncatechars:120 }}</p>
-            {% endif %}
+            <h2 class="card-title">{{ md.methodology.name }}</h2>
+            {% if md.methodology.description %}<p class="text-sm text-secondary mt-1">{{ md.methodology.description|truncatechars:120 }}</p>{% endif %}
         </div>
-        <form method="post" action="{% url 'methodology:apply' engagement.pk methodology.pk %}">
+        <form method="post" action="{% url 'methodology:apply' engagement.pk md.methodology.pk %}">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm">Apply checklist</button>
         </form>
     </div>
 
-    {% for category in methodology.categories.all %}
-    <div class="mb-4">
-        <h3 class="detail-label" style="padding-bottom:6px;border-bottom:1px solid var(--border-light);margin-bottom:8px">
-            {{ category.name }}
-        </h3>
-        {% for item in category.items.all %}
-        {% with ec=checklist_progress|get_checklist:item.pk %}
-        <div class="checklist-item flex items-start gap-3 flex-wrap" style="padding:8px 0;border-bottom:1px solid var(--border-light)">
-            <div style="flex:1;min-width:0">
-                <div class="flex items-center gap-2">
-                    {% if item.reference_id %}
-                    <span class="text-mono text-xs" style="color:var(--accent-light);background:var(--accent-bg);padding:1px 6px;border-radius:4px;flex-shrink:0">{{ item.reference_id }}</span>
-                    {% endif %}
-                    <span class="text-sm{% if ec and ec.status == 'completed' %} text-muted{% endif %}" {% if ec and ec.status == 'completed' %}style="text-decoration:line-through"{% endif %}>{{ item.title }}</span>
-                </div>
-                {% if item.description %}
-                <p class="text-sm text-secondary mt-1">{{ item.description|truncatechars:100 }}</p>
-                {% endif %}
-                {% if ec and ec.notes %}
-                <p class="text-xs text-muted mt-1" style="font-style:italic">{{ ec.notes }}</p>
-                {% endif %}
-            </div>
-            <form method="post" action="{% url 'methodology:update_item' engagement.pk item.pk %}" class="flex gap-1 items-center" style="flex-shrink:0">
-                {% csrf_token %}
-                <select name="status" class="form-input form-input--compact methodology-status-select" data-autosubmit>
-                    <option value="not_started" {% if not ec or ec.status == "not_started" %}selected{% endif %}>Not Started</option>
-                    <option value="in_progress" {% if ec and ec.status == "in_progress" %}selected{% endif %}>In Progress</option>
-                    <option value="completed" {% if ec and ec.status == "completed" %}selected{% endif %}>Completed</option>
-                    <option value="not_applicable" {% if ec and ec.status == "not_applicable" %}selected{% endif %}>N/A</option>
-                </select>
-            </form>
+    {% for cat in md.categories %}
+    <div class="card meth-cat">
+        <div class="meth-cat-head">
+            <div class="meth-cat-title">{{ cat.category.name }} <span class="meth-cat-count">{{ cat.done }}/{{ cat.total }}</span></div>
+            <div class="meth-cat-bar"><span style="width:{% if cat.total %}{% widthratio cat.done cat.total 100 %}{% else %}0{% endif %}%"></span></div>
         </div>
-        {% endwith %}
+        {% for entry in cat.items %}
+        <form method="post" action="{% url 'methodology:update_item' engagement.pk entry.item.pk %}" class="meth-item">
+            {% csrf_token %}
+            <span class="meth-check meth-check--{{ entry.status }}">
+                {% if entry.status == 'completed' %}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                {% elif entry.status == 'in_progress' %}<span class="meth-half"></span>{% endif %}
+            </span>
+            {% if entry.item.reference_id %}<span class="meth-ref">{{ entry.item.reference_id }}</span>{% endif %}
+            <span class="meth-title {% if entry.status == 'completed' %}is-done{% endif %}">{{ entry.item.title }}</span>
+            <select name="status" class="meth-status meth-status--{{ entry.status }}" data-autosubmit>
+                <option value="not_started" {% if entry.status == 'not_started' %}selected{% endif %}>not started</option>
+                <option value="in_progress" {% if entry.status == 'in_progress' %}selected{% endif %}>in progress</option>
+                <option value="completed" {% if entry.status == 'completed' %}selected{% endif %}>done</option>
+                <option value="not_applicable" {% if entry.status == 'not_applicable' %}selected{% endif %}>n/a</option>
+            </select>
+        </form>
         {% endfor %}
     </div>
     {% endfor %}

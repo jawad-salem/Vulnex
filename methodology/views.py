@@ -18,10 +18,39 @@ def methodology_dashboard(request, engagement_pk):
     for ec in engagement.checklist_items.select_related('checklist_item').all():
         checklist_progress[ec.checklist_item_id] = ec
 
+    # Pre-compute coverage so the template can render progress bars cleanly.
+    methodology_data = []
+    overall_total = 0
+    overall_done = 0
+    for m in methodologies:
+        cats = []
+        m_total = m_done = 0
+        for cat in m.categories.all():
+            items = []
+            c_total = c_done = 0
+            for it in cat.items.all():
+                ec = checklist_progress.get(it.pk)
+                status = ec.status if ec else 'not_started'
+                items.append({'item': it, 'status': status, 'notes': ec.notes if ec else ''})
+                c_total += 1
+                if status == 'completed':
+                    c_done += 1
+            cats.append({'category': cat, 'items': items, 'done': c_done, 'total': c_total})
+            m_total += c_total
+            m_done += c_done
+        methodology_data.append({
+            'methodology': m, 'categories': cats, 'done': m_done, 'total': m_total,
+        })
+        overall_total += m_total
+        overall_done += m_done
+
     context = {
         'engagement': engagement,
         'methodologies': methodologies,
         'checklist_progress': checklist_progress,
+        'methodology_data': methodology_data,
+        'overall_total': overall_total,
+        'overall_done': overall_done,
     }
     return render(request, 'methodology/dashboard.html', context)
 
