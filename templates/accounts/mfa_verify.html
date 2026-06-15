@@ -1,28 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Verify — Vulnex{% endblock %}
+{% block title %}Two-factor authentication — Vulnex{% endblock %}
 {% block auth_content %}
 <div class="auth-page">
-    <div class="auth-card">
+    <div class="auth-shell">
         <div class="auth-brand">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <h1>Verify</h1>
-            <p>Enter the code from your authenticator app.</p>
+            <svg class="auth-shield" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h1 class="auth-wordmark"><b>Vul</b>nex</h1>
+            <p class="auth-tagline">Offensive Security Operations Platform</p>
         </div>
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group">
-                <label>{{ form.code.label }}</label>
-                {{ form.code }}
+
+        <div class="auth-card">
+            <div class="auth-card-head">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                <span>Two-factor authentication</span>
+            </div>
+            <p class="auth-sub">Enter the 6-digit code from your authenticator app.</p>
+
+            <form method="post" id="mfaForm">
+                {% csrf_token %}
+                <div class="mfa-digits" id="mfaDigits" aria-hidden="true">
+                    <span class="mfa-digit"></span><span class="mfa-digit"></span><span class="mfa-digit"></span>
+                    <span class="mfa-digit"></span><span class="mfa-digit"></span><span class="mfa-digit"></span>
+                </div>
+                <div class="mfa-input-wrap">
+                    {{ form.code }}
+                </div>
                 {% for error in form.code.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-            {% if form.non_field_errors %}
-            <div class="alert alert-error" style="margin-bottom:12px">
-                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
-            </div>
-            {% endif %}
-            <button type="submit" class="btn btn-primary btn-full">Verify</button>
-        </form>
-        <p class="auth-footer">Lost your device? Use one of your single-use backup tokens.</p>
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin:12px 0 0">
+                    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                </div>
+                {% endif %}
+
+                <button type="submit" class="btn btn-primary btn-full auth-submit mt-4">Verify &amp; sign in</button>
+            </form>
+            <a class="auth-back" href="{% url 'accounts:login' %}">Back</a>
+        </div>
+
+        <p class="auth-foot">Authorized use only · All activity is logged &amp; audited</p>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+(function(){
+    var input = document.querySelector('#mfaForm input[name="{{ form.code.html_name }}"]') || document.querySelector('#mfaForm input[type="text"]');
+    var cells = document.querySelectorAll('#mfaDigits .mfa-digit');
+    if (!input) return;
+    input.classList.add('mfa-hidden-input');
+    input.setAttribute('inputmode', 'numeric');
+    input.setAttribute('maxlength', '6');
+    input.focus();
+    function render(){
+        var v = (input.value || '').replace(/\D/g, '').slice(0, 6);
+        cells.forEach(function(c, i){
+            c.textContent = v[i] || '';
+            c.classList.toggle('is-filled', !!v[i]);
+            c.classList.toggle('is-active', i === v.length);
+        });
+    }
+    input.addEventListener('input', render);
+    document.getElementById('mfaDigits').addEventListener('click', function(){ input.focus(); });
+    render();
+})();
+</script>
 {% endblock %}

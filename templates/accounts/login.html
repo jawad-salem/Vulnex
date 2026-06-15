@@ -1,31 +1,69 @@
 {% extends "base.html" %}
-{% block title %}Log in — Vulnex{% endblock %}
+{% block title %}Sign in — Vulnex{% endblock %}
 {% block auth_content %}
 <div class="auth-page">
-    <div class="auth-card">
+    <div class="auth-shell">
         <div class="auth-brand">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#7c5cfc" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <h1>Vulnex</h1>
-            <p>Penetration testing workflow platform</p>
+            <svg class="auth-shield" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <h1 class="auth-wordmark"><b>Vul</b>nex</h1>
+            <p class="auth-tagline">Offensive Security Operations Platform</p>
         </div>
-        <form method="post">
-            {% csrf_token %}
-            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
-            {% for field in form %}
-            <div class="form-group">
-                <label>{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
-            </div>
-            {% endfor %}
-            {% if form.non_field_errors %}
-            <div class="alert alert-error" style="margin-bottom:12px">
-                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
-            </div>
-            {% endif %}
-            <button type="submit" class="btn btn-primary btn-full">Log in</button>
-        </form>
-        <p class="auth-footer">Contact your administrator for an account.</p>
+
+        <div class="auth-card">
+            <form method="post" autocomplete="off">
+                {% csrf_token %}
+                {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-error" style="margin-bottom:16px">
+                    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="form-group">
+                    <label for="{{ form.username.id_for_label }}">Username or email</label>
+                    {{ form.username }}
+                    {% for error in form.username.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </div>
+
+                <div class="form-group">
+                    <label for="{{ form.password.id_for_label }}">Password</label>
+                    <div class="auth-password">
+                        {{ form.password }}
+                        <button type="button" class="auth-password-toggle" data-password-toggle aria-label="Show password">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    {% for error in form.password.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+                </div>
+
+                <div class="auth-row">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="remember"> Remember this device
+                    </label>
+                    <a class="auth-link" href="{% url 'accounts:login' %}" title="Contact your administrator to reset your password">Forgot?</a>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full auth-submit">
+                    Continue
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+            </form>
+        </div>
+
+        <p class="auth-foot">Authorized use only · All activity is logged &amp; audited</p>
     </div>
 </div>
+{% endblock %}
+{% block extra_js %}
+<script nonce="{{ request.csp_nonce }}">
+document.querySelectorAll('[data-password-toggle]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+        var input = btn.parentElement.querySelector('input');
+        if (!input) return;
+        input.type = input.type === 'password' ? 'text' : 'password';
+        btn.classList.toggle('is-on');
+    });
+});
+</script>
 {% endblock %}
