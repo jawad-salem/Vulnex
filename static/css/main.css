@@ -1,38 +1,48 @@
-/* ── Vulnex — Dark Cybersecurity Theme ── */
+/* ══════════════════════════════════════════════════════════════════
+   VULNEX · OPERATOR CONSOLE
+   Purposeful, low-noise, instrument-grade. Near-monochrome neutral slate;
+   saturated color reserved exclusively for severity/status meaning.
+   One restrained accent — signal teal. Hairline structure. Mono for data.
+   Token names are preserved 1:1 from the original theme so every template
+   reskins with no markup changes.
+   ══════════════════════════════════════════════════════════════════ */
 :root {
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-tertiary: #1f2638;
-    --bg-card: #1f2638;
-    --bg-hover: #252d42;
-    --bg-input: #0d1117;
+    --bg-primary: #0a0d12;     /* app canvas            */
+    --bg-secondary: #0e1217;   /* sidebar / panels      */
+    --bg-tertiary: #1a212b;    /* raised chips / inputs */
+    --bg-card: #131922;        /* cards                 */
+    --bg-hover: #1e2731;
+    --bg-input: #11161d;
 
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-muted: #484f58;
+    --text-primary: #e7edf3;
+    --text-secondary: #93a0b0;
+    --text-muted: #5a6675;
 
-    --border: #353c4a;
-    --border-light: #262c3a;
+    --border: #262e39;
+    --border-light: #1a212a;
 
-    --accent: #7a60e0;
-    --accent-light: #a28ff0;
-    --accent-bg: rgba(122, 96, 224, 0.12);
+    /* The ONLY brand color — signal teal */
+    --accent: #16b8a6;
+    --accent-light: #2ad6c2;
+    --accent-bg: rgba(22, 184, 166, 0.13);
 
-    --critical: #f05853;
-    --high: #f09236;
+    /* Severity — the loud signals */
+    --critical: #f25a52;
+    --high: #f3974a;
     --medium: #e3b341;
-    --low: #58a6ff;
-    --info: #8b949e;
+    --low: #59a6ff;
+    --info: #8b94a3;
 
-    --success: #3fb950;
+    --success: #3fb86b;
     --warning: #e3b341;
-    --danger: #f05853;
+    --danger: #f25a52;
 
-    --radius: 8px;
-    --radius-lg: 12px;
+    /* Sharper, instrument-like geometry */
+    --radius: 6px;
+    --radius-lg: 10px;
 
-    --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    --font: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2612,4 +2622,112 @@ select.form-input option {
     .ap-lists { grid-template-columns: 1fr; }
     .ap-popover-grid { grid-template-columns: 1fr; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   OPERATOR CONSOLE · refinements
+   Appended last so it overrides earlier rules by source order. Removes
+   decorative motion/noise, sharpens signals, and retires the last
+   hard-coded violet values left over from the old theme.
+   ════════════════════════════════════════════════════════════════════ */
+
+/* — Type rhythm: slightly tighter, instrument-grade — */
+body { font-size: 13px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: var(--accent-bg); color: var(--accent-light); }
+
+/* Tabular, monospaced numerics everywhere data lives */
+.stat-value, .kpi-value, .error-code, .cell-cvss,
+td .text-mono, .text-mono { font-variant-numeric: tabular-nums; }
+
+/* — Sidebar: hairline accent rail, calmer brand — */
+.sidebar-brand { color: var(--text-primary); letter-spacing: -0.2px; }
+.sidebar-brand svg { color: var(--accent-light); }
+.nav-item.active::before { width: 2.5px; top: 8px; bottom: 8px; }
+
+/* — Cards: flat, no hover lift (motion = noise) — */
+.card { transition: border-color 0.15s; }
+.stat-card { transition: border-color 0.15s; }
+.stat-card:hover { transform: none; border-color: var(--accent); }
+.card:hover { border-color: var(--border); }
+
+/* — Stat values: a touch smaller, tighter — */
+.stat-value { font-size: 25px; letter-spacing: -0.5px; }
+.kpi-value { font-family: var(--font-mono); letter-spacing: -0.5px; }
+
+/* — Badges → sharp instrument tags (no pill, no zoom) — */
+.badge {
+    border-radius: var(--radius-sm, 4px);
+    padding: 2px 7px;
+    letter-spacing: 0.3px;
+    border: 1px solid transparent;
+}
+.badge:hover { transform: none; }
+.badge-critical { background: rgba(242, 90, 82, 0.14); color: var(--critical); border-color: rgba(242, 90, 82, 0.28); }
+.badge-high     { background: rgba(243, 151, 74, 0.14); color: var(--high); border-color: rgba(243, 151, 74, 0.28); }
+.badge-medium   { background: rgba(227, 179, 65, 0.14); color: var(--medium); border-color: rgba(227, 179, 65, 0.28); }
+.badge-low      { background: rgba(89, 166, 255, 0.14); color: var(--low); border-color: rgba(89, 166, 255, 0.28); }
+.badge-open     { background: rgba(242, 90, 82, 0.14); color: var(--critical); border-color: rgba(242, 90, 82, 0.28); }
+
+/* — Buttons: primary reads as a precise control, not a candy button — */
+.btn { font-weight: 550; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+.btn-primary { color: #04201d; font-weight: 600; }
+.btn-primary:hover { color: #04201d; }
+.btn.loading::after { border-top-color: currentColor; }
+
+/* — Inputs: teal focus ring, mono-friendly — */
+.form-input:focus, .global-search-input:focus {
+    box-shadow: 0 0 0 3px rgba(22, 184, 166, 0.10);
+}
+
+/* — Phase stepper: teal focus halo (was violet rgba) — */
+.phase-step.phase-active .phase-dot { box-shadow: 0 0 0 4px rgba(22, 184, 166, 0.20); }
+
+/* — Quick actions: flatten the gradient + violet tints to a calm teal tint — */
+.quick-action { border-left-width: 2px; transition: background 0.13s, border-color 0.13s; }
+.quick-action:hover { transform: none; }
+.quick-action.qa-primary {
+    background: var(--accent-bg);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-left-color: var(--accent);
+}
+.quick-action.qa-primary .qa-icon { background: var(--accent-bg); color: var(--accent-light); }
+.qa-icon { color: var(--accent-light); border-radius: var(--radius); }
+
+/* — Scope empty-state hatch: teal instead of violet — */
+.scope-empty {
+    background: repeating-linear-gradient(45deg, transparent, transparent 7px,
+        rgba(22, 184, 166, 0.025) 7px, rgba(22, 184, 166, 0.025) 8px);
+}
+
+/* — Scanner manifest: retire violet rgba leftovers — */
+.manifest-tag, .manifest-dl dt, .manifest-cmd-accent { color: var(--accent); }
+.manifest-tag::before { background: var(--accent); box-shadow: 0 0 0 2px rgba(22, 184, 166, 0.18); }
+.manifest-row:hover { background: rgba(22, 184, 166, 0.05); }
+.manifest-row:hover .manifest-num { color: var(--accent); }
+.manifest-type[data-kind='json'] {
+    color: var(--accent-light);
+    border-color: rgba(22, 184, 166, 0.35);
+    background: rgba(22, 184, 166, 0.08);
+}
+.manifest-dl dd a { color: var(--accent); border-bottom-color: rgba(22, 184, 166, 0.4); }
+
+/* — Attack-path legend keeps the graph's own 5-color node taxonomy
+     (entrypoint/host/identity/asset/objective) — those are semantic
+     category colors drawn by attack_path.js, not brand chrome. — */
+
+/* — Tech tags / scope tags: teal-tinted, sharp — */
+.tech-tag { background: var(--accent-bg); color: var(--accent-light); border-radius: 4px; }
+
+/* — Tables: tabular numerics, calmer dividers — */
+td .text-mono { font-size: 12px; }
+th { letter-spacing: 0.5px; }
+
+/* — Prose blockquote / report bars already token-driven; nothing to do — */
+
+/* — Auth: subtle teal aura behind the card — */
+.auth-page {
+    background:
+        radial-gradient(900px 500px at 50% -10%, rgba(22, 184, 166, 0.06), transparent 70%),
+        var(--bg-primary);
+}
+.auth-brand h1 { color: var(--accent-light); }
 
