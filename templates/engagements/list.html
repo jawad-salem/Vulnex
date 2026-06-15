@@ -1,78 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Engagements — Vulnex{% endblock %}
 {% block content %}
-<div class="eng-hero">
-    <div class="eng-hero-main">
-        <h1 class="eng-hero-title">Engagements</h1>
-        <div class="eng-hero-meta">
-            <span class="eng-meta-item">{{ total_count }} total</span>
-            <span class="eng-meta-item">{{ active_count }} active</span>
-            <span class="eng-meta-item">{{ completed_count }} completed</span>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Engagements</h1>
+        <p class="page-subtitle">All assessments across clients</p>
+    </div>
+    {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
+</div>
+
+<form method="get" class="eng-filters">
+    <div class="eng-filters-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Filter engagements…">
+    </div>
+    <select name="client" class="form-input" data-autosubmit>
+        <option value="">All clients</option>
+        {% for c in client_choices %}
+        <option value="{{ c.pk }}" {% if current_client == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="type" class="form-input" data-autosubmit>
+        <option value="">All types</option>
+        {% for val, label in type_choices %}
+        <option value="{{ val }}" {% if current_type == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <div class="seg-toggle">
+        <a href="?bucket=all{% if current_type %}&type={{ current_type }}{% endif %}{% if current_client %}&client={{ current_client }}{% endif %}" class="seg-btn {% if current_bucket == 'all' %}active{% endif %}">All</a>
+        <a href="?bucket=active{% if current_type %}&type={{ current_type }}{% endif %}{% if current_client %}&client={{ current_client }}{% endif %}" class="seg-btn {% if current_bucket == 'active' %}active{% endif %}">Active</a>
+        <a href="?bucket=closed{% if current_type %}&type={{ current_type }}{% endif %}{% if current_client %}&client={{ current_client }}{% endif %}" class="seg-btn {% if current_bucket == 'closed' %}active{% endif %}">Closed</a>
+    </div>
+</form>
+
+{% if engagements %}
+<div class="eng-cards">
+    {% for e in engagements %}
+    <a href="{{ e.get_absolute_url }}" class="eng-card">
+        <div class="eng-card-top">
+            <span class="sig {% if e.status == 'exploitation' or e.status == 'post_exploitation' or e.status == 'reporting' %}sig--gold{% elif e.status == 'recon' or e.status == 'scanning' %}sig--blue{% elif e.status == 'completed' %}sig--green{% else %}sig--gray{% endif %}">{{ e.get_status_display }}</span>
+            <span class="eng-card-type">{{ e.get_engagement_type_display }}</span>
         </div>
-    </div>
-    <div class="eng-hero-actions">
-        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
-    </div>
+        <h2 class="eng-card-title">{{ e.name }}</h2>
+        <div class="eng-card-client">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/></svg>
+            {{ e.client_name|default:"—" }}
+        </div>
+        <div class="eng-card-sevs">
+            {% if e.critical_count %}<span class="cnt-pill cnt-pill--crit">{{ e.critical_count }} CRIT</span>{% endif %}
+            {% if e.high_count %}<span class="cnt-pill cnt-pill--high">{{ e.high_count }} HIGH</span>{% endif %}
+            <span class="cnt-pill cnt-pill--total">{{ e.finding_count }} total</span>
+        </div>
+        <div class="eng-card-foot">
+            <span class="eng-card-lead">
+                {% if e.lead %}<span class="mini-avatar" style="background:{{ e.lead.avatar_color }}">{{ e.lead.initials }}</span>{{ e.lead.get_full_name|default:e.lead.username }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}
+            </span>
+            <span class="eng-card-window">{% if e.start_date %}{{ e.start_date|date:"M j" }}{% if e.end_date %} – {{ e.end_date|date:"M j, Y" }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
 </div>
-
-<div class="filter-bar">
-    <form method="get" class="flex gap-2 flex-wrap" style="width:100%">
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search engagements..." class="form-input search-input">
-        <select name="status" class="form-input" data-autosubmit-loading>
-            <option value="">All statuses</option>
-            {% for val, label in status_choices %}
-            <option value="{{ val }}" {% if current_status == val %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        <select name="type" class="form-input" data-autosubmit-loading>
-            <option value="">All types</option>
-            {% for val, label in type_choices %}
-            <option value="{{ val }}" {% if current_type == val %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn">Filter</button>
-    </form>
+{% include "includes/pagination.html" %}
+{% else %}
+<div class="empty-state">
+    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+    <p>No engagements match your filters.</p>
+    {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">New engagement</a>{% endif %}
 </div>
-
-<div class="card">
-    {% if engagements %}
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr><th>Name</th><th>Client</th><th>Type</th><th>Status</th><th>Progress</th><th>Findings</th><th>Dates</th></tr>
-            </thead>
-            <tbody>
-            {% for e in engagements %}
-            <tr>
-                <td><a href="{{ e.get_absolute_url }}"><strong>{{ e.name }}</strong></a></td>
-                <td>{{ e.client_name }}</td>
-                <td class="text-sm">{{ e.get_engagement_type_display }}</td>
-                <td><span class="badge badge-{{ e.status }}">{{ e.get_status_display }}</span></td>
-                <td style="width:100px">
-                    <div class="progress-bar" title="{{ e.get_status_display }} — {{ e.progress_percent }}%">
-                        <div class="progress-fill" style="width:{{ e.progress_percent }}%"></div>
-                    </div>
-                </td>
-                <td class="text-mono">
-                    {{ e.finding_count }}
-                    {% if e.critical_count %}<span style="color:var(--critical)" class="text-xs">({{ e.critical_count }}C)</span>{% endif %}
-                </td>
-                <td class="text-sm text-secondary">
-                    {% if e.start_date %}{{ e.start_date|date:"M d" }}{% endif %}
-                    {% if e.end_date %} — {{ e.end_date|date:"M d" }}{% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% include "includes/pagination.html" %}
-    {% else %}
-    <div class="empty-state">
-        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-        <p>No engagements found.</p>
-        <a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>
-    </div>
-    {% endif %}
-</div>
+{% endif %}
 {% endblock %}

@@ -1,48 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Clients — Vulnex{% endblock %}
-{% block breadcrumbs %}
-<nav class="breadcrumbs">
-    <a href="{% url 'engagements:list' %}">Engagements</a>
-    <span class="bc-sep">&#8250;</span>
-    <span class="bc-current">Clients</span>
-</nav>
-{% endblock %}
 {% block content %}
-<div class="eng-hero">
-    <div class="eng-hero-main">
-        <h1 class="eng-hero-title">Clients</h1>
-        <div class="eng-hero-meta">
-            <span class="eng-meta-item">{{ total_count }} client{{ total_count|pluralize }}</span>
-        </div>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Clients</h1>
+        <p class="page-subtitle">Organizations under assessment</p>
     </div>
     {% if can_manage %}
-    <div class="eng-hero-actions">
-        <a href="{% url 'engagements:client_create' %}" class="btn btn-primary">+ New client</a>
-    </div>
+    <a href="{% url 'engagements:client_create' %}" class="btn btn-primary">+ Add client</a>
     {% endif %}
 </div>
 
-<div class="filter-bar">
-    <form method="get" class="flex gap-2 flex-wrap" style="width:100%">
-        <input type="text" name="q" value="{{ search_query }}" placeholder="Search clients..." class="form-input search-input">
-        <button type="submit" class="btn">Filter</button>
-    </form>
-</div>
+{% if search_query or clients %}
+<form method="get" class="eng-filters mb-3">
+    <div class="eng-filters-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="Search clients…">
+    </div>
+</form>
+{% endif %}
 
 <div class="card">
     {% if clients %}
     <div class="table-wrap">
-        <table>
-            <thead>
-                <tr><th>Client</th><th>Engagements</th><th>Primary contact</th><th>Added</th></tr>
-            </thead>
+        <table class="op-table">
+            <thead><tr><th>Client</th><th>Industry</th><th>Engagements</th><th>Primary contact</th><th></th></tr></thead>
             <tbody>
             {% for c in clients %}
-            <tr>
-                <td><a href="{{ c.get_absolute_url }}"><strong>{{ c.name }}</strong></a></td>
+            <tr class="row-link" data-href="{{ c.get_absolute_url }}">
+                <td>
+                    <div class="client-cell">
+                        <span class="client-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1M9 13h1M9 17h1M14 9h1M14 13h1M14 17h1"/></svg></span>
+                        <a href="{{ c.get_absolute_url }}" class="op-finding">{{ c.name }}</a>
+                    </div>
+                </td>
+                <td>{{ c.industry|default:"—" }}</td>
                 <td class="text-mono">{{ c.eng_count }}</td>
-                <td class="text-sm">{{ c.primary_contact_email|default:"—" }}</td>
-                <td class="text-sm text-secondary">{{ c.created_at|date:"M d, Y" }}</td>
+                <td class="text-mono text-sm" style="color:var(--accent-light)">{{ c.primary_contact_email|default:"—" }}</td>
+                <td class="text-right"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><polyline points="9 18 15 12 9 6"/></svg></td>
             </tr>
             {% endfor %}
             </tbody>
@@ -50,7 +45,9 @@
     </div>
     {% else %}
     <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/></svg>
         <p>No clients found.</p>
+        {% if can_manage %}<a href="{% url 'engagements:client_create' %}" class="btn btn-primary">Add your first client</a>{% endif %}
     </div>
     {% endif %}
 </div>

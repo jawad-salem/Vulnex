@@ -123,11 +123,12 @@ class ClientForm(forms.ModelForm):
     class Meta:
         model = Client
         fields = [
-            'name', 'primary_contact_name', 'primary_contact_email',
+            'name', 'industry', 'primary_contact_name', 'primary_contact_email',
             'logo', 'notes',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Acme Corporation'}),
+            'industry': forms.TextInput(attrs={'placeholder': 'Financial services'}),
             'primary_contact_name': forms.TextInput(attrs={'placeholder': 'Jane Doe'}),
             'primary_contact_email': forms.EmailInput(attrs={'placeholder': 'jane@acme.test'}),
             'notes': forms.Textarea(attrs={'rows': 4, 'placeholder': 'Optional internal notes (markdown).'}),

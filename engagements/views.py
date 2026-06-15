@@ -32,18 +32,30 @@ def engagement_list(request):
             members__user=request.user
         ).distinct()
 
+    engagements = engagements.select_related('client')
+    closed_statuses = [Engagement.Status.COMPLETED, Engagement.Status.CANCELLED]
+
     total_count = engagements.count()
-    active_count = engagements.exclude(
-        status__in=[Engagement.Status.COMPLETED, Engagement.Status.CANCELLED]
-    ).count()
+    active_count = engagements.exclude(status__in=closed_statuses).count()
     completed_count = engagements.filter(status=Engagement.Status.COMPLETED).count()
 
-    status_filter = request.GET.get('status')
+    # Clients available for the filter dropdown (drawn from the user's set).
+    client_choices = (
+        Client.objects.filter(pk__in=engagements.values('client'))
+        .order_by('name')
+    )
+
+    bucket = request.GET.get('bucket') or 'all'
+    client_filter = request.GET.get('client')
     type_filter = request.GET.get('type')
     search = request.GET.get('q')
 
-    if status_filter:
-        engagements = engagements.filter(status=status_filter)
+    if bucket == 'active':
+        engagements = engagements.exclude(status__in=closed_statuses)
+    elif bucket == 'closed':
+        engagements = engagements.filter(status__in=closed_statuses)
+    if client_filter:
+        engagements = engagements.filter(client_id=client_filter)
     if type_filter:
         engagements = engagements.filter(engagement_type=type_filter)
     if search:
@@ -55,8 +67,10 @@ def engagement_list(request):
     page = paginator.get_page(request.GET.get('page'))
 
     qs_parts = []
-    if status_filter:
-        qs_parts.append(f'status={status_filter}')
+    if bucket and bucket != 'all':
+        qs_parts.append(f'bucket={bucket}')
+    if client_filter:
+        qs_parts.append(f'client={client_filter}')
     if type_filter:
         qs_parts.append(f'type={type_filter}')
     if search:
@@ -67,9 +81,10 @@ def engagement_list(request):
         'engagements': page,
         'page_obj': page,
         'query_string': query_string,
-        'status_choices': Engagement.Status.choices,
         'type_choices': Engagement.EngagementType.choices,
-        'current_status': status_filter,
+        'client_choices': client_choices,
+        'current_bucket': bucket,
+        'current_client': client_filter,
         'current_type': type_filter,
         'search_query': search or '',
         'total_count': total_count,

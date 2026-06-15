@@ -3093,3 +3093,122 @@ th { letter-spacing: 0.5px; }
 .opfeed-action { color: var(--text-secondary); }
 .opfeed-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; margin-top: 2px; }
 
+/* ── Engagement / client filters ── */
+.eng-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 18px;
+}
+.eng-filters-search {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+}
+.eng-filters-search svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.eng-filters-search input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px 0 36px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 9px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font);
+}
+.eng-filters-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.eng-filters .form-input { width: auto; min-width: 150px; height: 40px; }
+
+.seg-toggle {
+    display: inline-flex;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    border-radius: 9px;
+    padding: 3px;
+    gap: 2px;
+}
+.seg-btn {
+    padding: 6px 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.seg-btn:hover { color: var(--text-primary); }
+.seg-btn.active { background: var(--accent); color: #04201d; }
+
+/* ── Engagement cards ── */
+.eng-cards { display: flex; flex-direction: column; gap: 14px; }
+.eng-card {
+    display: block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    transition: border-color 0.16s, transform 0.16s;
+    color: var(--text-primary);
+}
+.eng-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); color: var(--text-primary); }
+.eng-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.eng-card-type {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.eng-card-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.eng-card-client {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 6px 0 14px;
+}
+.eng-card-client svg { color: var(--text-muted); }
+.eng-card-sevs { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; border-bottom: 1px solid var(--border-light); }
+.cnt-pill {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 3px 9px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.cnt-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.cnt-pill--crit { color: var(--critical); background: color-mix(in srgb, var(--critical) 14%, transparent); }
+.cnt-pill--high { color: var(--high); background: color-mix(in srgb, var(--high) 14%, transparent); }
+.cnt-pill--total { color: var(--text-secondary); background: var(--bg-tertiary); }
+.cnt-pill--total::before { display: none; }
+.eng-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.eng-card-lead { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-secondary); }
+.eng-card-window { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+
+/* ── Clients table ── */
+.client-cell { display: flex; align-items: center; gap: 11px; }
+.client-ico {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+.row-link { cursor: pointer; }
+

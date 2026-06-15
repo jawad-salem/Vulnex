@@ -12,6 +12,7 @@ def client_logo_path(instance, filename):
 class Client(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, unique=True)
+    industry = models.CharField(max_length=120, blank=True, help_text='e.g. Financial services, E-commerce, Healthcare')
     logo = models.ImageField(upload_to=client_logo_path, blank=True, null=True)
     primary_contact_name = models.CharField(max_length=200, blank=True)
     primary_contact_email = models.EmailField(blank=True)
@@ -110,6 +111,13 @@ class Engagement(models.Model):
     @property
     def high_count(self):
         return self.findings.filter(severity='high').count()
+
+    @property
+    def lead(self):
+        """The engagement lead (first member with the lead role), or the
+        creator as a fallback. Used for the engagement card byline."""
+        member = self.members.filter(role='lead').select_related('user').first()
+        return member.user if member else self.created_by
 
     def get_user_role(self, user):
         """Return the user's EngagementMember role, or None if not a member."""

@@ -198,6 +198,12 @@
             dismiss.parentElement.remove();
             return;
         }
+        // Clickable table rows — ignore real links/buttons inside.
+        var rowLink = e.target.closest('[data-href]');
+        if (rowLink && !e.target.closest('a, button')) {
+            window.location.href = rowLink.getAttribute('data-href');
+            return;
+        }
         var confirmEl = e.target.closest('[data-confirm]');
         if (confirmEl) {
             if (!window.confirm(confirmEl.getAttribute('data-confirm'))) {
