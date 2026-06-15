@@ -105,42 +105,39 @@
 <div class="card">
     {% if findings %}
     <div class="table-wrap">
-        <table>
+        <table class="op-table">
             <thead>
                 <tr>
-                    <th>Title</th>
-                    <th>Host</th>
+                    <th>Finding</th>
                     <th>Severity</th>
                     <th>CVSS</th>
                     <th>Status</th>
                     {% if not is_client %}<th>Review</th>{% endif %}
                     <th>Assignee</th>
-                    <th>Due</th>
-                    <th>Date</th>
+                    <th>SLA</th>
                 </tr>
             </thead>
             <tbody>
             {% for f in findings %}
-            <tr>
-                <td><a href="{{ f.get_absolute_url }}"><strong>{{ f.title|truncatechars:50 }}</strong></a></td>
-                <td class="text-mono text-sm">{{ f.host|default:"—" }}{% if f.port %}<span class="text-muted">:{{ f.port }}</span>{% endif %}</td>
-                <td><span class="badge badge-{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td class="text-mono font-semibold">{{ f.cvss_score|floatformat:1 }}</td>
+            <tr class="row-link" data-href="{{ f.get_absolute_url }}">
+                <td>
+                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:54 }}</a>
+                    {% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}
+                </td>
+                <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                <td><span class="cvss-num" style="color:{{ f.severity_color }}">{{ f.cvss_score|floatformat:1 }}</span></td>
                 <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
                 {% if not is_client %}<td><span class="badge badge-{{ f.review_state }}">{{ f.get_review_state_display }}</span></td>{% endif %}
-                <td class="text-sm">{% if f.assigned_to %}{{ f.assigned_to }}{% else %}<span class="text-muted">Unassigned</span>{% endif %}</td>
-                <td class="text-sm">
-                    {% if f.sla_status == 'closed' %}
-                        <span class="text-muted">—</span>
-                    {% elif f.sla_status == 'overdue' %}
-                        <span class="badge badge-overdue" title="Due {{ f.due_date|date:'M d, Y' }}">Overdue {{ f.overdue_days }}d</span>
-                    {% elif f.sla_status == 'due_soon' %}
-                        <span class="badge badge-due_soon" title="Due {{ f.due_date|date:'M d, Y' }}">{{ f.days_until_due }}d left</span>
-                    {% else %}
-                        <span class="text-secondary">{{ f.due_date|date:"M d" }}</span>
-                    {% endif %}
+                <td>
+                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
-                <td class="text-sm text-secondary">{{ f.created_at|date:"M d, Y" }}</td>
+                <td>
+                    {% if f.sla_status == 'overdue' %}<span class="sig sig--red" title="Due {{ f.due_date|date:'M d, Y' }}">overdue</span>
+                    {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold" title="Due {{ f.due_date|date:'M d, Y' }}">due soon</span>
+                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
             </tr>
             {% endfor %}
             </tbody>
