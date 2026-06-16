@@ -184,7 +184,9 @@ def mfa_verify(request):
     else:
         form = MFACodeForm()
 
-    return render(request, 'accounts/mfa_verify.html', {'form': form})
+    return render(request, 'accounts/mfa_verify.html', {
+        'form': form, 'pending_username': user.username,
+    })
 
 
 @login_required

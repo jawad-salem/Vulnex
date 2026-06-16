@@ -28,10 +28,10 @@
         </div>
     </div>
     <div class="eng-hero-actions">
-        <span class="badge badge-{{ finding.severity }} badge-lg">{{ finding.get_severity_display }}</span>
-        <span class="badge badge-{{ finding.status }} badge-lg">{{ finding.get_status_display }}</span>
+        <span class="sig sig--{{ finding.severity }}">{{ finding.get_severity_display }}</span>
+        <span class="badge badge-{{ finding.status }}">{{ finding.get_status_display }}</span>
         {% if not is_client %}
-        <span class="badge badge-{{ finding.review_state }} badge-lg">{{ finding.get_review_state_display }}</span>
+        <span class="badge badge-{{ finding.review_state }}">{{ finding.get_review_state_display }}</span>
         {% endif %}
         {% if can_edit %}
         <a href="{% url 'vulns:edit' finding.pk %}" class="btn">Edit</a>
