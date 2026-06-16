@@ -115,8 +115,12 @@ def engagement_detail(request, pk):
             messages.success(request, 'Note added.')
             return redirect('engagements:detail', pk=pk)
 
-    # Get team members for display
-    members = engagement.members.select_related('user').all()
+    # Get team members for display, annotated with each user's MFA status.
+    from django_otp.plugins.otp_totp.models import TOTPDevice
+    members = list(engagement.members.select_related('user').all())
+    _mfa_ids = set(TOTPDevice.objects.filter(confirmed=True).values_list('user_id', flat=True))
+    for m in members:
+        m.has_mfa = m.user_id in _mfa_ids
     pending_invitations = engagement.invitations.filter(status='pending')
 
     # Risk score — clients only see approved findings everywhere

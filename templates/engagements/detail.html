@@ -238,54 +238,69 @@
     <!-- Team -->
     {% if not is_client %}
     <div class="tab-panel" id="tab-team" role="tabpanel">
-        <div class="grid-2">
-            <div class="card">
-                <div class="card-header"><h2 class="card-title">Members</h2><span class="text-xs text-muted">{{ members|length }}</span></div>
+        <div class="card">
+            <div class="card-header"><h2 class="card-title">Members</h2><span class="text-xs text-muted">{{ members|length }} member{{ members|length|pluralize }}</span></div>
+            <div class="table-wrap"><table class="op-table">
+                <thead><tr><th>Member</th><th>Role</th><th>MFA</th><th>Last active</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+                <tbody>
                 {% for m in members %}
-                <div class="member-row">
-                    <div class="flex items-center gap-3">
-                        <span class="mini-avatar" style="background:{{ m.user.avatar_color }}">{{ m.user.initials }}</span>
-                        <div><div class="text-sm font-semibold">{{ m.user.get_full_name|default:m.user.username }}</div><div class="text-xs text-muted">{{ m.user.email }}</div></div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="sig {% if m.role == 'lead' %}sig--green{% elif m.role == 'pentester' %}sig--blue{% elif m.role == 'reviewer' %}sig--gold{% else %}sig--gray{% endif %}">{{ m.get_role_display }}</span>
-                        {% if can_manage and m.user != request.user %}
+                <tr>
+                    <td>
+                        <div class="user-cell">
+                            <span class="mini-avatar" style="background:{{ m.user.avatar_color }}">{{ m.user.initials }}</span>
+                            <div><div class="op-finding">{{ m.user.get_full_name|default:m.user.username }}</div><div class="op-finding-sub">{{ m.user.email }}</div></div>
+                        </div>
+                    </td>
+                    <td><span class="sig {% if m.role == 'lead' %}sig--green{% elif m.role == 'pentester' %}sig--blue{% elif m.role == 'reviewer' %}sig--gold{% else %}sig--gray{% endif %}">{{ m.get_role_display }}</span></td>
+                    <td>{% if m.has_mfa %}<span class="sig sig--green">Enabled</span>{% else %}<span class="sig sig--red">Off</span>{% endif %}</td>
+                    <td class="text-secondary text-sm">{% if m.user.last_login %}{{ m.user.last_login|timesince }} ago{% else %}<span class="text-muted">never</span>{% endif %}</td>
+                    {% if can_manage %}
+                    <td class="text-right">
+                        {% if m.user != request.user %}
                         <form method="post" action="{% url 'engagements:remove_member' engagement.pk m.pk %}" style="margin:0">
                             {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-danger icon-btn" data-confirm="Remove {{ m.user }}?" aria-label="Remove">&times;</button>
+                            <button type="submit" class="kebab" data-confirm="Remove {{ m.user }}?" aria-label="Remove {{ m.user }}">&times;</button>
                         </form>
                         {% endif %}
-                    </div>
-                </div>
+                    </td>
+                    {% endif %}
+                </tr>
                 {% endfor %}
-            </div>
-            {% if can_manage %}
+                </tbody>
+            </table></div>
+        </div>
+
+        {% if can_manage %}
+        <div class="grid-2">
             <div class="card">
                 <div class="card-header"><h2 class="card-title">Invite member</h2></div>
                 <form method="post" action="{% url 'engagements:invite' engagement.pk %}">
                     {% csrf_token %}
-                    <div class="form-group"><label for="invite-email">Email</label><input type="email" id="invite-email" name="email" placeholder="email@example.com" required class="form-input"></div>
-                    <div class="form-group"><label for="invite-role">Role</label>
-                        <select id="invite-role" name="role" class="form-input">
-                            <option value="pentester">Pentester</option><option value="lead">Lead</option>
-                            <option value="reviewer">Reviewer</option><option value="client">Client</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group"><label for="invite-email">Email</label><input type="email" id="invite-email" name="email" placeholder="email@example.com" required class="form-input"></div>
+                        <div class="form-group"><label for="invite-role">Role</label>
+                            <select id="invite-role" name="role" class="form-input">
+                                <option value="pentester">Pentester</option><option value="lead">Lead</option>
+                                <option value="reviewer">Reviewer</option><option value="client">Client</option>
+                            </select>
+                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-full">Send invite</button>
+                    <button type="submit" class="btn btn-primary">Send invite</button>
                 </form>
-                {% if pending_invitations %}
-                <div class="mt-4"><div class="card-section-title">Pending invitations</div>
-                    {% for inv in pending_invitations %}
-                    <div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--border-light)">
-                        <div><div class="text-sm">{{ inv.email }}</div><div class="text-xs text-muted">{{ inv.get_role_display }} · {{ inv.created_at|timesince }} ago</div></div>
-                        <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">{% csrf_token %}<button type="submit" class="btn btn-sm">Cancel</button></form>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
             </div>
-            {% endif %}
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Pending invitations</h2><span class="text-xs text-muted">{{ pending_invitations|length }}</span></div>
+                {% for inv in pending_invitations %}
+                <div class="member-row">
+                    <div><div class="text-sm">{{ inv.email }}</div><div class="text-xs text-muted">{{ inv.get_role_display }} · {{ inv.created_at|timesince }} ago</div></div>
+                    <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">{% csrf_token %}<button type="submit" class="btn btn-sm">Cancel</button></form>
+                </div>
+                {% empty %}
+                <p class="text-secondary text-sm">No pending invitations.</p>
+                {% endfor %}
+            </div>
         </div>
+        {% endif %}
     </div>
     {% endif %}
 </div>
