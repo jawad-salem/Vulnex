@@ -97,17 +97,62 @@
         </div>
         {% endif %}
 
-        {% if engagement.description %}
+        <!-- Latest findings -->
         <div class="card">
-            <h2 class="card-title mb-3">Description</h2>
-            <div class="prose">{{ engagement.description|linebreaksbr }}</div>
+            <div class="card-header">
+                <h2 class="card-title">Latest findings</h2>
+                <a href="{% url 'vulns:list' engagement.pk %}" class="card-link">All →</a>
+            </div>
+            {% if findings %}
+            <div class="table-wrap"><table class="op-table">
+                <thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Added</th></tr></thead>
+                <tbody>
+                {% for f in findings %}
+                <tr class="row-link" data-href="{{ f.get_absolute_url }}">
+                    <td><a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:54 }}</a>{% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}</td>
+                    <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                    <td><span class="sig {% if f.status == 'open' %}sig--red{% elif f.status == 'confirmed' %}sig--gold{% elif f.status == 'remediated' %}sig--green{% else %}sig--gray{% endif %}">{{ f.get_status_display }}</span></td>
+                    <td class="op-window">{{ f.created_at|date:"M j, Y" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No findings yet.</p>
+                {% if can_edit %}<a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-sm btn-primary mt-2">+ Add finding</a>{% endif %}
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
 
-        {% if not is_client %}
+        <!-- Details + activity -->
         <div class="grid-2">
             <div class="card">
-                <div class="card-header"><h2 class="card-title">Notes</h2><span class="text-xs text-muted">{{ notes|length }}</span></div>
+                <div class="card-header"><h2 class="card-title">Details</h2></div>
+                <div class="detail-list">
+                    <div class="detail-row"><span class="detail-label">Lead</span>
+                        <span class="flex items-center gap-2">{% if engagement.lead %}<span class="mini-avatar" style="background:{{ engagement.lead.avatar_color }}">{{ engagement.lead.initials }}</span>{{ engagement.lead.get_full_name|default:engagement.lead.username }}{% else %}—{% endif %}</span>
+                    </div>
+                    <div class="detail-row"><span class="detail-label">Client</span><span>{{ engagement.client_name|default:"—" }}</span></div>
+                    <div class="detail-row"><span class="detail-label">Type</span><span>{{ engagement.get_engagement_type_display }}</span></div>
+                    <div class="detail-row"><span class="detail-label">Phase</span><span class="sig {% if engagement.status == 'exploitation' or engagement.status == 'post_exploitation' or engagement.status == 'reporting' %}sig--gold{% elif engagement.status == 'recon' or engagement.status == 'scanning' %}sig--blue{% elif engagement.status == 'completed' %}sig--green{% else %}sig--gray{% endif %}">{{ engagement.get_status_display }}</span></div>
+                    <div class="detail-row"><span class="detail-label">Window</span><span>{% if engagement.start_date %}{{ engagement.start_date|date:"M j" }}{% if engagement.end_date %} – {{ engagement.end_date|date:"M j, Y" }}{% endif %}{% else %}—{% endif %}</span></div>
+                    <div class="detail-row"><span class="detail-label">Created</span><span>{{ engagement.created_at|date:"M j, Y" }}</span></div>
+                </div>
+                {% if engagement.description %}
+                <div class="mt-3">
+                    <div class="detail-label mb-2">Description</div>
+                    <div class="prose text-sm">{{ engagement.description|linebreaksbr }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if not is_client %}
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Notes &amp; activity</h2>
+                    <span class="text-xs text-muted">{{ notes|length }} note{{ notes|length|pluralize }}</span>
+                </div>
                 {% if can_edit %}
                 <form method="post" class="mb-3">
                     {% csrf_token %}
@@ -116,7 +161,7 @@
                     <button type="submit" class="btn btn-sm btn-primary">Post note</button>
                 </form>
                 {% endif %}
-                {% for note in notes %}
+                {% for note in notes|slice:":3" %}
                 <div class="note-item">
                     <div class="flex items-center gap-2 mb-2">
                         <span class="mini-avatar" style="background:{{ note.author.avatar_color }}">{{ note.author.initials }}</span>
@@ -124,22 +169,17 @@
                     </div>
                     <div class="note-content">{{ note.content|linebreaksbr }}</div>
                 </div>
-                {% empty %}
-                <p class="text-secondary text-sm">No notes yet.</p>
                 {% endfor %}
-            </div>
-            <div class="card">
-                <div class="card-header"><h2 class="card-title">Activity</h2></div>
-                <div class="opfeed">
-                    {% for log in activity %}
-                    <div class="opfeed-row"><span class="opfeed-dot"></span><div class="opfeed-body"><div class="opfeed-line"><b>{{ log.user }}</b> <span class="opfeed-action">{{ log.action|truncatechars:60 }}</span></div></div><span class="opfeed-time">{{ log.timestamp|timesince }}</span></div>
+                <div class="opfeed mt-2">
+                    {% for log in activity|slice:":5" %}
+                    <div class="opfeed-row"><span class="opfeed-dot"></span><div class="opfeed-body"><div class="opfeed-line"><b>{{ log.user }}</b> <span class="opfeed-action">{{ log.action|truncatechars:54 }}</span></div></div><span class="opfeed-time">{{ log.timestamp|timesince }}</span></div>
                     {% empty %}
                     <p class="text-secondary text-sm">No activity yet.</p>
                     {% endfor %}
                 </div>
             </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 
     <!-- Scope & RoE -->
