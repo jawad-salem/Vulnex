@@ -291,7 +291,13 @@
     {% if not is_client %}
     <div class="tab-panel" id="tab-team" role="tabpanel">
         <div class="card">
-            <div class="card-header"><h2 class="card-title">Members</h2><span class="text-xs text-muted">{{ members|length }} member{{ members|length|pluralize }}</span></div>
+            <div class="card-header">
+                <h2 class="card-title">Members</h2>
+                <div class="flex items-center gap-3">
+                    {% if can_manage %}<button type="button" class="btn btn-sm btn-primary" data-toggle-panel="invitePanel" aria-expanded="false">+ Invite member</button>{% endif %}
+                    <span class="text-xs text-muted">{{ members|length }} member{{ members|length|pluralize }}</span>
+                </div>
+            </div>
             <div class="table-wrap"><table class="op-table">
                 <thead><tr><th>Member</th><th>Role</th><th>MFA</th><th>Last active</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
                 <tbody>
@@ -323,33 +329,31 @@
         </div>
 
         {% if can_manage %}
-        <div class="grid-2">
+        <div class="invite-panel" id="invitePanel" hidden>
             <div class="card">
-                <div class="card-header"><h2 class="card-title">Invite member</h2></div>
-                <form method="post" action="{% url 'engagements:invite' engagement.pk %}">
+                <div class="card-header"><h2 class="card-title">Invite member</h2>{% if pending_invitations %}<span class="text-xs text-muted">{{ pending_invitations|length }} pending</span>{% endif %}</div>
+                <form method="post" action="{% url 'engagements:invite' engagement.pk %}" class="invite-row">
                     {% csrf_token %}
-                    <div class="form-row">
-                        <div class="form-group"><label for="invite-email">Email</label><input type="email" id="invite-email" name="email" placeholder="email@example.com" required class="form-input"></div>
-                        <div class="form-group"><label for="invite-role">Role</label>
-                            <select id="invite-role" name="role" class="form-input">
-                                <option value="pentester">Pentester</option><option value="lead">Lead</option>
-                                <option value="reviewer">Reviewer</option><option value="client">Client</option>
-                            </select>
-                        </div>
+                    <div class="form-group invite-email"><label for="invite-email">Email</label><input type="email" id="invite-email" name="email" placeholder="email@example.com" required class="form-input"></div>
+                    <div class="form-group invite-role"><label for="invite-role">Role</label>
+                        <select id="invite-role" name="role" class="form-input">
+                            <option value="pentester">Pentester</option><option value="lead">Lead</option>
+                            <option value="reviewer">Reviewer</option><option value="client">Client</option>
+                        </select>
                     </div>
                     <button type="submit" class="btn btn-primary">Send invite</button>
                 </form>
-            </div>
-            <div class="card">
-                <div class="card-header"><h2 class="card-title">Pending invitations</h2><span class="text-xs text-muted">{{ pending_invitations|length }}</span></div>
-                {% for inv in pending_invitations %}
-                <div class="member-row">
-                    <div><div class="text-sm">{{ inv.email }}</div><div class="text-xs text-muted">{{ inv.get_role_display }} · {{ inv.created_at|timesince }} ago</div></div>
-                    <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">{% csrf_token %}<button type="submit" class="btn btn-sm">Cancel</button></form>
+                {% if pending_invitations %}
+                <div class="invite-pending">
+                    <div class="card-section-title">Pending invitations</div>
+                    {% for inv in pending_invitations %}
+                    <div class="member-row">
+                        <div><div class="text-sm">{{ inv.email }}</div><div class="text-xs text-muted">{{ inv.get_role_display }} · {{ inv.created_at|timesince }} ago</div></div>
+                        <form method="post" action="{% url 'engagements:cancel_invitation' engagement.pk inv.pk %}" style="margin:0">{% csrf_token %}<button type="submit" class="btn btn-sm">Cancel</button></form>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% empty %}
-                <p class="text-secondary text-sm">No pending invitations.</p>
-                {% endfor %}
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -372,6 +376,17 @@
     });
     var hash = (location.hash || '').replace('#', '');
     if (hash && document.getElementById('tab-' + hash)) activate(hash);
+
+    // Toggle collapsible panels (e.g. invite member).
+    document.querySelectorAll('[data-toggle-panel]').forEach(function(b) {
+        b.addEventListener('click', function() {
+            var panel = document.getElementById(this.dataset.togglePanel);
+            if (!panel) return;
+            var willOpen = panel.hasAttribute('hidden');
+            if (willOpen) { panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden', ''); }
+            this.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        });
+    });
 })();
 </script>
 {% endblock %}

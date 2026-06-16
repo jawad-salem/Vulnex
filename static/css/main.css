@@ -3529,3 +3529,15 @@ th { letter-spacing: 0.5px; }
 .roe-signoff b { color: var(--text-primary); }
 .roe-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
+/* ── Invite member (collapsible) ── */
+.invite-panel { margin-top: 14px; }
+.invite-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.invite-row .form-group { margin-bottom: 0; }
+.invite-row .invite-email { flex: 2; min-width: 220px; }
+.invite-row .invite-role { flex: 1; min-width: 150px; }
+.invite-pending {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-light);
+}
+
