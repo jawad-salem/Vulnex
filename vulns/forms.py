@@ -78,7 +78,14 @@ class EvidenceForm(forms.ModelForm):
 
     class Meta:
         model = Evidence
-        fields = ['file', 'caption']
+        fields = ['file', 'caption', 'request_response']
+        widgets = {
+            'caption': forms.TextInput(attrs={'placeholder': 'What does this screenshot show?'}),
+            'request_response': forms.Textarea(attrs={
+                'rows': 5,
+                'placeholder': 'Optional — the request / response / payload that produced this evidence',
+            }),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

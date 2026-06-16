@@ -395,6 +395,9 @@ class Evidence(models.Model):
     finding = models.ForeignKey(Finding, on_delete=models.CASCADE, related_name='evidence')
     file = models.FileField(upload_to='evidence/%Y/%m/', storage=protected_storage)
     caption = models.CharField(max_length=300, blank=True)
+    # The request / response / payload that produced this screenshot, tying the
+    # evidence to the reproduction step it proves.
+    request_response = models.TextField(blank=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 

@@ -3598,6 +3598,61 @@ th { letter-spacing: 0.5px; }
 .ev-review-btn { flex: 1; background: none; border: none; padding: 8px; font-size: 11px; font-weight: 600; color: var(--text-secondary); cursor: pointer; font-family: var(--font); }
 .ev-review-btn:hover { background: var(--bg-hover); color: var(--accent-light); }
 .ev-review-btn.is-on { color: var(--success); }
+
+/* ── Evidence proof steps (caption + request/payload + screenshot) ── */
+.ev-steps { display: flex; flex-direction: column; gap: 16px; }
+.ev-step {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-secondary);
+    padding: 14px;
+}
+.ev-step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ev-step-num {
+    width: 26px; height: 26px; flex-shrink: 0;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    font-family: var(--font-mono); font-size: 12px; font-weight: 700;
+    color: var(--accent); background: var(--accent-bg);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.ev-step-cap { flex: 1; min-width: 0; }
+.ev-step-title { font-weight: 600; font-size: 13.5px; color: var(--text-primary); }
+.ev-step-by { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.ev-step-by .mini-avatar { border-radius: 5px; }
+.ev-step-code { margin-bottom: 12px; }
+.ev-step-code-label {
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted);
+    margin-bottom: 6px;
+}
+.ev-step-code pre {
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.5;
+    background: var(--bg-primary); border: 1px solid var(--border-light);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 12px 14px; overflow-x: auto;
+    color: var(--text-primary); white-space: pre-wrap; word-break: break-word;
+}
+.ev-step-img {
+    display: block; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border-light); position: relative; cursor: zoom-in;
+    max-height: 460px;
+}
+.ev-step-img img { display: block; width: 100%; height: auto; max-height: 460px; object-fit: contain; background: var(--bg-primary); }
+.ev-step-img .ev-zoom { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; background: rgba(6,8,13,.7); color: #fff; opacity: 0; transition: opacity .15s; }
+.ev-step-img:hover .ev-zoom { opacity: 1; }
+.ev-step-file {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; border-radius: 8px;
+    background: var(--bg-tertiary); border: 1px solid var(--border-light);
+    color: var(--text-primary);
+}
+.ev-step-file:hover { border-color: var(--accent); color: var(--text-primary); }
+.ev-step-file svg { color: var(--text-muted); }
+.ev-step-file-name { flex: 1; min-width: 0; font-size: 13px; word-break: break-all; }
+.ev-step-file .ext { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--accent-light); padding: 2px 7px; border: 1px solid var(--border); border-radius: 5px; }
+.ev-step-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.ev-step-foot-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .ev-drop { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px dashed var(--border); border-radius: var(--radius-lg); background: var(--bg-primary); transition: border-color .16s, background .16s; cursor: pointer; }
 .ev-drop:hover, .ev-drop.is-drag { border-color: var(--accent); background: var(--accent-bg); }
 .ev-drop .ev-drop-ico { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--bg-tertiary); color: var(--accent); }
