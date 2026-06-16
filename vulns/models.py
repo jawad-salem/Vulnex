@@ -398,6 +398,14 @@ class Evidence(models.Model):
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
+    # Review acknowledgement — a lead/reviewer confirms the evidence is sound.
+    reviewed = models.BooleanField(default=False)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='reviewed_evidence',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         verbose_name_plural = 'evidence'
 

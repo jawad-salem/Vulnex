@@ -159,6 +159,29 @@ def finding_detail(request, pk):
             messages.success(request, 'Retest recorded.')
             return redirect('vulns:detail', pk=pk)
 
+    if request.method == 'POST' and 'update_poc' in request.POST and can_edit:
+        finding.proof_of_concept = request.POST.get('proof_of_concept', '')
+        finding.save(update_fields=['proof_of_concept', 'updated_at'])
+        messages.success(request, 'Reproduction steps updated.')
+        from django.urls import reverse
+        return redirect(reverse('vulns:detail', kwargs={'pk': pk}) + '#evidence')
+
+    if request.method == 'POST' and 'review_evidence' in request.POST and can_review:
+        ev = finding.evidence.filter(pk=request.POST.get('evidence_id')).first()
+        if ev:
+            if ev.reviewed:
+                ev.reviewed = False
+                ev.reviewed_by = None
+                ev.reviewed_at = None
+                ev.save(update_fields=['reviewed', 'reviewed_by', 'reviewed_at'])
+            else:
+                ev.reviewed = True
+                ev.reviewed_by = request.user
+                ev.reviewed_at = timezone.now()
+                ev.save(update_fields=['reviewed', 'reviewed_by', 'reviewed_at'])
+        from django.urls import reverse
+        return redirect(reverse('vulns:detail', kwargs={'pk': pk}) + '#evidence')
+
     if request.method == 'POST' and 'post_comment' in request.POST:
         comment_form = FindingCommentForm(
             request.POST,

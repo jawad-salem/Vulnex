@@ -3590,6 +3590,14 @@ th { letter-spacing: 0.5px; }
 .ev-actions a { flex: 1; text-align: center; padding: 8px; font-size: 11px; font-weight: 600; color: var(--text-secondary); transition: background .14s, color .14s; }
 .ev-actions a:hover { background: var(--bg-hover); color: var(--accent-light); }
 .ev-actions a + a { border-left: 1px solid var(--border-light); }
+.ev-reviewed { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600; color: var(--success); margin-top: 2px; }
+.ev-reviewed svg { color: var(--success); }
+.ev-reviewed--pending { color: var(--text-muted); }
+.ev-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
+.ev-actions .ev-review-form { flex: 1; display: flex; margin: 0; border-left: 1px solid var(--border-light); }
+.ev-review-btn { flex: 1; background: none; border: none; padding: 8px; font-size: 11px; font-weight: 600; color: var(--text-secondary); cursor: pointer; font-family: var(--font); }
+.ev-review-btn:hover { background: var(--bg-hover); color: var(--accent-light); }
+.ev-review-btn.is-on { color: var(--success); }
 .ev-drop { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1.5px dashed var(--border); border-radius: var(--radius-lg); background: var(--bg-primary); transition: border-color .16s, background .16s; cursor: pointer; }
 .ev-drop:hover, .ev-drop.is-drag { border-color: var(--accent); background: var(--accent-bg); }
 .ev-drop .ev-drop-ico { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--bg-tertiary); color: var(--accent); }

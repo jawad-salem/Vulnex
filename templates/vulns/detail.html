@@ -209,15 +209,32 @@
 
     <!-- ── Evidence (PoC + screenshots) ── -->
     <div class="tab-panel" id="tab-evidence" role="tabpanel">
-        <div class="card">
-            <div class="card-header"><h2 class="card-title">Reproduction</h2><span class="text-xs text-muted">Steps · request / response</span></div>
-            {% if finding.proof_of_concept %}
-            <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
-            {% else %}
-            <div class="empty-state compact">
-                <p class="text-secondary text-sm">No reproduction steps yet.</p>
-                {% if can_edit %}<a href="{% url 'vulns:edit' finding.pk %}" class="btn btn-sm mt-2">Add proof of concept</a>{% endif %}
+        <div class="card" id="reproCard">
+            <div class="card-header">
+                <h2 class="card-title">Reproduction</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-muted">steps · request / response</span>
+                    {% if can_edit %}<button type="button" class="btn btn-sm" data-repro-edit>{% if finding.proof_of_concept %}Edit{% else %}+ Add steps{% endif %}</button>{% endif %}
+                </div>
             </div>
+            <div data-repro-view>
+                {% if finding.proof_of_concept %}
+                <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
+                {% else %}
+                <p class="text-secondary text-sm">No reproduction steps yet.{% if can_edit %} Use <b>+ Add steps</b> to write the PoC inline — numbered steps, payloads, and request/response.{% endif %}</p>
+                {% endif %}
+            </div>
+            {% if can_edit %}
+            <form method="post" data-repro-form hidden>
+                {% csrf_token %}
+                <input type="hidden" name="update_poc" value="1">
+                <textarea name="proof_of_concept" rows="12" class="form-input text-mono" placeholder="## Steps to reproduce&#10;1. Authenticate as a low-priv user&#10;2. Send the request below&#10;&#10;```http&#10;POST /api/v1/search HTTP/1.1&#10;Host: app.example&#10;&#10;q=1' OR '1'='1&#10;```">{{ finding.proof_of_concept }}</textarea>
+                <div class="flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-sm btn-primary">Save reproduction</button>
+                    <button type="button" class="btn btn-sm" data-repro-cancel>Cancel</button>
+                </div>
+                <span class="form-help mt-2">Markdown supported — fenced <code>```http</code> blocks render as request/response.</span>
+            </form>
             {% endif %}
         </div>
 
@@ -244,10 +261,23 @@
                     <figcaption class="ev-body">
                         <span class="ev-name">{{ ev.caption|default:ev.file.name|basename }}</span>
                         <span class="ev-meta">{% if ev.uploaded_by %}<span class="av" style="background:{{ ev.uploaded_by.avatar_color }}">{{ ev.uploaded_by.initials }}</span>{% endif %}<span>{{ ev.uploaded_at|date:"M j, Y" }}</span></span>
+                        {% if ev.reviewed %}
+                        <span class="ev-reviewed"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> Reviewed by {{ ev.reviewed_by|default:"—" }}</span>
+                        {% else %}
+                        <span class="ev-reviewed ev-reviewed--pending"><span class="ev-dot"></span> Pending review</span>
+                        {% endif %}
                     </figcaption>
                     <div class="ev-actions">
                         <a href="{% url 'vulns:evidence_download' ev.pk %}" download>Download</a>
                         <a href="{% url 'vulns:evidence_download' ev.pk %}" target="_blank" rel="noopener">Open</a>
+                        {% if can_review %}
+                        <form method="post" class="ev-review-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="review_evidence" value="1">
+                            <input type="hidden" name="evidence_id" value="{{ ev.pk }}">
+                            <button type="submit" class="ev-review-btn{% if ev.reviewed %} is-on{% endif %}">{% if ev.reviewed %}✓ Reviewed{% else %}Mark reviewed{% endif %}</button>
+                        </form>
+                        {% endif %}
                     </div>
                 </figure>
                 {% endfor %}
@@ -406,6 +436,19 @@
             ['dragenter', 'dragover'].forEach(function(ev) { drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.add('is-drag'); }); });
             ['dragleave', 'drop'].forEach(function(ev) { drop.addEventListener(ev, function(e) { e.preventDefault(); drop.classList.remove('is-drag'); }); });
             drop.addEventListener('drop', function(e) { if (e.dataTransfer && e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event('change')); } });
+        }
+    }
+
+    // Inline reproduction (PoC) editor toggle
+    var repro = document.getElementById('reproCard');
+    if (repro) {
+        var view = repro.querySelector('[data-repro-view]');
+        var form = repro.querySelector('[data-repro-form]');
+        var editBtn = repro.querySelector('[data-repro-edit]');
+        var cancelBtn = repro.querySelector('[data-repro-cancel]');
+        if (editBtn && form && view) {
+            editBtn.addEventListener('click', function() { view.hidden = true; form.hidden = false; editBtn.hidden = true; form.querySelector('textarea').focus(); });
+            if (cancelBtn) cancelBtn.addEventListener('click', function() { form.hidden = true; view.hidden = false; editBtn.hidden = false; });
         }
     }
 })();
