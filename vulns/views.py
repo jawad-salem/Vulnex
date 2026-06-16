@@ -1,6 +1,6 @@
 import csv
 import json
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -206,13 +206,58 @@ def finding_detail(request, pk):
         c.user_can_edit = c.can_edit(request.user)
         c.user_can_delete = c.can_delete(request.user)
 
+    evidence = list(finding.evidence.select_related('uploaded_by').all())
+
+    # Attack paths this finding is referenced in (via AttackPathEdge.finding).
+    attack_paths = []
+    _seen = set()
+    for edge in finding.attack_path_edges.select_related('path').all():
+        if edge.path_id not in _seen:
+            _seen.add(edge.path_id)
+            attack_paths.append(edge.path)
+
+    # Synthesised activity timeline (oldest → newest) from existing timestamps.
+    timeline = [{
+        'ts': finding.created_at, 'kind': 'create',
+        'title': 'Finding created', 'who': finding.found_by,
+        'meta': finding.tool_source or 'Manual entry',
+    }]
+    for ev in evidence:
+        timeline.append({
+            'ts': ev.uploaded_at, 'kind': 'evidence',
+            'title': 'Evidence uploaded', 'who': ev.uploaded_by,
+            'meta': ev.caption or ev.file.name.rsplit('/', 1)[-1],
+        })
+    for c in comments:
+        timeline.append({
+            'ts': c.created_at,
+            'kind': 'review' if c.is_review_feedback else 'comment',
+            'title': 'Review feedback' if c.is_review_feedback else 'Comment added',
+            'who': c.author, 'meta': 'Internal' if c.internal_only else '',
+        })
+    if finding.reviewed_at and (not is_client or finding.review_state == Finding.ReviewState.APPROVED):
+        timeline.append({
+            'ts': finding.reviewed_at, 'kind': 'review',
+            'title': f'Review · {finding.get_review_state_display()}',
+            'who': finding.reviewed_by, 'meta': '',
+        })
+    if finding.retest_date:
+        timeline.append({
+            'ts': timezone.make_aware(datetime.combine(finding.retest_date, time.min)),
+            'kind': 'retest', 'title': f'Retest · {finding.get_retest_status_display()}',
+            'who': finding.retested_by, 'meta': '',
+        })
+    timeline.sort(key=lambda e: e['ts'])
+
     context = {
         'finding': finding,
-        'evidence': finding.evidence.all(),
+        'evidence': evidence,
         'evidence_form': evidence_form,
         'retest_form': retest_form,
         'comment_form': comment_form,
         'comments': comments,
+        'timeline': timeline,
+        'attack_paths': attack_paths,
         'is_client': is_client,
         'can_edit': can_edit,
         'can_review': can_review,
