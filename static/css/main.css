@@ -3495,3 +3495,18 @@ th { letter-spacing: 0.5px; }
 }
 .ap-node-x:hover { color: var(--critical); }
 
+/* ── Scope rows (engagement scope & RoE) ── */
+.scope-rows { display: flex; flex-direction: column; }
+.scope-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 2px;
+    border-bottom: 1px solid var(--border-light);
+    font-size: 13.5px;
+}
+.scope-row:last-child { border-bottom: 0; }
+.scope-row svg { color: var(--accent); flex-shrink: 0; }
+.scope-row .text-mono { color: var(--text-primary); word-break: break-all; }
+.scope-row--out svg { color: var(--text-muted); }
+

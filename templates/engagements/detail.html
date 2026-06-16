@@ -184,25 +184,50 @@
 
     <!-- Scope & RoE -->
     <div class="tab-panel" id="tab-scope" role="tabpanel">
-        <div class="card">
-            <h2 class="card-title mb-3">In scope</h2>
-            {% if engagement.scope_targets %}
-            <div class="mono-block">{% for t in engagement.scope_targets %}<div class="scope-target">{{ t }}</div>{% endfor %}</div>
-            {% else %}<p class="text-secondary text-sm">No scope targets defined.</p>{% endif %}
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">In-scope targets</h2>
+                    {% if engagement.scope_targets %}<span class="chip">{{ engagement.scope_targets|length }} item{{ engagement.scope_targets|length|pluralize }}</span>{% endif %}
+                </div>
+                {% if engagement.scope_targets %}
+                <div class="scope-rows">
+                    {% for t in engagement.scope_targets %}
+                    <div class="scope-row">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+                        <span class="text-mono">{{ t }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-secondary text-sm">No scope targets defined.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <div class="card-header"><h2 class="card-title">Rules of engagement</h2></div>
+                {% if engagement.rules_of_engagement %}
+                <div class="prose">{{ engagement.rules_of_engagement|linebreaksbr }}</div>
+                {% else %}
+                <p class="text-secondary text-sm">No rules of engagement recorded.</p>
+                {% endif %}
+                {% if can_edit %}<a href="{% url 'engagements:edit' engagement.pk %}" class="btn btn-sm mt-3">Edit scope &amp; RoE</a>{% endif %}
+            </div>
         </div>
+
         {% if engagement.out_of_scope %}
         <div class="card">
-            <h2 class="card-title mb-3">Out of scope</h2>
-            <div class="mono-block">{% for t in engagement.out_of_scope.splitlines %}{% if t.strip %}<div class="scope-target">{{ t }}</div>{% endif %}{% endfor %}</div>
+            <div class="card-header"><h2 class="card-title">Out of scope</h2></div>
+            <div class="scope-rows">
+                {% for t in engagement.out_of_scope.splitlines %}{% if t.strip %}
+                <div class="scope-row scope-row--out">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+                    <span class="text-mono">{{ t }}</span>
+                </div>
+                {% endif %}{% endfor %}
+            </div>
         </div>
         {% endif %}
-        {% if engagement.rules_of_engagement %}
-        <div class="card">
-            <h2 class="card-title mb-3">Rules of engagement</h2>
-            <div class="prose">{{ engagement.rules_of_engagement|linebreaksbr }}</div>
-        </div>
-        {% endif %}
-        {% if can_edit %}<a href="{% url 'engagements:edit' engagement.pk %}" class="btn">Edit scope &amp; RoE</a>{% endif %}
     </div>
 
     <!-- Findings -->
