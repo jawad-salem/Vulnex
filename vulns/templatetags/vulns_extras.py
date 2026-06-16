@@ -7,6 +7,8 @@ scripts/styles/iframes.
 The PDF generator reuses ``render_markdown`` and lowers the resulting HTML into
 ReportLab flowables in ``reports.markdown`` (kept out of this template layer).
 """
+import os
+
 import bleach
 import markdown as md
 from django import template
@@ -14,6 +16,19 @@ from django.utils.safestring import mark_safe
 
 
 register = template.Library()
+
+
+@register.filter(name='basename')
+def basename(value):
+    """Last path component of a stored file name (drops the upload_to dirs)."""
+    return os.path.basename(str(value))
+
+
+@register.filter(name='file_ext')
+def file_ext(value):
+    """Uppercase file extension (no dot), capped at 4 chars — for file chips."""
+    ext = os.path.splitext(str(value))[1].lstrip('.')
+    return ext.upper()[:4] or 'FILE'
 
 
 ALLOWED_TAGS = [
