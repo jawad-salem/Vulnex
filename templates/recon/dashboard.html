@@ -18,7 +18,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15"/></svg>
             Sync
         </a>
-        <button type="button" class="btn btn-primary" data-jump-tab="newscan">▷ New scan</button>
+        <button type="button" class="btn btn-primary" data-toggle-panel="newscanPanel" aria-expanded="false">▷ New scan</button>
     </div>
 </div>
 
@@ -30,11 +30,35 @@
     <div class="opstat"><div class="opstat-label">Running</div><div class="opstat-value">{{ recon_stats.running }}</div>{% if recon_stats.running %}<div class="opstat-tag" style="color:var(--low);background:color-mix(in srgb,var(--low) 14%,transparent)">active</div>{% endif %}</div>
 </div>
 
+<!-- Collapsible "New scan" panel (revealed by the New scan button) -->
+<div class="newscan-panel" id="newscanPanel" hidden>
+    <div class="grid-2">
+        <div class="card">
+            <h2 class="card-title mb-4">Single scan</h2>
+            <form method="post" action="{% url 'recon:start_scan' engagement.pk %}">
+                {% csrf_token %}
+                <div class="form-group"><label for="{{ scan_form.scan_type.id_for_label }}">Scan type</label>{{ scan_form.scan_type }}</div>
+                <div class="form-group"><label for="{{ scan_form.target.id_for_label }}">Target</label>{{ scan_form.target }}</div>
+                <button type="submit" class="btn btn-primary">Start scan</button>
+            </form>
+        </div>
+        <div class="card">
+            <h2 class="card-title mb-4">Multi-scan pipeline</h2>
+            <form method="post" action="{% url 'recon:start_pipeline' engagement.pk %}">
+                {% csrf_token %}
+                <div class="form-group"><label for="{{ pipeline_form.preset.id_for_label }}">Preset</label>{{ pipeline_form.preset }}</div>
+                <div class="form-group"><label for="{{ pipeline_form.target.id_for_label }}">Target</label>{{ pipeline_form.target }}</div>
+                <div id="pipeline-desc" class="text-xs text-secondary mb-3" style="min-height:18px"></div>
+                <button type="submit" class="btn btn-primary">Run pipeline</button>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div class="tabs">
     <div class="tab-nav" role="tablist">
         <button class="tab-btn active" data-tab="hosts" role="tab">Hosts{% if hosts %} <span class="tab-count">{{ hosts|length }}</span>{% endif %}</button>
         <button class="tab-btn" data-tab="scans" role="tab">Scan jobs{% if scans %} <span class="tab-count">{{ recon_stats.scans_run }}</span>{% endif %}</button>
-        <button class="tab-btn" data-tab="newscan" role="tab">New scan</button>
         <button class="tab-btn" data-tab="schedule" role="tab">Schedule</button>
         <button class="tab-btn" data-tab="import" role="tab">Import</button>
     </div>
@@ -94,31 +118,6 @@
             {% else %}
             <div class="empty-state compact"><p class="text-secondary text-sm">No scans yet.</p></div>
             {% endif %}
-        </div>
-    </div>
-
-    <!-- New scan -->
-    <div class="tab-panel" id="tab-newscan" role="tabpanel">
-        <div class="grid-2">
-            <div class="card">
-                <h2 class="card-title mb-4">Single scan</h2>
-                <form method="post" action="{% url 'recon:start_scan' engagement.pk %}">
-                    {% csrf_token %}
-                    <div class="form-group"><label for="{{ scan_form.scan_type.id_for_label }}">Scan type</label>{{ scan_form.scan_type }}</div>
-                    <div class="form-group"><label for="{{ scan_form.target.id_for_label }}">Target</label>{{ scan_form.target }}</div>
-                    <button type="submit" class="btn btn-primary">Start scan</button>
-                </form>
-            </div>
-            <div class="card">
-                <h2 class="card-title mb-4">Multi-scan pipeline</h2>
-                <form method="post" action="{% url 'recon:start_pipeline' engagement.pk %}">
-                    {% csrf_token %}
-                    <div class="form-group"><label for="{{ pipeline_form.preset.id_for_label }}">Preset</label>{{ pipeline_form.preset }}</div>
-                    <div class="form-group"><label for="{{ pipeline_form.target.id_for_label }}">Target</label>{{ pipeline_form.target }}</div>
-                    <div id="pipeline-desc" class="text-xs text-secondary mb-3" style="min-height:18px"></div>
-                    <button type="submit" class="btn btn-primary">Run pipeline</button>
-                </form>
-            </div>
         </div>
     </div>
 
@@ -188,7 +187,16 @@
         panels.forEach(function(p) { p.classList.toggle('active', p.id === 'tab-' + name); });
     }
     tabs.forEach(function(t) { t.addEventListener('click', function() { activate(this.dataset.tab); history.replaceState(null,'','#'+this.dataset.tab); }); });
-    document.querySelectorAll('[data-jump-tab]').forEach(function(b){ b.addEventListener('click', function(){ activate(this.dataset.jumpTab); }); });
+    document.querySelectorAll('[data-toggle-panel]').forEach(function(b){
+        b.addEventListener('click', function(){
+            var panel = document.getElementById(this.dataset.togglePanel);
+            if (!panel) return;
+            var willOpen = panel.hasAttribute('hidden');
+            if (willOpen) { panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden', ''); }
+            this.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            if (willOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    });
     var hash = (location.hash || '').replace('#', '');
     if (hash && document.getElementById('tab-' + hash)) activate(hash);
 
