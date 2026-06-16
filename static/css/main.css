@@ -3509,4 +3509,23 @@ th { letter-spacing: 0.5px; }
 .scope-row svg { color: var(--accent); flex-shrink: 0; }
 .scope-row .text-mono { color: var(--text-primary); word-break: break-all; }
 .scope-row--out svg { color: var(--text-muted); }
+.scope-col .card:last-child { margin-bottom: 0; }
+
+/* RoE sign-off callout */
+.roe-signoff {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 11px 13px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--success) 9%, var(--bg-card));
+    border: 1px solid color-mix(in srgb, var(--success) 30%, var(--border));
+}
+.roe-signoff svg { color: var(--success); flex-shrink: 0; margin-top: 1px; }
+.roe-signoff b { color: var(--text-primary); }
+.roe-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 

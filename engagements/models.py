@@ -70,6 +70,15 @@ class Engagement(models.Model):
     out_of_scope = models.TextField(help_text='Excluded targets, one per line', blank=True)
     rules_of_engagement = models.TextField(blank=True)
 
+    # Rules-of-engagement sign-off — once signed, scope/RoE edits are locked
+    # until a lead revokes the sign-off.
+    roe_signed_off = models.BooleanField(default=False)
+    roe_signed_off_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='signed_off_engagements',
+    )
+    roe_signed_off_at = models.DateTimeField(null=True, blank=True)
+
     # Dates
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)

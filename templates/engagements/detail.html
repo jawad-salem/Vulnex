@@ -185,49 +185,76 @@
     <!-- Scope & RoE -->
     <div class="tab-panel" id="tab-scope" role="tabpanel">
         <div class="grid-2">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">In-scope targets</h2>
-                    {% if engagement.scope_targets %}<span class="chip">{{ engagement.scope_targets|length }} item{{ engagement.scope_targets|length|pluralize }}</span>{% endif %}
-                </div>
-                {% if engagement.scope_targets %}
-                <div class="scope-rows">
-                    {% for t in engagement.scope_targets %}
-                    <div class="scope-row">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-                        <span class="text-mono">{{ t }}</span>
+            <div class="scope-col">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">In-scope targets</h2>
+                        {% if engagement.scope_targets %}<span class="chip">{{ engagement.scope_targets|length }} item{{ engagement.scope_targets|length|pluralize }}</span>{% endif %}
                     </div>
-                    {% endfor %}
+                    {% if engagement.scope_targets %}
+                    <div class="scope-rows">
+                        {% for t in engagement.scope_targets %}
+                        <div class="scope-row">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+                            <span class="text-mono">{{ t }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-secondary text-sm">No scope targets defined.</p>
+                    {% endif %}
                 </div>
-                {% else %}
-                <p class="text-secondary text-sm">No scope targets defined.</p>
+
+                {% if engagement.out_of_scope %}
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Out of scope</h2></div>
+                    <div class="scope-rows">
+                        {% for t in engagement.out_of_scope.splitlines %}{% if t.strip %}
+                        <div class="scope-row scope-row--out">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+                            <span class="text-mono">{{ t }}</span>
+                        </div>
+                        {% endif %}{% endfor %}
+                    </div>
+                </div>
                 {% endif %}
             </div>
 
             <div class="card">
-                <div class="card-header"><h2 class="card-title">Rules of engagement</h2></div>
+                <div class="card-header">
+                    <h2 class="card-title">Rules of engagement</h2>
+                    {% if engagement.roe_signed_off %}<span class="sig sig--green">Signed off</span>{% endif %}
+                </div>
                 {% if engagement.rules_of_engagement %}
                 <div class="prose">{{ engagement.rules_of_engagement|linebreaksbr }}</div>
                 {% else %}
                 <p class="text-secondary text-sm">No rules of engagement recorded.</p>
                 {% endif %}
-                {% if can_edit %}<a href="{% url 'engagements:edit' engagement.pk %}" class="btn btn-sm mt-3">Edit scope &amp; RoE</a>{% endif %}
-            </div>
-        </div>
 
-        {% if engagement.out_of_scope %}
-        <div class="card">
-            <div class="card-header"><h2 class="card-title">Out of scope</h2></div>
-            <div class="scope-rows">
-                {% for t in engagement.out_of_scope.splitlines %}{% if t.strip %}
-                <div class="scope-row scope-row--out">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
-                    <span class="text-mono">{{ t }}</span>
+                {% if engagement.roe_signed_off %}
+                <div class="roe-signoff">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>Signed off by <b>{{ engagement.roe_signed_off_by|default:"—" }}</b>{% if engagement.roe_signed_off_at %} · {{ engagement.roe_signed_off_at|date:"M j, Y" }}{% endif %} — scope &amp; RoE are locked.</span>
                 </div>
-                {% endif %}{% endfor %}
+                {% if can_manage %}
+                <form method="post" action="{% url 'engagements:toggle_roe_signoff' engagement.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm" data-confirm="Revoke sign-off and unlock scope &amp; RoE editing?">Revoke sign-off</button>
+                </form>
+                {% endif %}
+                {% else %}
+                <div class="roe-actions mt-3">
+                    {% if can_edit %}<a href="{% url 'engagements:edit' engagement.pk %}" class="btn btn-sm">Edit scope &amp; RoE</a>{% endif %}
+                    {% if can_manage %}
+                    <form method="post" action="{% url 'engagements:toggle_roe_signoff' engagement.pk %}" style="margin:0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-primary" data-confirm="Sign off the rules of engagement? This locks scope &amp; RoE until revoked.">✓ Sign off RoE</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
-        {% endif %}
     </div>
 
     <!-- Findings -->

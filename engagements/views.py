@@ -199,6 +199,13 @@ def engagement_create(request):
 @engagement_edit_required
 def engagement_edit(request, pk):
     engagement = request.engagement
+    if engagement.roe_signed_off:
+        messages.error(
+            request,
+            'Scope & rules of engagement are signed off and locked. '
+            'A lead must revoke the sign-off before editing.',
+        )
+        return redirect('engagements:detail', pk=pk)
     if request.method == 'POST':
         form = EngagementForm(request.POST, instance=engagement)
         if form.is_valid():
@@ -256,6 +263,44 @@ def engagement_update_status(request, pk):
         )
         messages.success(request, f'Status updated to {engagement.get_status_display()}.')
     return redirect('engagements:detail', pk=pk)
+
+
+@login_required
+@engagement_access()
+def toggle_roe_signoff(request, pk):
+    """Lead-only: sign off the rules of engagement (locking scope/RoE edits)
+    or revoke an existing sign-off."""
+    engagement = request.engagement
+    if not engagement.user_is_lead(request.user):
+        messages.error(request, 'Only the engagement lead can sign off the rules of engagement.')
+        return redirect('engagements:detail', pk=pk)
+    if request.method == 'POST':
+        if engagement.roe_signed_off:
+            engagement.roe_signed_off = False
+            engagement.roe_signed_off_by = None
+            engagement.roe_signed_off_at = None
+            engagement.save(update_fields=[
+                'roe_signed_off', 'roe_signed_off_by', 'roe_signed_off_at', 'updated_at',
+            ])
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action='Revoked rules-of-engagement sign-off',
+            )
+            messages.success(request, 'Sign-off revoked — scope & RoE can be edited again.')
+        else:
+            engagement.roe_signed_off = True
+            engagement.roe_signed_off_by = request.user
+            engagement.roe_signed_off_at = timezone.now()
+            engagement.save(update_fields=[
+                'roe_signed_off', 'roe_signed_off_by', 'roe_signed_off_at', 'updated_at',
+            ])
+            ActivityLog.objects.create(
+                engagement=engagement, user=request.user,
+                action='Signed off the rules of engagement',
+            )
+            messages.success(request, 'Rules of engagement signed off — scope & RoE are now locked.')
+    from django.urls import reverse
+    return redirect(reverse('engagements:detail', kwargs={'pk': pk}) + '#scope')
 
 
 # ── Team management ──

@@ -16,6 +16,7 @@ urlpatterns = [
     path('<uuid:pk>/edit/', views.engagement_edit, name='edit'),
     path('<uuid:pk>/delete/', views.engagement_delete, name='delete'),
     path('<uuid:pk>/status/', views.engagement_update_status, name='update_status'),
+    path('<uuid:pk>/roe-signoff/', views.toggle_roe_signoff, name='toggle_roe_signoff'),
     # Team management
     path('<uuid:pk>/invite/', views.invite_member, name='invite'),
     path('<uuid:pk>/remove/<uuid:member_pk>/', views.remove_member, name='remove_member'),
