@@ -177,45 +177,42 @@
                 </div>
                 {% endif %}
 
+                {% if not is_client %}
+                <div class="card mt-4">
+                    <div class="card-header"><h2 class="card-title">Review</h2><span class="badge badge-{{ finding.review_state }}">{{ finding.get_review_state_display }}</span></div>
+                    {% if finding.reviewed_by %}<p class="text-xs text-muted mb-3">Last reviewed by {{ finding.reviewed_by }}{% if finding.reviewed_at %} · {{ finding.reviewed_at|date:"M j, Y" }}{% endif %}</p>{% endif %}
+                    {% if finding.review_state == 'changes_requested' and finding.review_notes %}<div class="review-feedback mb-3">{{ finding.review_notes|linebreaksbr }}</div>{% endif %}
+                    {% if finding.review_state == 'in_review' and can_review %}
+                    <form method="post" action="{% url 'vulns:request_changes' finding.pk %}">
+                        {% csrf_token %}
+                        <div class="form-group"><label>Request changes</label><textarea name="review_notes" rows="3" class="form-input" required placeholder="What needs to change?"></textarea></div>
+                        <button type="submit" class="btn btn-sm btn-danger">Request changes</button>
+                    </form>
+                    {% elif finding.review_state == 'approved' %}
+                    <p class="text-sm" style="color:var(--success)">Approved &amp; visible to the client.</p>
+                    {% endif %}
+                    {% if can_review %}<a href="{% url 'vulns:merge' finding.pk %}" class="btn btn-sm mt-3">Merge into…</a>{% endif %}
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header"><h2 class="card-title">Retest</h2><span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span></div>
+                    {% if finding.retest_date or finding.retested_by %}<p class="text-xs text-muted mb-3">{% if finding.retest_date %}{{ finding.retest_date|date:"M j, Y" }}{% endif %}{% if finding.retested_by %} · by {{ finding.retested_by }}{% endif %}</p>{% endif %}
+                    {% if can_edit %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="record_retest" value="1">
+                        <div class="form-row">
+                            <div class="form-group"><label>Status</label>{{ retest_form.retest_status }}</div>
+                            <div class="form-group"><label>Date</label>{{ retest_form.retest_date }}</div>
+                        </div>
+                        <div class="form-group"><label>Notes</label>{{ retest_form.retest_notes }}</div>
+                        <button type="submit" class="btn btn-sm btn-primary">Save retest</button>
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
             </aside>
         </div>
-
-        {% if not is_client %}
-        <div class="grid-2 mt-4">
-            <div class="card">
-                <div class="card-header"><h2 class="card-title">Review</h2><span class="badge badge-{{ finding.review_state }}">{{ finding.get_review_state_display }}</span></div>
-                {% if finding.reviewed_by %}<p class="text-xs text-muted mb-3">Last reviewed by {{ finding.reviewed_by }}{% if finding.reviewed_at %} · {{ finding.reviewed_at|date:"M j, Y" }}{% endif %}</p>{% endif %}
-                {% if finding.review_state == 'changes_requested' and finding.review_notes %}<div class="review-feedback mb-3">{{ finding.review_notes|linebreaksbr }}</div>{% endif %}
-                {% if finding.review_state == 'in_review' and can_review %}
-                <form method="post" action="{% url 'vulns:request_changes' finding.pk %}">
-                    {% csrf_token %}
-                    <div class="form-group"><label>Request changes</label><textarea name="review_notes" rows="3" class="form-input" required placeholder="What needs to change?"></textarea></div>
-                    <button type="submit" class="btn btn-sm btn-danger">Request changes</button>
-                </form>
-                {% elif finding.review_state == 'approved' %}
-                <p class="text-sm" style="color:var(--success)">Approved &amp; visible to the client.</p>
-                {% endif %}
-                {% if can_review %}<a href="{% url 'vulns:merge' finding.pk %}" class="btn btn-sm mt-3">Merge into…</a>{% endif %}
-            </div>
-
-            <div class="card">
-                <div class="card-header"><h2 class="card-title">Retest</h2><span class="badge badge-{{ finding.retest_status }}">{{ finding.get_retest_status_display }}</span></div>
-                {% if finding.retest_date or finding.retested_by %}<p class="text-xs text-muted mb-3">{% if finding.retest_date %}{{ finding.retest_date|date:"M j, Y" }}{% endif %}{% if finding.retested_by %} · by {{ finding.retested_by }}{% endif %}</p>{% endif %}
-                {% if can_edit %}
-                <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="record_retest" value="1">
-                    <div class="form-row">
-                        <div class="form-group"><label>Status</label>{{ retest_form.retest_status }}</div>
-                        <div class="form-group"><label>Date</label>{{ retest_form.retest_date }}</div>
-                    </div>
-                    <div class="form-group"><label>Notes</label>{{ retest_form.retest_notes }}</div>
-                    <button type="submit" class="btn btn-sm btn-primary">Save retest</button>
-                </form>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     <!-- ── Evidence (PoC + screenshots) ── -->
