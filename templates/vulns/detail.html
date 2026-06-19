@@ -102,6 +102,14 @@
                     <div class="prose">{{ finding.description|markdown }}</div>
                 </div>
 
+                {% if finding.proof_of_concept %}
+                <div class="card mt-4">
+                    <h2 class="card-title mb-3">Proof of concept</h2>
+                    <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
+                    <p class="text-xs text-muted mt-2">Step-by-step screenshots with their requests are in the <b>Evidence</b> tab.</p>
+                </div>
+                {% endif %}
+
                 {% if finding.remediation %}
                 <div class="card mt-4">
                     <h2 class="card-title mb-3">Remediation</h2>
@@ -209,39 +217,13 @@
 
     <!-- ── Evidence (PoC + screenshots) ── -->
     <div class="tab-panel" id="tab-evidence" role="tabpanel">
-        <div class="card" id="reproCard">
-            <div class="card-header">
-                <h2 class="card-title">Reproduction</h2>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs text-muted">steps · request / response</span>
-                    {% if can_edit %}<button type="button" class="btn btn-sm" data-repro-edit>{% if finding.proof_of_concept %}Edit{% else %}+ Add steps{% endif %}</button>{% endif %}
-                </div>
-            </div>
-            <div data-repro-view>
-                {% if finding.proof_of_concept %}
-                <div class="prose">{{ finding.proof_of_concept|markdown }}</div>
-                {% else %}
-                <p class="text-secondary text-sm">No reproduction steps yet.{% if can_edit %} Use <b>+ Add steps</b> to write the PoC inline — numbered steps, payloads, and request/response.{% endif %}</p>
-                {% endif %}
-            </div>
-            {% if can_edit %}
-            <form method="post" data-repro-form hidden>
-                {% csrf_token %}
-                <input type="hidden" name="update_poc" value="1">
-                <textarea name="proof_of_concept" rows="12" class="form-input text-mono" placeholder="## Steps to reproduce&#10;1. Authenticate as a low-priv user&#10;2. Send the request below&#10;&#10;```http&#10;POST /api/v1/search HTTP/1.1&#10;Host: app.example&#10;&#10;q=1' OR '1'='1&#10;```">{{ finding.proof_of_concept }}</textarea>
-                <div class="flex gap-2 mt-3">
-                    <button type="submit" class="btn btn-sm btn-primary">Save reproduction</button>
-                    <button type="button" class="btn btn-sm" data-repro-cancel>Cancel</button>
-                </div>
-                <span class="form-help mt-2">Markdown supported — fenced <code>```http</code> blocks render as request/response.</span>
-            </form>
-            {% endif %}
-        </div>
-
-        <div class="card mt-4">
+        <div class="card">
             <div class="ev-toolbar">
-                <h2 class="card-title">Evidence files</h2>
-                <span class="ev-count">{{ evidence|length }} item{{ evidence|length|pluralize }}</span>
+                <div>
+                    <h2 class="card-title">Reproduction steps</h2>
+                    <p class="ev-intro">Each step pairs the request / payload with the screenshot that proves it.</p>
+                </div>
+                <span class="ev-count">{{ evidence|length }} step{{ evidence|length|pluralize }}</span>
             </div>
             {% if evidence %}
             <div class="ev-steps">

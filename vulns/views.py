@@ -151,6 +151,14 @@ def finding_detail(request, pk):
             f.retested_by = request.user
             if f.retest_status == Finding.RetestStatus.FIXED:
                 f.status = Finding.Status.REMEDIATED
+            elif f.retest_status in (
+                Finding.RetestStatus.STILL_PRESENT,
+                Finding.RetestStatus.PARTIALLY_FIXED,
+            ):
+                # Retest shows the issue isn't fully fixed — re-open it if a
+                # previous "fixed" retest had marked it remediated.
+                if f.status == Finding.Status.REMEDIATED:
+                    f.status = Finding.Status.CONFIRMED
             f.save()
             ActivityLog.objects.create(
                 engagement=finding.engagement, user=request.user,
