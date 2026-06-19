@@ -954,6 +954,11 @@ select.form-input.form-input--compact {
     overflow: hidden;
     margin-bottom: 24px;
 }
+/* 6-cell variant (finding detail) — divides evenly at each breakpoint so no
+   empty grid cells show the strip's border as gray boxes. */
+.kpi-strip--6 { grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 1100px) { .kpi-strip--6 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .kpi-strip--6 { grid-template-columns: repeat(2, 1fr); } }
 .kpi-item {
     background: var(--bg-card);
     padding: 14px 18px;
