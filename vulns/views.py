@@ -167,21 +167,6 @@ def finding_detail(request, pk):
             messages.success(request, 'Retest recorded.')
             return redirect('vulns:detail', pk=pk)
 
-    if request.method == 'POST' and 'assign_finding' in request.POST and can_edit:
-        member_id = request.POST.get('assigned_to')
-        new_owner = None
-        if member_id:
-            member = finding.engagement.members.filter(user_id=member_id).first()
-            new_owner = member.user if member else None
-        finding.assigned_to = new_owner
-        finding.save(update_fields=['assigned_to', 'updated_at'])
-        ActivityLog.objects.create(
-            engagement=finding.engagement, user=request.user,
-            action=f'Assigned finding "{finding.title}" to {new_owner or "unassigned"}',
-        )
-        messages.success(request, 'Assignee updated.')
-        return redirect('vulns:detail', pk=pk)
-
     if request.method == 'POST' and 'update_poc' in request.POST and can_edit:
         finding.proof_of_concept = request.POST.get('proof_of_concept', '')
         finding.save(update_fields=['proof_of_concept', 'updated_at'])
@@ -304,7 +289,6 @@ def finding_detail(request, pk):
         'comments': comments,
         'timeline': timeline,
         'attack_paths': attack_paths,
-        'assignable_members': finding.engagement.members.exclude(role='client').select_related('user'),
         'is_client': is_client,
         'can_edit': can_edit,
         'can_review': can_review,
