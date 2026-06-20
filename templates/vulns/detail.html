@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load vulns_extras %}
 {% block title %}{{ finding.title }} — Vulnex{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="/static/css/findings.css">{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
     <a href="{% url 'engagements:detail' finding.engagement.pk %}">{{ finding.engagement.name|truncatechars:22 }}</a>
