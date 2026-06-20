@@ -223,7 +223,7 @@
 
         if (e.key === '/') {
             e.preventDefault();
-            var globalSearch = document.querySelector('.global-search-input');
+            var globalSearch = document.querySelector('.topbar-search-input');
             var search = document.querySelector('.search-input');
             (globalSearch || search || {focus: function(){}}).focus();
             return;
