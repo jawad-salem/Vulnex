@@ -63,7 +63,7 @@
         {% elif finding.sla_status == 'overdue' %}
         <div class="kpi-value" style="font-size:18px;color:var(--critical)">Overdue</div><div class="kpi-sub" style="color:var(--critical)">{{ finding.overdue_days }}d past due</div>
         {% elif finding.sla_status == 'due_soon' %}
-        <div class="kpi-value" style="font-size:18px;color:var(--warning)">{{ finding.days_until_due }}d</div><div class="kpi-sub">Due {{ finding.due_date|date:"M j" }}</div>
+        <div class="kpi-value" style="font-size:18px;color:var(--warning)">{% if finding.days_until_due == 0 %}Today{% else %}{{ finding.days_until_due }}d{% endif %}</div><div class="kpi-sub">Due {{ finding.due_date|date:"M j" }}</div>
         {% else %}
         <div class="kpi-value" style="font-size:18px">{{ finding.days_until_due }}d</div><div class="kpi-sub">Due {{ finding.due_date|date:"M j" }}</div>
         {% endif %}
