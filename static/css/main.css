@@ -1,11 +1,11 @@
-/* â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
-   VULNEX آ· OPERATOR CONSOLE
+/* ══════════════════════════════════════════════════════════════════
+   VULNEX · OPERATOR CONSOLE
    Purposeful, low-noise, instrument-grade. Near-monochrome neutral slate;
    saturated color reserved exclusively for severity/status meaning.
-   One restrained accent â€” signal teal. Hairline structure. Mono for data.
+   One restrained accent — signal teal. Hairline structure. Mono for data.
    Token names are preserved 1:1 from the original theme so every template
    reskins with no markup changes.
-   â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
+   ══════════════════════════════════════════════════════════════════ */
 :root {
     --bg-primary: #0a0d12;     /* app canvas            */
     --bg-secondary: #0e1217;   /* sidebar / panels      */
@@ -21,12 +21,12 @@
     --border: #262e39;
     --border-light: #1a212a;
 
-    /* The ONLY brand color â€” signal teal */
+    /* The ONLY brand color — signal teal */
     --accent: #16b8a6;
     --accent-light: #2ad6c2;
     --accent-bg: rgba(22, 184, 166, 0.13);
 
-    /* Severity â€” the loud signals */
+    /* Severity — the loud signals */
     --critical: #f25a52;
     --high: #f3974a;
     --medium: #e3b341;
@@ -58,7 +58,7 @@ body {
 a { color: var(--accent-light); text-decoration: none; }
 a:hover { color: var(--accent); }
 
-/* â”€â”€ Utility classes â”€â”€ */
+/* ── Utility classes ── */
 .text-mono { font-family: var(--font-mono); }
 .text-sm { font-size: 12px; }
 .text-xs { font-size: 11px; }
@@ -117,7 +117,7 @@ a:hover { color: var(--accent); }
     margin-bottom: 16px;
 }
 
-/* â”€â”€ Layout â”€â”€ */
+/* ── Layout ── */
 .layout {
     display: flex;
     min-height: 100vh;
@@ -244,7 +244,7 @@ a:hover { color: var(--accent); }
     min-height: 100vh;
 }
 
-/* â”€â”€ Top bar â”€â”€ */
+/* ── Top bar ── */
 .topbar {
     position: sticky;
     top: 0;
@@ -332,7 +332,7 @@ a:hover { color: var(--accent); }
 
 .page-body { padding: 22px 28px 44px; }
 
-/* â”€â”€ Typography â”€â”€ */
+/* ── Typography ── */
 .page-header {
     display: flex;
     align-items: center;
@@ -351,7 +351,7 @@ a:hover { color: var(--accent); }
     margin-top: 2px;
 }
 
-/* â”€â”€ Cards â”€â”€ */
+/* ── Cards ── */
 .card {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -374,7 +374,7 @@ a:hover { color: var(--accent); }
     font-weight: 600;
 }
 
-/* â”€â”€ Stat cards â”€â”€ */
+/* ── Stat cards ── */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -414,7 +414,7 @@ a:hover { color: var(--accent); }
 }
 .stat-sublabel.high { color: var(--high); }
 
-/* â”€â”€ Tables â”€â”€ */
+/* ── Tables ── */
 .table-wrap {
     overflow-x: auto;
 }
@@ -445,7 +445,7 @@ tr:hover td {
 }
 td a { transition: color 0.15s; }
 
-/* â”€â”€ User cell (avatar + name in tables) â”€â”€ */
+/* ── User cell (avatar + name in tables) ── */
 .user-cell {
     display: flex;
     align-items: center;
@@ -460,7 +460,7 @@ td a { transition: color 0.15s; }
     color: var(--text-muted);
 }
 
-/* â”€â”€ Team member row â”€â”€ */
+/* ── Team member row ── */
 .member-row {
     display: flex;
     justify-content: space-between;
@@ -470,7 +470,7 @@ td a { transition: color 0.15s; }
 }
 .member-row:last-child { border-bottom: none; }
 
-/* â”€â”€ Badges â”€â”€ */
+/* ── Badges ── */
 .badge {
     display: inline-flex;
     align-items: center;
@@ -532,7 +532,7 @@ td a { transition: color 0.15s; }
     padding: 4px 12px;
 }
 
-/* â”€â”€ Buttons â”€â”€ */
+/* ── Buttons ── */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -566,7 +566,7 @@ td a { transition: color 0.15s; }
 .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn-full { width: 100%; justify-content: center; margin-top: 8px; }
 
-/* â”€â”€ Forms â”€â”€ */
+/* ── Forms ── */
 .form-group {
     margin-bottom: 16px;
 }
@@ -643,7 +643,7 @@ select.form-input.form-input--compact {
     accent-color: var(--accent);
 }
 
-/* â”€â”€ Alerts â”€â”€ */
+/* ── Alerts ── */
 .messages { margin-bottom: 16px; }
 .alert {
     padding: 10px 16px;
@@ -677,7 +677,7 @@ select.form-input.form-input--compact {
     opacity: 0.7;
 }
 
-/* â”€â”€ Progress bar â”€â”€ */
+/* ── Progress bar ── */
 .progress-bar {
     height: 6px;
     background: var(--bg-primary);
@@ -706,7 +706,7 @@ select.form-input.form-input--compact {
     border-radius: 2px;
 }
 
-/* â”€â”€ Avatar â”€â”€ */
+/* ── Avatar ── */
 .avatar-sm {
     width: 28px;
     height: 28px;
@@ -726,7 +726,7 @@ select.form-input.form-input--compact {
     transition: opacity 0.15s ease;
 }
 
-/* â”€â”€ Engagement detail: hero â”€â”€ */
+/* ── Engagement detail: hero ── */
 .eng-hero {
     display: flex;
     justify-content: space-between;
@@ -778,7 +778,7 @@ select.form-input.form-input--compact {
     font-weight: 600;
 }
 
-/* â”€â”€ Phase stepper â”€â”€ */
+/* ── Phase stepper ── */
 .phase-stepper {
     display: flex;
     align-items: flex-start;
@@ -845,7 +845,7 @@ select.form-input.form-input--compact {
 .phase-step.phase-active .phase-label { color: var(--text-primary); font-weight: 600; }
 .phase-step.phase-done .phase-label { color: var(--text-secondary); }
 
-/* â”€â”€ KPI strip (compact stat row) â”€â”€ */
+/* ── KPI strip (compact stat row) ── */
 .kpi-strip {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -856,7 +856,7 @@ select.form-input.form-input--compact {
     overflow: hidden;
     margin-bottom: 24px;
 }
-/* 6-cell variant (finding detail) â€” divides evenly at each breakpoint so no
+/* 6-cell variant (finding detail) — divides evenly at each breakpoint so no
    empty grid cells show the strip's border as gray boxes. */
 .kpi-strip--6 { grid-template-columns: repeat(6, 1fr); }
 @media (max-width: 1100px) { .kpi-strip--6 { grid-template-columns: repeat(3, 1fr); } }
@@ -889,7 +889,7 @@ select.form-input.form-input--compact {
     .kpi-strip { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* â”€â”€ Tabs â”€â”€ */
+/* ── Tabs ── */
 .tabs { margin-top: 8px; }
 .tab-nav {
     display: flex;
@@ -933,7 +933,7 @@ select.form-input.form-input--compact {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
-/* â”€â”€ Quick actions (overview) â”€â”€ */
+/* ── Quick actions (overview) ── */
 .quick-actions {
     display: flex;
     flex-direction: column;
@@ -1025,7 +1025,7 @@ select.form-input.form-input--compact {
 }
 .quick-action:hover .qa-sub { color: var(--text-secondary); }
 
-/* â”€â”€ Scope targets â”€â”€ */
+/* ── Scope targets ── */
 .scope-target {
     font-family: var(--font-mono);
     font-size: 12px;
@@ -1149,7 +1149,7 @@ select.form-input.form-input--compact {
     vertical-align: 1px;
 }
 
-/* â”€â”€ Notes â”€â”€ */
+/* ── Notes ── */
 .note-item {
     padding: 14px 0;
     border-bottom: 1px solid var(--border-light);
@@ -1162,13 +1162,13 @@ select.form-input.form-input--compact {
     padding-left: 36px;
 }
 
-/* â”€â”€ Empty state compact â”€â”€ */
+/* ── Empty state compact ── */
 .empty-state.compact {
     padding: 20px 12px;
     text-align: center;
 }
 
-/* â”€â”€ Card section title (inside card) â”€â”€ */
+/* ── Card section title (inside card) ── */
 .card-section-title {
     font-size: 11px;
     font-weight: 600;
@@ -1178,13 +1178,13 @@ select.form-input.form-input--compact {
     margin-bottom: 8px;
 }
 
-/* â”€â”€ Icon button (tiny X remove) â”€â”€ */
+/* ── Icon button (tiny X remove) ── */
 .icon-btn {
     padding: 2px 8px !important;
     font-size: 13px !important;
     line-height: 1 !important;
 }
-/* â”€â”€ Report cards (rebuilt) â”€â”€ */
+/* ── Report cards (rebuilt) ── */
 .report-card-stack {
     margin-bottom: 18px;
     position: relative;
@@ -1330,7 +1330,7 @@ select.form-input.form-input--compact {
 }
 .report-card__stack-list > summary::-webkit-details-marker { display: none; }
 .report-card__stack-list > summary::before {
-    content: 'â–¸';
+    content: '▸';
     display: inline-block;
     color: var(--report-accent, var(--accent));
     transition: transform 160ms ease;
@@ -1376,7 +1376,7 @@ select.form-input.form-input--compact {
     .report-card__cta { width: calc(100% - 28px); margin: 0 14px 14px; }
 }
 
-/* â”€â”€ Grid layouts â”€â”€ */
+/* ── Grid layouts ── */
 .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1390,7 +1390,7 @@ select.form-input.form-input--compact {
     align-items: start;
 }
 
-/* â”€â”€ Auth pages â”€â”€ */
+/* ── Auth pages ── */
 .auth-page {
     min-height: 100vh;
     display: flex;
@@ -1506,7 +1506,7 @@ select.form-input.form-input--compact {
 .mfa-digit.is-filled { border-color: var(--border-light); }
 .mfa-digit.is-active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 
-/* â”€â”€ Filter bar â”€â”€ */
+/* ── Filter bar ── */
 .filter-bar {
     display: flex;
     gap: 8px;
@@ -1519,7 +1519,7 @@ select.form-input.form-input--compact {
     min-width: 140px;
 }
 
-/* â”€â”€ Scan feed (recent scans with pipeline grouping) â”€â”€ */
+/* ── Scan feed (recent scans with pipeline grouping) ── */
 .scan-feed {
     display: flex;
     flex-direction: column;
@@ -1678,7 +1678,7 @@ select.form-input.form-input--compact {
     .scan-feed__child-time { display: none; }
 }
 
-/* â”€â”€ Finding filters (primary + collapsible advanced) â”€â”€ */
+/* ── Finding filters (primary + collapsible advanced) ── */
 .finding-filters {
     display: block;
     padding: 0;
@@ -1747,7 +1747,7 @@ select.form-input.form-input--compact {
     min-width: 200px;
 }
 
-/* â”€â”€ Audit filter bar â”€â”€ */
+/* ── Audit filter bar ── */
 .audit-filter-bar {
     display: flex;
     flex-direction: column;
@@ -1768,7 +1768,7 @@ select.form-input.form-input--compact {
     width: 100%;
 }
 
-/* â”€â”€ Empty state â”€â”€ */
+/* ── Empty state ── */
 .empty-state {
     text-align: center;
     padding: 48px 24px;
@@ -1813,7 +1813,7 @@ select.form-input.form-input--compact {
     line-height: 1.5;
 }
 
-/* â”€â”€ Detail list â”€â”€ */
+/* ── Detail list ── */
 .detail-list {
     font-size: 13px;
 }
@@ -1833,7 +1833,7 @@ select.form-input.form-input--compact {
     font-weight: 600;
 }
 
-/* â”€â”€ Form helpers â”€â”€ */
+/* ── Form helpers ── */
 .form-help {
     display: block;
     font-size: 11px;
@@ -1847,7 +1847,7 @@ select.form-input.form-input--compact {
     margin-top: 4px;
 }
 
-/* â”€â”€ Prose (rich text blocks) â”€â”€ */
+/* ── Prose (rich text blocks) ── */
 .prose {
     font-size: 13px;
     line-height: 1.7;
@@ -1924,7 +1924,7 @@ select.form-input.form-input--compact {
     text-underline-offset: 2px;
 }
 
-/* â”€â”€ Markdown editor field (write / preview tabs) â”€â”€ */
+/* ── Markdown editor field (write / preview tabs) ── */
 .md-field { display: flex; flex-direction: column; }
 .md-tabs {
     display: flex;
@@ -1969,7 +1969,7 @@ select.form-input.form-input--compact {
 }
 .md-preview-pane.md-preview-loading { opacity: 0.5; }
 
-/* â”€â”€ Code inline â”€â”€ */
+/* ── Code inline ── */
 code {
     font-family: var(--font-mono);
     font-size: 0.9em;
@@ -1979,7 +1979,7 @@ code {
     border: 1px solid var(--border-light);
 }
 
-/* â”€â”€ Mobile hamburger â”€â”€ */
+/* ── Mobile hamburger ── */
 .mobile-toggle {
     display: none;
     position: fixed;
@@ -2003,7 +2003,7 @@ code {
 }
 .sidebar-overlay.active { display: block; }
 
-/* â”€â”€ Loading spinner â”€â”€ */
+/* ── Loading spinner ── */
 .btn.loading {
     pointer-events: none;
     opacity: 0.7;
@@ -2023,7 +2023,7 @@ code {
     to { transform: rotate(360deg); }
 }
 
-/* â”€â”€ Pagination â”€â”€ */
+/* ── Pagination ── */
 .pagination {
     display: flex;
     align-items: center;
@@ -2063,7 +2063,7 @@ code {
     color: var(--text-muted);
 }
 
-/* â”€â”€ Error pages â”€â”€ */
+/* ── Error pages ── */
 .error-page {
     min-height: 100vh;
     display: flex;
@@ -2086,7 +2086,7 @@ code {
     margin-bottom: 24px;
 }
 
-/* â”€â”€ Charts â”€â”€ */
+/* ── Charts ── */
 .chart-container {
     position: relative;
     height: 220px;
@@ -2096,7 +2096,7 @@ code {
     height: 200px;
 }
 
-/* â”€â”€ Breadcrumbs â”€â”€ */
+/* ── Breadcrumbs ── */
 .breadcrumbs {
     display: flex;
     align-items: center;
@@ -2135,26 +2135,26 @@ code {
     vertical-align: middle;
 }
 
-/* â”€â”€ Form 2-column section â”€â”€ */
+/* ── Form 2-column section ── */
 .form-2col {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0 20px;
 }
 
-/* â”€â”€ Select dropdown native styling â”€â”€ */
+/* ── Select dropdown native styling ── */
 select.form-input option {
     background: var(--bg-secondary);
     color: var(--text-primary);
     padding: 8px;
 }
 
-/* â”€â”€ Card that should not stretch vertically â”€â”€ */
+/* ── Card that should not stretch vertically ── */
 .card-fit {
     align-self: start;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 768px) {
     .mobile-toggle { display: block; }
     .sidebar {
@@ -2173,7 +2173,7 @@ select.form-input option {
     .import-layout { grid-template-columns: 1fr; }
 }
 
-/* â”€â”€ Scanner import page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Scanner import page ─────────────────────────────────────── */
 .import-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -2194,10 +2194,10 @@ select.form-input option {
     border-radius: 4px;
 }
 
-/* â”€â”€ Scanner manifest sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ── Scanner manifest sidebar ────────────────────────────────
    A technical "receipt" for the parsers registered in vulns/parsers.py.
    Monospace-forward, tabular rhythm, dashed separators. Purple accent
-   is spent on labels and separators only â€” body stays muted.
+   is spent on labels and separators only — body stays muted.
    ------------------------------------------------------------ */
 .scanner-manifest {
     display: flex;
@@ -2207,7 +2207,7 @@ select.form-input option {
     overflow: hidden;
 }
 .scanner-manifest::before {
-    /* corner cut â€” makes the card feel like a physical manifest */
+    /* corner cut — makes the card feel like a physical manifest */
     content: '';
     position: absolute;
     top: 0; right: 0;
@@ -2421,7 +2421,7 @@ select.form-input option {
     50%      { opacity: 1; }
 }
 
-/* â”€â”€ Attack-path mapper (red-team) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Attack-path mapper (red-team) ────────────────────────────────────── */
 .attack-path-canvas-card { padding: 1rem; margin-bottom: 1rem; }
 #attack-path-canvas {
     background: var(--bg-secondary);
@@ -2516,7 +2516,7 @@ select.form-input option {
     background: transparent;
 }
 
-/* Popover (disclosure) â€” drops in flow under the toolbar. Absolute on wide
+/* Popover (disclosure) — drops in flow under the toolbar. Absolute on wide
    viewports so it floats over the canvas instead of pushing it down. */
 .ap-popover {
     margin-top: 0.5rem;
@@ -2546,7 +2546,7 @@ select.form-input option {
 .ap-popover-grid-wide { grid-column: 1 / -1; }
 .ap-popover-form .form-actions { margin-top: 0.8rem; }
 
-/* Two-column Nodes / Edges row below the canvas â€” full width, no dead space. */
+/* Two-column Nodes / Edges row below the canvas — full width, no dead space. */
 .ap-lists {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2558,14 +2558,14 @@ select.form-input option {
     .ap-popover-grid { grid-template-columns: 1fr; }
 }
 
-/* â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
-   OPERATOR CONSOLE آ· refinements
+/* ════════════════════════════════════════════════════════════════════
+   OPERATOR CONSOLE · refinements
    Appended last so it overrides earlier rules by source order. Removes
    decorative motion/noise, sharpens signals, and retires the last
    hard-coded violet values left over from the old theme.
-   â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
+   ════════════════════════════════════════════════════════════════════ */
 
-/* â€” Type rhythm: slightly tighter, instrument-grade â€” */
+/* — Type rhythm: slightly tighter, instrument-grade — */
 body { font-size: 13px; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 ::selection { background: var(--accent-bg); color: var(--accent-light); }
 
@@ -2573,22 +2573,22 @@ body { font-size: 13px; -webkit-font-smoothing: antialiased; text-rendering: opt
 .stat-value, .kpi-value, .error-code, .cell-cvss,
 td .text-mono, .text-mono { font-variant-numeric: tabular-nums; }
 
-/* â€” Sidebar: hairline accent rail, calmer brand â€” */
+/* — Sidebar: hairline accent rail, calmer brand — */
 .sidebar-brand { color: var(--text-primary); letter-spacing: -0.2px; }
 .sidebar-brand svg { color: var(--accent-light); }
 .nav-item.active::before { width: 2.5px; top: 8px; bottom: 8px; }
 
-/* â€” Cards: flat, no hover lift (motion = noise) â€” */
+/* — Cards: flat, no hover lift (motion = noise) — */
 .card { transition: border-color 0.15s; }
 .stat-card { transition: border-color 0.15s; }
 .stat-card:hover { transform: none; border-color: var(--accent); }
 .card:hover { border-color: var(--border); }
 
-/* â€” Stat values: a touch smaller, tighter â€” */
+/* — Stat values: a touch smaller, tighter — */
 .stat-value { font-size: 25px; letter-spacing: -0.5px; }
 .kpi-value { font-family: var(--font-mono); letter-spacing: -0.5px; }
 
-/* â€” Badges â†’ sharp instrument tags (no pill, no zoom) â€” */
+/* — Badges → sharp instrument tags (no pill, no zoom) — */
 .badge {
     border-radius: var(--radius-sm, 4px);
     padding: 2px 7px;
@@ -2602,21 +2602,21 @@ td .text-mono, .text-mono { font-variant-numeric: tabular-nums; }
 .badge-low      { background: rgba(89, 166, 255, 0.14); color: var(--low); border-color: rgba(89, 166, 255, 0.28); }
 .badge-open     { background: rgba(242, 90, 82, 0.14); color: var(--critical); border-color: rgba(242, 90, 82, 0.28); }
 
-/* â€” Buttons: primary reads as a precise control, not a candy button â€” */
+/* — Buttons: primary reads as a precise control, not a candy button — */
 .btn { font-weight: 550; transition: background 0.12s, border-color 0.12s, color 0.12s; }
 .btn-primary { color: #04201d; font-weight: 600; }
 .btn-primary:hover { color: #04201d; }
 .btn.loading::after { border-top-color: currentColor; }
 
-/* â€” Inputs: teal focus ring, mono-friendly â€” */
+/* — Inputs: teal focus ring, mono-friendly — */
 .form-input:focus, .global-search-input:focus {
     box-shadow: 0 0 0 3px rgba(22, 184, 166, 0.10);
 }
 
-/* â€” Phase stepper: teal focus halo (was violet rgba) â€” */
+/* — Phase stepper: teal focus halo (was violet rgba) — */
 .phase-step.phase-active .phase-dot { box-shadow: 0 0 0 4px rgba(22, 184, 166, 0.20); }
 
-/* â€” Quick actions: flatten the gradient + violet tints to a calm teal tint â€” */
+/* — Quick actions: flatten the gradient + violet tints to a calm teal tint — */
 .quick-action { border-left-width: 2px; transition: background 0.13s, border-color 0.13s; }
 .quick-action:hover { transform: none; }
 .quick-action.qa-primary {
@@ -2627,13 +2627,13 @@ td .text-mono, .text-mono { font-variant-numeric: tabular-nums; }
 .quick-action.qa-primary .qa-icon { background: var(--accent-bg); color: var(--accent-light); }
 .qa-icon { color: var(--accent-light); border-radius: var(--radius); }
 
-/* â€” Scope empty-state hatch: teal instead of violet â€” */
+/* — Scope empty-state hatch: teal instead of violet — */
 .scope-empty {
     background: repeating-linear-gradient(45deg, transparent, transparent 7px,
         rgba(22, 184, 166, 0.025) 7px, rgba(22, 184, 166, 0.025) 8px);
 }
 
-/* â€” Scanner manifest: retire violet rgba leftovers â€” */
+/* — Scanner manifest: retire violet rgba leftovers — */
 .manifest-tag, .manifest-dl dt, .manifest-cmd-accent { color: var(--accent); }
 .manifest-tag::before { background: var(--accent); box-shadow: 0 0 0 2px rgba(22, 184, 166, 0.18); }
 .manifest-row:hover { background: rgba(22, 184, 166, 0.05); }
@@ -2645,26 +2645,26 @@ td .text-mono, .text-mono { font-variant-numeric: tabular-nums; }
 }
 .manifest-dl dd a { color: var(--accent); border-bottom-color: rgba(22, 184, 166, 0.4); }
 
-/* â€” Attack-path legend keeps the graph's own 5-color node taxonomy
-     (entrypoint/host/identity/asset/objective) â€” those are semantic
-     category colors drawn by attack_path.js, not brand chrome. â€” */
+/* — Attack-path legend keeps the graph's own 5-color node taxonomy
+     (entrypoint/host/identity/asset/objective) — those are semantic
+     category colors drawn by attack_path.js, not brand chrome. — */
 
-/* â€” Tech tags / scope tags: teal-tinted, sharp â€” */
+/* — Tech tags / scope tags: teal-tinted, sharp — */
 .tech-tag { background: var(--accent-bg); color: var(--accent-light); border-radius: 4px; }
 
-/* â€” Tables: tabular numerics, calmer dividers â€” */
+/* — Tables: tabular numerics, calmer dividers — */
 td .text-mono { font-size: 12px; }
 th { letter-spacing: 0.5px; }
 
-/* â€” Prose blockquote / report bars already token-driven; nothing to do â€” */
+/* — Prose blockquote / report bars already token-driven; nothing to do — */
 
-/* â€” Auth aura handled in the Operator Console auth block above. The
+/* — Auth aura handled in the Operator Console auth block above. The
      split-color wordmark (.auth-wordmark) sets its own colors, so no
-     blanket h1 color override here. â€” */
+     blanket h1 color override here. — */
 
-/* â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ
-   OPERATOR CONSOLE â€” dashboard
-   â•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گâ•گ */
+/* ════════════════════════════════════════════════════════════════════
+   OPERATOR CONSOLE — dashboard
+   ════════════════════════════════════════════════════════════════════ */
 .op-head {
     display: flex;
     align-items: flex-start;
@@ -2846,7 +2846,7 @@ th { letter-spacing: 0.5px; }
 .opfeed-action { color: var(--text-secondary); }
 .opfeed-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); white-space: nowrap; margin-top: 2px; }
 
-/* â”€â”€ Engagement / client filters â”€â”€ */
+/* ── Engagement / client filters ── */
 .eng-filters {
     display: flex;
     gap: 10px;
@@ -2899,7 +2899,7 @@ th { letter-spacing: 0.5px; }
 .seg-btn:hover { color: var(--text-primary); }
 .seg-btn.active { background: var(--accent); color: #04201d; }
 
-/* â”€â”€ Engagement cards â”€â”€ */
+/* ── Engagement cards ── */
 .eng-cards { display: flex; flex-direction: column; gap: 14px; }
 .eng-card {
     display: block;
@@ -2950,7 +2950,7 @@ th { letter-spacing: 0.5px; }
 .eng-card-lead { display: inline-flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text-secondary); }
 .eng-card-window { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
 
-/* â”€â”€ Clients table â”€â”€ */
+/* ── Clients table ── */
 .client-cell { display: flex; align-items: center; gap: 11px; }
 .client-ico {
     width: 32px;
@@ -2975,7 +2975,7 @@ th { letter-spacing: 0.5px; }
 }
 .kebab:hover { color: var(--text-primary); background: var(--bg-tertiary); }
 
-/* â”€â”€ Audit log feed â”€â”€ */
+/* ── Audit log feed ── */
 .audit-feed { display: flex; flex-direction: column; }
 .audit-row {
     display: flex;
@@ -3004,7 +3004,7 @@ th { letter-spacing: 0.5px; }
 .audit-detail { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
 .audit-time { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
-/* â”€â”€ Report kits â”€â”€ */
+/* ── Report kits ── */
 .kit-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
 .kit-card {
     --kit-accent: var(--accent);
@@ -3042,7 +3042,7 @@ th { letter-spacing: 0.5px; }
 .kit-foot { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light); }
 .kit-edit { flex: 1; justify-content: center; }
 
-/* â”€â”€ Reports: generate-type cards â”€â”€ */
+/* ── Reports: generate-type cards ── */
 .gen-kicker {
     font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--text-muted);
@@ -3063,7 +3063,7 @@ th { letter-spacing: 0.5px; }
 .gen-card-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin-bottom: 16px; }
 .gen-card .btn { width: 100%; justify-content: center; }
 
-/* â”€â”€ Engagement detail hero â”€â”€ */
+/* ── Engagement detail hero ── */
 .eng-detail-hero {
     display: flex;
     align-items: flex-start;
@@ -3088,7 +3088,7 @@ th { letter-spacing: 0.5px; }
 .eng-detail-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .phase-stepper-card { padding: 8px 16px; }
 
-/* â”€â”€ Neutral chip (types, tools, ports) â”€â”€ */
+/* ── Neutral chip (types, tools, ports) ── */
 .chip {
     display: inline-flex;
     align-items: center;
@@ -3104,7 +3104,7 @@ th { letter-spacing: 0.5px; }
 .chip-mono { font-family: var(--font-mono); }
 .chip-teal { color: var(--accent-light); background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 
-/* â”€â”€ Credential vault banner â”€â”€ */
+/* ── Credential vault banner ── */
 .vault-banner {
     display: flex;
     align-items: flex-start;
@@ -3120,7 +3120,7 @@ th { letter-spacing: 0.5px; }
 }
 .vault-banner svg { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
 
-/* â”€â”€ Recon â”€â”€ */
+/* ── Recon ── */
 .recon-tech { display: flex; flex-wrap: wrap; gap: 5px; }
 .recon-ports { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .recon-port {
@@ -3134,7 +3134,7 @@ th { letter-spacing: 0.5px; }
 }
 .recon-more { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
 
-/* â”€â”€ Methodology coverage â”€â”€ */
+/* ── Methodology coverage ── */
 .cov-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .cov-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
 .cov-count { font-family: var(--font-mono); font-size: 13px; color: var(--text-secondary); }
@@ -3204,13 +3204,13 @@ th { letter-spacing: 0.5px; }
 .meth-status--not_started { color: var(--text-secondary); background: var(--bg-tertiary); }
 .meth-status--not_applicable { color: var(--text-muted); background: var(--bg-tertiary); }
 
-/* â”€â”€ Form sections (multi-card forms) â”€â”€ */
+/* ── Form sections (multi-card forms) ── */
 .form-section { margin-bottom: 16px; }
 .form-section-head { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-light); }
 .form-section-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .form-section-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
 
-/* â”€â”€ Kill-chain node chips â”€â”€ */
+/* ── Kill-chain node chips ── */
 .ap-node-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .ap-node-chip {
     display: inline-flex;
@@ -3248,7 +3248,7 @@ th { letter-spacing: 0.5px; }
 }
 .ap-node-x:hover { color: var(--critical); }
 
-/* â”€â”€ Scope rows (engagement scope & RoE) â”€â”€ */
+/* ── Scope rows (engagement scope & RoE) ── */
 .scope-rows { display: flex; flex-direction: column; }
 .scope-row {
     display: flex;
@@ -3282,7 +3282,7 @@ th { letter-spacing: 0.5px; }
 .roe-signoff b { color: var(--text-primary); }
 .roe-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-/* â”€â”€ Invite member (collapsible) â”€â”€ */
+/* ── Invite member (collapsible) ── */
 .invite-panel { margin-top: 14px; }
 .invite-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .invite-row .form-group { margin-bottom: 0; }
