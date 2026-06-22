@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}{{ path.name }} — Kill chain — Vulnex{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="/static/css/killchain.css">{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
     <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
