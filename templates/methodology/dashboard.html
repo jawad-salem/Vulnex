@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Methodology — {{ engagement.name }} — Vulnex{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="/static/css/methodology.css">{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
     <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:24 }}</a>
