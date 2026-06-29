@@ -48,64 +48,69 @@ Open <http://localhost:8000> after `web` finishes boot. The entrypoint migrates,
 ## Feature tour
 
 ### Dashboard
-Risk score, active-engagement and finding counts, SLA-overdue and "assigned to me" widgets, severity/status charts, and an urgent-findings table.
+Risk score, active-engagement and finding counts, awaiting-review and SLA-overdue widgets, and a triage queue of the highest-risk open findings.
 
 ![Dashboard](docs/screenshots/01-dashboard.png)
 
-### Client overview
-Per-client rollup — findings by severity, SLA status, and every engagement for that client.
+### Engagement overview
+Phase stepper, severity distribution, latest findings, and engagement details with a running notes/activity feed.
 
-![Client overview](docs/screenshots/02-client-detail.png)
+![Engagement overview](docs/screenshots/02-engagement.png)
 
-### Engagement setup
-Create an engagement with type, status, scope, and rules of engagement.
+### Scope & rules of engagement
+In-scope and out-of-scope targets plus a rules-of-engagement sign-off that locks scope once approved.
 
-![Engagement setup](docs/screenshots/03-engagement-form.png)
+![Scope and rules of engagement](docs/screenshots/03-scope-roe.png)
 
 ### Reconnaissance
 Built-in scanners (port, subdomain, tech, DNS, dirbrute) with single or chained multi-scan, Celery-backed scheduling, discovered-host tracking, and Nmap XML import.
 
 ![Reconnaissance](docs/screenshots/04-recon.png)
 
-### Methodology checklist
-OWASP WSTG-seeded checklists with per-engagement progress tracking and status dropdowns.
+### Methodology coverage
+OWASP WSTG-seeded checklists with an overall coverage meter and per-item status tracking.
 
-![Methodology](docs/screenshots/05-methodology.png)
+![Methodology coverage](docs/screenshots/05-methodology.png)
 
-### Findings list
-Severity chips, CVSS, review-state badges, SLA due dates, severity/status/assignee filters, dedup-aware import, and CSV/JSON export.
+### Findings
+Severity chips, CVSS, review state, and status per finding, scoped to the engagement.
 
-![Findings list](docs/screenshots/06-findings-list.png)
+![Findings](docs/screenshots/06-findings.png)
 
 ### Finding detail
-Severity and CVSS, review/approval workflow, SLA, retest tracking, evidence, threaded comments, and structured location — organised across tabs.
+Severity and CVSS breakdown, review/approval workflow, SLA, retest, structured location, references — organised across tabs.
 
 ![Finding detail](docs/screenshots/07-finding-detail.png)
 
 ### Evidence
-Authenticated evidence uploads per finding, plus Markdown-supported threaded comments (internal-only or client-visible).
+Reproduction steps that pair each request/payload with its proof screenshot; authenticated uploads with reviewer sign-off and delete.
 
-![Evidence](docs/screenshots/08-finding-evidence.png)
+![Evidence](docs/screenshots/08-evidence.png)
+
+### Comments
+Markdown-supported threaded discussion per finding, with internal-only and review-feedback flags.
+
+![Comments](docs/screenshots/09-comments.png)
+
+### Credential vault
+Secrets encrypted at rest with Fernet; plaintext is shown only on explicit reveal and every reveal is audited. Hidden from the client role entirely.
+
+![Credential vault](docs/screenshots/10-credentials.png)
 
 ### Kill-chain diagram (red-team)
-DAG editor — entrypoints, hosts, identities, assets, objectives connected by techniques with optional ATT&CK IDs. Embedded into the technical PDF.
+DAG editor — entrypoints, hosts, identities, assets, objectives connected by techniques with optional MITRE ATT&CK IDs. Embedded into the technical PDF.
 
-![Kill-chain diagram](docs/screenshots/09-kill-chain.png)
+![Kill-chain diagram](docs/screenshots/11-kill-chain.png)
 
-### Report templates
-Brand kits for generated PDFs — logo, colours, boilerplate, and per-client default templates.
+### Reports
+Generate a full technical report, an executive summary, or a technical-detail report as branded PDFs.
 
-![Report templates](docs/screenshots/10-report-templates.png)
-
-### Users & roles
-Role-based access — admin, pentester, reviewer, client — with per-engagement membership.
-
-![Users](docs/screenshots/11-users.png)
+![Reports](docs/screenshots/12-reports.png)
 
 ### Audit log
-Append-only record of admin actions and security events — logins, MFA changes, report generation, user creation.
+Append-only record of security-relevant events — logins, MFA changes, evidence downloads, invitations, report generation — with CSV export.
 
-![Audit log](docs/screenshots/12-audit-log.png)
+![Audit log](docs/screenshots/13-audit-log.png)
 
 ## Architecture
 
