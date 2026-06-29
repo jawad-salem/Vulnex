@@ -271,6 +271,14 @@
                                 <button type="submit" class="btn btn-sm{% if ev.reviewed %} btn-primary{% endif %}">{% if ev.reviewed %}✓ Reviewed{% else %}Mark reviewed{% endif %}</button>
                             </form>
                             {% endif %}
+                            {% if can_edit %}
+                            <form method="post" style="margin:0">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_evidence" value="1">
+                                <input type="hidden" name="evidence_id" value="{{ ev.pk }}">
+                                <button type="submit" class="btn btn-sm btn-danger" data-confirm="Delete this evidence? This cannot be undone.">Delete</button>
+                            </form>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

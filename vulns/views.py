@@ -190,6 +190,19 @@ def finding_detail(request, pk):
         from django.urls import reverse
         return redirect(reverse('vulns:detail', kwargs={'pk': pk}) + '#evidence')
 
+    if request.method == 'POST' and 'delete_evidence' in request.POST and can_edit:
+        ev = finding.evidence.filter(pk=request.POST.get('evidence_id')).first()
+        if ev:
+            ev.file.delete(save=False)  # remove the file from protected storage too
+            ev.delete()
+            ActivityLog.objects.create(
+                engagement=finding.engagement, user=request.user,
+                action=f'Deleted evidence from finding: {finding.title}',
+            )
+            messages.success(request, 'Evidence deleted.')
+        from django.urls import reverse
+        return redirect(reverse('vulns:detail', kwargs={'pk': pk}) + '#evidence')
+
     if request.method == 'POST' and 'post_comment' in request.POST:
         comment_form = FindingCommentForm(
             request.POST,

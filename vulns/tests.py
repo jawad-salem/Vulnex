@@ -774,6 +774,63 @@ class EvidenceDownloadTests(TestCase):
         self.assertEqual(body, b'fake-bytes')
 
 
+@override_settings(MFA_REQUIRED_ROLES=[])
+class EvidenceDeleteTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls._tmpdir = tempfile.mkdtemp()
+        cls._field = Evidence._meta.get_field('file')
+        cls._orig_storage = cls._field.storage
+        cls._field.storage = FileSystemStorage(location=cls._tmpdir)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._field.storage = cls._orig_storage
+        shutil.rmtree(cls._tmpdir, ignore_errors=True)
+        super().tearDownClass()
+
+    def setUp(self):
+        self.client = Client()
+        self.lead = User.objects.create_user('lead', role='pentester', password='testpass1')
+        self.reviewer = User.objects.create_user('rev', role='reviewer', password='testpass1')
+        self.engagement = Engagement.objects.create(
+            name='X', client=EngagementClient.objects.get_or_create(name='ACME')[0], created_by=self.lead,
+        )
+        EngagementMember.objects.create(engagement=self.engagement, user=self.lead, role='lead')
+        EngagementMember.objects.create(engagement=self.engagement, user=self.reviewer, role='reviewer')
+        self.finding = Finding.objects.create(
+            engagement=self.engagement, title='SQLi', found_by=self.lead, confidentiality_impact='H',
+        )
+
+    def _make_evidence(self):
+        return Evidence.objects.create(
+            finding=self.finding,
+            file=SimpleUploadedFile('proof.png', b'fake-bytes', content_type='image/png'),
+            uploaded_by=self.lead,
+        )
+
+    def test_editor_can_delete_evidence(self):
+        ev = self._make_evidence()
+        self.client.login(username='lead', password='testpass1')
+        resp = self.client.post(
+            reverse('vulns:detail', args=[self.finding.pk]),
+            {'delete_evidence': '1', 'evidence_id': ev.pk},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Evidence.objects.filter(pk=ev.pk).exists())
+
+    def test_reviewer_cannot_delete_evidence(self):
+        # Reviewers can sign off evidence but not delete it (not an editor).
+        ev = self._make_evidence()
+        self.client.login(username='rev', password='testpass1')
+        self.client.post(
+            reverse('vulns:detail', args=[self.finding.pk]),
+            {'delete_evidence': '1', 'evidence_id': ev.pk},
+        )
+        self.assertTrue(Evidence.objects.filter(pk=ev.pk).exists())
+
+
 # ── Scanner parsers (step 2.2) ────────────────────────────────────────────
 
 from .parsers import (  # noqa: E402
