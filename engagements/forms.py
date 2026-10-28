@@ -70,7 +70,7 @@ class EngagementForm(forms.ModelForm):
         fields = [
             'name', 'engagement_type', 'status',
             'description', 'in_scope', 'out_of_scope',
-            'rules_of_engagement', 'start_date', 'end_date',
+            'rules_of_engagement', 'authorization_reference', 'start_date', 'end_date',
         ]
         widgets = {
             'start_date': forms.DateInput(attrs={'type': 'date'}),
@@ -202,7 +202,7 @@ class AttackPathForm(forms.ModelForm):
 class AttackPathNodeForm(forms.ModelForm):
     class Meta:
         model = AttackPathNode
-        fields = ['label', 'kind', 'notes']
+        fields = ['label', 'kind', 'discovered_host', 'notes']
         widgets = {
             'label': forms.TextInput(attrs={'placeholder': 'e.g. CONTOSO\\administrator or web01.example.com'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
@@ -210,6 +210,8 @@ class AttackPathNodeForm(forms.ModelForm):
 
     def __init__(self, *args, engagement=None, **kwargs):
         super().__init__(*args, **kwargs)
+        from recon.models import DiscoveredHost
+        self.fields['discovered_host'].queryset = DiscoveredHost.objects.filter(engagement=engagement) if engagement else DiscoveredHost.objects.none()
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
 
@@ -225,6 +227,7 @@ class AttackPathEdgeForm(forms.ModelForm):
 
     def __init__(self, *args, path=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.path = path
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', 'form-input')
         if path is not None:
@@ -242,7 +245,18 @@ class AttackPathEdgeForm(forms.ModelForm):
         cleaned = super().clean()
         from_node = cleaned.get('from_node')
         to_node = cleaned.get('to_node')
-        if from_node and to_node and from_node == to_node:
-            raise forms.ValidationError('Edge cannot connect a node to itself.')
+        if from_node and to_node:
+            if from_node == to_node:
+                raise forms.ValidationError('A connection cannot return to the same node.')
+            adjacency = {}
+            for source, target in self.path.edges.values_list('from_node_id', 'to_node_id'):
+                adjacency.setdefault(source, []).append(target)
+            pending, visited = [to_node.pk], set()
+            while pending:
+                current = pending.pop()
+                if current == from_node.pk:
+                    raise forms.ValidationError('This connection would create a cycle. Represent a later visit as a separate node.')
+                if current not in visited:
+                    visited.add(current)
+                    pending.extend(adjacency.get(current, []))
         return cleaned
-

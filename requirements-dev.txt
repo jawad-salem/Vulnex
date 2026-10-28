@@ -1,0 +1,2 @@
+# Optional browser checks; install application requirements separately.
+playwright==1.64.1

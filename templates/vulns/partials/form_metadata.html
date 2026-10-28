@@ -1,0 +1,24 @@
+<!-- Metadata -->
+        <div class="editor-section">
+            <h3 class="section-title">Metadata & References</h3>
+            <p class="section-desc">Classification, tooling, and external references.</p>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.cwe_id.id_for_label }}">CWE ID</label>
+                    {{ form.cwe_id }}
+                    <span class="form-help">e.g. CWE-79</span>
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.tool_source.id_for_label }}">Tool source</label>
+                    {{ form.tool_source }}
+                    <span class="form-help">e.g. Burp Suite, Manual</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.references.id_for_label }}">References</label>
+                {{ form.references }}
+                <span class="form-help">CVE IDs, URLs — one per line</span>
+            </div>
+        </div>

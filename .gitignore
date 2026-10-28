@@ -62,3 +62,11 @@ API_NOTES.md
 .claude/
 data/
 .git
+
+# Local Python environment
+myvenv/
+
+!.env.demo.example
+
+# Local UI verification artifacts
+artifacts/

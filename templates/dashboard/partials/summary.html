@@ -1,0 +1,30 @@
+<!-- ── Stat strip ── -->
+<div class="dashboard-summary">
+    <div class="opstat">
+        <div class="opstat-label">Active engagements</div>
+        <div class="opstat-value">{{ active_engagements }}</div>
+        {% if in_test_count %}<div class="opstat-tag">{{ in_test_count }} in test</div>{% endif %}
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">Open findings</div>
+        <div class="opstat-value">{{ open_findings_count }}</div>
+        <div class="opstat-sub">across all engagements</div>
+    </div>
+    <div class="opstat">
+        <div class="opstat-label">Critical</div>
+        <div class="opstat-value {% if critical_open %}is-critical{% endif %}">{{ critical_open }}</div>
+        <div class="opstat-sub {% if critical_open %}is-critical{% endif %}">{% if critical_open %}requires escalation{% else %}none open{% endif %}</div>
+    </div>
+    {% if not user.is_client %}
+    <div class="opstat">
+        <div class="opstat-label">Awaiting review</div>
+        <div class="opstat-value">{{ awaiting_review }}</div>
+        <div class="opstat-sub">in QA queue</div>
+    </div>
+    {% endif %}
+    <div class="opstat">
+        <div class="opstat-label">SLA overdue</div>
+        <div class="opstat-value {% if overdue_count %}is-warn{% endif %}">{{ overdue_count }}</div>
+        <div class="opstat-sub {% if overdue_count %}is-warn{% endif %}">{% if overdue_count %}past due date{% else %}all on track{% endif %}</div>
+    </div>
+</div>

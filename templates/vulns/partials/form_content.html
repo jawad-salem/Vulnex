@@ -1,0 +1,38 @@
+<!-- Impact & reproduction -->
+        <div class="editor-section">
+            <h3 class="section-title">Impact & Reproduction</h3>
+            <p class="section-desc">Describe affected hosts, proof of concept, and remediation.</p>
+
+            <div class="form-2col">
+                <div class="form-group">
+                    <label for="{{ form.proof_of_concept.id_for_label }}">Proof of concept</label>
+                    <div class="md-field" data-md-field>
+                        <div class="md-tabs" role="tablist">
+                            <button type="button" class="md-tab" data-md-tab="edit" role="tab">Write</button>
+                            <button type="button" class="md-tab" data-md-tab="preview" role="tab">Preview</button>
+                            <span class="md-help text-xs text-secondary">Use fenced ```code``` blocks for repro steps.</span>
+                        </div>
+                        {{ form.proof_of_concept }}
+                        <div class="md-preview-pane prose"></div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.affected_hosts.id_for_label }}">Additional affected hosts</label>
+                    {{ form.affected_hosts }}
+                    <span class="form-help">Other hosts affected by the same issue — one per line</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="{{ form.remediation.id_for_label }}">Remediation</label>
+                <div class="md-field" data-md-field>
+                    <div class="md-tabs" role="tablist">
+                        <button type="button" class="md-tab" data-md-tab="edit" role="tab">Write</button>
+                        <button type="button" class="md-tab" data-md-tab="preview" role="tab">Preview</button>
+                        <span class="md-help text-xs text-secondary">Markdown supported.</span>
+                    </div>
+                    {{ form.remediation }}
+                    <div class="md-preview-pane prose"></div>
+                </div>
+            </div>
+        </div>

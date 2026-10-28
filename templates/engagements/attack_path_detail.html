@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}{{ path.name }} — Kill chain — Vulnex{% endblock %}
-{% block extra_css %}<link rel="stylesheet" href="/static/css/killchain.css">{% endblock %}
+{% block title %}{{ path.name }} — Attack path — Vulnex{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/killchain.css' %}">{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
     <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name|truncatechars:20 }}</a>
     <span class="bc-sep">&#8250;</span>
-    <a href="{% url 'engagements:attack_path_list' engagement.pk %}">Kill chains</a>
+    <a href="{% url 'engagements:attack_path_list' engagement.pk %}">Attack paths</a>
     <span class="bc-sep">&#8250;</span>
     <span class="bc-current">{{ path.name|truncatechars:30 }}</span>
 </nav>
@@ -15,24 +15,29 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">{{ path.name }}</h1>
-        <p class="page-subtitle">{% if path.description %}{{ path.description }} · {% endif %}mapped to MITRE ATT&amp;CK</p>
+        <p class="page-subtitle">{% if path.description %}{{ path.description }} · {% endif %}Entry points, techniques and objectives</p>
     </div>
     <div class="btn-group">
         <a href="{% url 'engagements:attack_path_data' engagement.pk path.pk %}" target="_blank" rel="noopener" class="btn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export
+            Export JSON
         </a>
-        <a href="{% url 'engagements:attack_path_list' engagement.pk %}" class="btn">All</a>
+        <a href="{% url 'engagements:attack_path_list' engagement.pk %}" class="btn">All attack paths</a>
         {% if can_edit %}
         <form method="post" action="{% url 'engagements:attack_path_delete' engagement.pk path.pk %}" style="display:inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-danger" data-confirm="Delete this kill-chain diagram?">Delete</button>
+            <button type="submit" class="btn btn-danger" data-confirm="Delete this attack path?">Delete</button>
         </form>
         {% endif %}
     </div>
 </div>
 
+<section class="path-readiness" aria-label="Path completeness">
+    <div><h2>{% if path_connected %}Entry-to-objective route connected{% else %}Finish mapping this path{% endif %}</h2><p>Connectivity describes the diagram, not whether the objective was achieved during testing.</p></div>
+    {% if path_issues %}<ul>{% for issue in path_issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endif %}
+</section>
 {% if can_edit %}
+<details class="path-edit"><summary>Edit path name &amp; objective narrative</summary><form method="post">{% csrf_token %}{{ path_form.as_p }}<button class="btn" type="submit">Save path</button></form></details>
 <div class="ap-toolbar">
     <details class="ap-toolbar-action">
         <summary>
@@ -54,6 +59,7 @@
                 <div class="form-group">
                     <label for="{{ node_form.notes.id_for_label }}">Notes</label>
                     {{ node_form.notes }}
+                    <label for="{{ node_form.discovered_host.id_for_label }}">Discovered asset (optional)</label>{{ node_form.discovered_host }}
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Add node</button>
@@ -64,7 +70,7 @@
 
     <details class="ap-toolbar-action">
         <summary>
-            <span class="ap-toolbar-icon">+</span> Add edge
+            <span class="ap-toolbar-icon">+</span> Add connection
             {% if path.nodes.count < 2 %}<span class="ap-toolbar-hint">(needs 2+ nodes)</span>{% endif %}
         </summary>
         <div class="ap-popover">
@@ -94,7 +100,7 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Add edge</button>
+                    <button type="submit" class="btn btn-primary">Add connection</button>
                 </div>
             </form>
             {% else %}
@@ -111,13 +117,13 @@
 
 <div class="card attack-path-canvas-card">
     <div class="card-header">
-        <h2 class="card-title">Kill chain</h2>
+        <h2 class="card-title">Attack path</h2>
         <span class="text-xs text-muted">Hover an edge for technique &middot; click for the linked finding</span>
     </div>
     <div id="attack-path-canvas"
          data-path-data-url="{% url 'engagements:attack_path_data' engagement.pk path.pk %}"
          data-finding-url-prefix="/vulns/"
-         role="img" aria-label="Attack path graph">
+         role="region" aria-label="Attack path graph; equivalent connections are listed below" tabindex="0">
         <p class="text-secondary text-center" style="padding:3rem">Loading attack path…</p>
     </div>
     <div class="attack-path-legend">
@@ -129,22 +135,22 @@
     </div>
 </div>
 
-<!-- Technique chain -->
+<!-- Connections &amp; supporting findings -->
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">Technique chain</h2>
+        <h2 class="card-title">Connections &amp; supporting findings</h2>
         <span class="text-xs text-muted">{{ path.edges.count }} step{{ path.edges.count|pluralize }}</span>
     </div>
-    {% if path.edges.all %}
+    {% if path_edges %}
     <div class="table-wrap"><table class="op-table">
-        <thead><tr><th>#</th><th>Technique</th><th>ATT&amp;CK ID</th><th>From → To</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+        <thead><tr><th>Order</th><th>Technique</th><th>ATT&amp;CK ID</th><th>From → To</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
         <tbody>
-        {% for e in path.edges.all %}
+        {% for e in path_edges %}
         <tr>
             <td class="text-mono text-muted">{{ forloop.counter }}</td>
             <td>
                 <span class="op-finding">{{ e.technique }}</span>
-                {% if e.finding %}<div class="op-finding-sub"><a href="{% url 'vulns:detail' e.finding.pk %}">{{ e.finding.title|truncatechars:40 }}</a></div>{% endif %}
+                {% if e.finding %}<div class="op-finding-sub"><a href="{% url 'vulns:detail' e.finding.pk %}">{{ e.finding.title }}</a></div>{% endif %}
             </td>
             <td>{% if e.mitre_attack_id %}<span class="chip chip-teal chip-mono">{{ e.mitre_attack_id }}</span>{% else %}<span class="text-muted">—</span>{% endif %}</td>
             <td class="text-mono text-sm" style="color:var(--accent-light)">{{ e.from_node.label }} → {{ e.to_node.label }}</td>
@@ -165,18 +171,18 @@
     {% endif %}
 </div>
 
-{% if can_edit %}
 <div class="card">
     <div class="card-header"><h2 class="card-title">Nodes</h2><span class="text-xs text-muted">{{ path.nodes.count }}</span></div>
-    {% if path.nodes.all %}
+    {% if path_nodes %}
     <div class="ap-node-chips">
-        {% for n in path.nodes.all %}
+        {% for n in path_nodes %}
         <span class="ap-node-chip ap-node-chip--{{ n.kind }}">
             <span class="ap-node-kind">{{ n.get_kind_display }}</span>{{ n.label }}
-            <form method="post" action="{% url 'engagements:attack_path_node_delete' engagement.pk path.pk n.pk %}" style="display:inline;margin:0">
+            {% if n.notes %}<span class="ap-node-notes">{{ n.notes }}</span>{% endif %}
+            {% if can_edit %}<form method="post" action="{% url 'engagements:attack_path_node_delete' engagement.pk path.pk n.pk %}" style="display:inline;margin:0">
                 {% csrf_token %}
                 <button type="submit" class="ap-node-x" data-confirm="Delete node and its edges?" aria-label="Delete node">&times;</button>
-            </form>
+            </form>{% endif %}
         </span>
         {% endfor %}
     </div>
@@ -184,7 +190,6 @@
     <p class="text-secondary text-sm">No nodes yet.</p>
     {% endif %}
 </div>
-{% endif %}
 
 <script src="{% static 'js/attack_path.js' %}" nonce="{{ request.csp_nonce }}"></script>
 {% endblock %}

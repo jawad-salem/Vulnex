@@ -3,9 +3,11 @@ Real scanning engines using Python stdlib.
 No external tools required — works on Windows, Linux, and macOS.
 """
 import socket
-import struct
+from contextvars import ContextVar
+from .scope import current_scope, ScopeViolation
+
+_ACTIVE_SCOPE = ContextVar("scan_scope", default=None)
 import ssl
-import json
 import http.client
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -100,6 +102,9 @@ def _validate_target(target: str) -> tuple[str, str]:
     if _is_internal_ip(resolved_ip):
         raise ValueError(f'Scanning internal/private IPs is not allowed: {target} ({resolved_ip})')
 
+    policy = _ACTIVE_SCOPE.get()
+    if policy:
+        policy.check_address(target, resolved_ip)
     return target, resolved_ip
 
 
@@ -247,22 +252,22 @@ def scan_subdomains(target: str) -> list[dict]:
         target = target.split('://')[1].split('/')[0]
     if ':' in target:
         target = target.split(':')[0]
-    # Remove any leading subdomain to get base domain
-    parts = target.split('.')
-    if len(parts) > 2:
-        target = '.'.join(parts[-2:])
-
     # SSRF guard: refuse to enumerate when the base domain resolves to
     # an internal/private IP. Raises ValueError for internal targets.
     _validate_target(target)
 
     found = []
+    policy = _ACTIVE_SCOPE.get()
 
     def _try_resolve(sub):
         fqdn = f'{sub}.{target}'
         try:
+            if policy:
+                policy.check(fqdn)
             ip = socket.gethostbyname(fqdn)
-        except socket.gaierror:
+            if policy:
+                policy.check_address(fqdn, ip)
+        except (socket.gaierror, ScopeViolation):
             return None
         # Drop subdomains that resolve to internal IPs (split-horizon DNS).
         if _is_internal_ip(ip):
@@ -282,9 +287,11 @@ def scan_subdomains(target: str) -> list[dict]:
     # Also check the base domain itself
     try:
         base_ip = socket.gethostbyname(target)
+        if policy:
+            policy.check_address(target, base_ip)
         if not _is_internal_ip(base_ip):
             found.insert(0, {'hostname': target, 'ip': base_ip})
-    except socket.gaierror:
+    except (socket.gaierror, ScopeViolation):
         pass
 
     found.sort(key=lambda x: x['hostname'])
@@ -416,14 +423,18 @@ def enum_dns(target: str) -> list[dict]:
         target = target.split(':')[0]
 
     results = []
+    policy = _ACTIVE_SCOPE.get()
 
     # A record
     try:
         ips = socket.getaddrinfo(target, None, socket.AF_INET)
         a_records = list(set(ip[4][0] for ip in ips))
         for ip in a_records:
+            if policy:
+                try: policy.check_address(target, ip)
+                except ScopeViolation: continue
             results.append({'type': 'A', 'hostname': target, 'value': ip})
-    except socket.gaierror:
+    except (socket.gaierror, ScopeViolation):
         pass
 
     # AAAA record
@@ -431,8 +442,11 @@ def enum_dns(target: str) -> list[dict]:
         ips = socket.getaddrinfo(target, None, socket.AF_INET6)
         aaaa_records = list(set(ip[4][0] for ip in ips))
         for ip in aaaa_records:
+            if policy:
+                try: policy.check_address(target, ip)
+                except ScopeViolation: continue
             results.append({'type': 'AAAA', 'hostname': target, 'value': ip})
-    except socket.gaierror:
+    except (socket.gaierror, ScopeViolation):
         pass
 
     # Reverse DNS for A records
@@ -448,9 +462,13 @@ def enum_dns(target: str) -> list[dict]:
     for prefix in mail_prefixes:
         try:
             fqdn = f'{prefix}.{target}'
+            if policy:
+                policy.check(fqdn)
             ip = socket.gethostbyname(fqdn)
+            if policy:
+                policy.check_address(fqdn, ip)
             results.append({'type': 'MX (inferred)', 'hostname': fqdn, 'value': ip})
-        except socket.gaierror:
+        except (socket.gaierror, ScopeViolation):
             pass
 
     # NS records via common ns subdomains
@@ -458,9 +476,13 @@ def enum_dns(target: str) -> list[dict]:
     for prefix in ns_prefixes:
         try:
             fqdn = f'{prefix}.{target}'
+            if policy:
+                policy.check(fqdn)
             ip = socket.gethostbyname(fqdn)
+            if policy:
+                policy.check_address(fqdn, ip)
             results.append({'type': 'NS (inferred)', 'hostname': fqdn, 'value': ip})
-        except socket.gaierror:
+        except (socket.gaierror, ScopeViolation):
             pass
 
     if not results:
@@ -476,11 +498,6 @@ def lookup_whois(target: str) -> list[dict]:
         target = target.split('://')[1].split('/')[0]
     if ':' in target:
         target = target.split(':')[0]
-
-    # Get base domain
-    parts = target.split('.')
-    if len(parts) > 2:
-        target = '.'.join(parts[-2:])
 
     whois_servers = {
         'com': 'whois.verisign-grs.com',
@@ -607,9 +624,15 @@ SCANNERS = {
 }
 
 
-def run_scan(scan_type: str, target: str) -> list[dict]:
-    """Run the appropriate scanner and return results."""
+def run_scan(scan_type: str, target: str, *, engagement_id) -> list[dict]:
+    """The application dispatch boundary always requires a current scope."""
+    policy = current_scope(engagement_id)
+    target = policy.check(target)
     scanner = SCANNERS.get(scan_type)
     if not scanner:
-        return [{'error': f'Unknown scan type: {scan_type}'}]
-    return scanner(target)
+        raise ValueError(f'Unknown scan type: {scan_type}')
+    token = _ACTIVE_SCOPE.set(policy)
+    try:
+        return scanner(target)
+    finally:
+        _ACTIVE_SCOPE.reset(token)

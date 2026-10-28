@@ -1,0 +1,27 @@
+<!-- Latest findings -->
+        <div class="workspace-section">
+            <div class="card-header">
+                <h2 class="card-title">Latest findings</h2>
+                <a href="{% url 'vulns:list' engagement.pk %}" class="card-link">All →</a>
+            </div>
+            {% if findings %}
+            <div class="table-wrap"><table class="op-table"><caption class="sr-only">Latest findings in this engagement</caption>
+                <thead><tr><th>Title</th><th>Severity</th><th>Status</th><th>Added</th></tr></thead>
+                <tbody>
+                {% for f in findings|slice:":5" %}
+                <tr class="row-link" data-href="{{ f.get_absolute_url }}">
+                    <td><a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:54 }}</a>{% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}</td>
+                    <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                    <td><span class="sig {% if f.status == 'open' %}sig--red{% elif f.status == 'confirmed' %}sig--gold{% elif f.status == 'remediated' %}sig--green{% else %}sig--gray{% endif %}">{{ f.get_status_display }}</span></td>
+                    <td class="op-window">{{ f.created_at|date:"M j, Y" }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table></div>
+            {% else %}
+            <div class="empty-state compact">
+                <p class="text-secondary text-sm">No findings yet.</p>
+                {% if can_edit %}<a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-sm btn-primary mt-2">+ Add finding</a>{% endif %}
+            </div>
+            {% endif %}
+        </div>

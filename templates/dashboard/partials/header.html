@@ -1,0 +1,14 @@
+<div class="op-head">
+    <div class="op-head-main">
+        <div class="op-kicker">Operator Console</div>
+        <h1 class="op-greeting">{{ greeting }}, {{ user.first_name|default:user.username }}</h1>
+        <p class="op-subtitle">{{ active_engagements }} active engagement{{ active_engagements|pluralize }} · {{ attention_count }} finding{{ attention_count|pluralize }} {{ attention_count|pluralize:"needs,need" }} attention</p>
+    </div>
+    <div class="op-head-actions">
+        <a href="#recent-activity" class="btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
+            Activity
+        </a>
+        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
+    </div>
+</div>

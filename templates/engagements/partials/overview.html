@@ -1,0 +1,54 @@
+<section class="tab-panel active" id="tab-overview" role="tabpanel">
+    <div class="engagement-layout">
+        <div class="engagement-main">
+            {% if work_queue %}
+            <section class="workspace-section" aria-labelledby="work-heading">
+                <div class="section-heading"><div><p class="eyebrow">Your workflow</p><h2 id="work-heading">Move this engagement forward</h2></div></div>
+                <ol class="work-list">
+                    {% for item in work_queue %}
+                    <li class="work-row{% if item.attention %} needs-attention{% endif %}">
+                        <span class="work-order" aria-hidden="true">0{{ forloop.counter }}</span>
+                        <div class="work-copy"><h3>{{ item.label }}</h3><p>{{ item.description }}</p></div>
+                        <div class="work-result"><span class="work-value">{{ item.value }}</span><a href="{{ item.url }}">{{ item.action }} <span aria-hidden="true">↗</span></a></div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </section>
+            {% endif %}
+            {% include "engagements/partials/findings.html" %}
+        </div>
+        <aside class="engagement-rail" aria-label="Engagement summary">
+            <section class="rail-section">
+                <p class="eyebrow">Finding summary</p>
+                <div class="finding-total">{{ finding_total }} <span>finding{{ finding_total|pluralize }}</span></div>
+                <dl class="risk-ledger">
+                    <div><dt><i class="severity-dot severity-dot--critical" aria-hidden="true"></i>Critical</dt><dd>{{ sev_counts.critical }}</dd></div>
+                    <div><dt><i class="severity-dot severity-dot--high" aria-hidden="true"></i>High</dt><dd>{{ sev_counts.high }}</dd></div>
+                    <div><dt><i class="severity-dot severity-dot--medium" aria-hidden="true"></i>Medium</dt><dd>{{ sev_counts.medium }}</dd></div>
+                    <div><dt><i class="severity-dot severity-dot--low" aria-hidden="true"></i>Low</dt><dd>{{ sev_counts.low }}</dd></div>
+                    <div><dt><i class="severity-dot severity-dot--info" aria-hidden="true"></i>Informational</dt><dd>{{ sev_counts.info }}</dd></div>
+                </dl>
+                <p class="rail-footnote">{{ resolved_count }} remediated</p>
+            </section>
+            <section class="rail-section">
+                <h2>Engagement brief</h2>
+                <dl class="brief-list">
+                    <div><dt>Lead</dt><dd>{{ engagement.lead|default:"Unassigned" }}</dd></div>
+                    <div><dt>Phase</dt><dd>{{ engagement.get_status_display }}</dd></div>
+                    <div><dt>Window</dt><dd>{% if engagement.start_date %}{{ engagement.start_date|date:"M j" }}{% if engagement.end_date %} – {{ engagement.end_date|date:"M j, Y" }}{% endif %}{% else %}Not scheduled{% endif %}</dd></div>
+                </dl>
+                {% if engagement.description %}<p class="engagement-description">{{ engagement.description|linebreaksbr }}</p>{% endif %}
+            </section>
+            {% if not is_client %}
+            <section class="rail-section">
+                <div class="section-heading"><h2>Latest activity</h2><a href="#activity">View all</a></div>
+                <ol class="rail-timeline">
+                    {% for log in activity|slice:":3" %}
+                    <li><p>{{ log.action }}</p><span>{{ log.user|default:"System" }} · {{ log.timestamp|timesince }} ago</span></li>
+                    {% empty %}<li><p>No activity recorded yet.</p></li>{% endfor %}
+                </ol>
+            </section>
+            {% endif %}
+        </aside>
+    </div>
+</section>

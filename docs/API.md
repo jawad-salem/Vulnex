@@ -49,8 +49,7 @@ Response:
 
 Use `Authorization: Bearer <access>` on subsequent requests. Refresh before
 expiry (30 min) by POSTing the refresh token to
-`/api/v1/auth/token/refresh/`; refresh tokens rotate and the old one is
-invalidated.
+`/api/v1/auth/token/refresh/`; refresh tokens rotate; the old token is not blacklisted by the current configuration.
 
 ### Session (for the browser)
 
@@ -197,3 +196,38 @@ Standard DRF shape:
 | 403  | Authenticated but not permitted (e.g. client hitting credentials)   |
 | 404  | Resource not found *or* caller has no access (scoped queryset miss) |
 | 429  | Throttled — back off until the `Retry-After` header elapses         |
+
+## Shared workflow rules
+
+Creating an engagement adds the creator as its lead. Only leads and global admins
+can delete engagements. Signed-off engagements cannot be edited until sign-off
+is revoked in the UI. Finding and credential updates cannot change their parent
+engagement.
+
+Clients can only retrieve approved findings, including through nested lists and
+evidence routes. Their engagement summary counts follow the same rule. Recon
+hosts and credentials are restricted to internal engagement members.
+
+`review_state` is read-only in finding create/update payloads. Use:
+
+```http
+POST /api/v1/findings/{id}/review/
+Content-Type: application/json
+
+{"state": "in_review"}
+```
+
+Lead/pentester/admin may submit drafts or findings with changes requested.
+Lead/reviewer/admin may change an in-review finding to `approved` or
+`changes_requested`. For `changes_requested`, provide a nonempty `notes` string.
+Invalid transitions return 400; insufficient permissions return 403.
+
+
+### Report visibility and finding review
+
+Reports expose `published_at` and `published_by` as read-only metadata. Client
+members can list/download only explicitly published PDFs. Lead/admin publication
+and withdrawal are performed from the report dashboard after reviewing the file.
+Live report preview is internal-only. Material changes to a finding's narrative,
+location or CVSS fields reset its review state to draft; status-only changes do
+not. Evidence uploads use the same file restrictions as browser uploads.

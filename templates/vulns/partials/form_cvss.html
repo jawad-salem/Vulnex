@@ -1,0 +1,60 @@
+<!-- CVSS v3.1 vectors -->
+        <div class="editor-section">
+            <h3 class="section-title">CVSS v3.1 Base Score</h3>
+            <p class="section-desc">Severity and CVSS score are automatically calculated from these vectors.</p>
+
+            <div class="form-group">
+                <label for="cvssVectorPaste">Paste CVSS vector string (optional)</label>
+                <div class="flex gap-2">
+                    <input type="text" id="cvssVectorPaste" class="form-input text-mono"
+                           placeholder="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" autocomplete="off">
+                    <button type="button" id="cvssParseBtn" class="btn">Apply</button>
+                </div>
+                <span class="form-help" id="cvssParseHelp">Auto-fills the dropdowns below from a CVSS:3.1 vector string.</span>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.attack_vector.id_for_label }}">Attack Vector</label>
+                    {{ form.attack_vector }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.attack_complexity.id_for_label }}">Attack Complexity</label>
+                    {{ form.attack_complexity }}
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="{{ form.privileges_required.id_for_label }}">Privileges Required</label>
+                    {{ form.privileges_required }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.user_interaction.id_for_label }}">User Interaction</label>
+                    {{ form.user_interaction }}
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="{{ form.scope.id_for_label }}">Scope</label>
+                {{ form.scope }}
+                <span class="form-help">Changed = the vulnerability impacts components beyond its security authority (e.g. sandbox escape, SSRF reaching internal network, XSS hopping origins).</span>
+            </div>
+            <div class="form-row form-row--three">
+                <div class="form-group">
+                    <label for="{{ form.confidentiality_impact.id_for_label }}">Confidentiality</label>
+                    {{ form.confidentiality_impact }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.integrity_impact.id_for_label }}">Integrity</label>
+                    {{ form.integrity_impact }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.availability_impact.id_for_label }}">Availability</label>
+                    {{ form.availability_impact }}
+                </div>
+            </div>
+
+            <div id="cvssPreview" class="flex gap-3 items-center mt-2" style="display:none">
+                <span class="detail-label">Estimated severity:</span>
+                <span id="cvssBadge" class="badge badge-lg"></span>
+            </div>
+        </div>

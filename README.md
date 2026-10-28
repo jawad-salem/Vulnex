@@ -17,7 +17,7 @@ Most open-source tools in this space are one slice — reporting (Dradis, PwnDoc
 - **Scanner-agnostic ingestion** — Nuclei, Nikto, Burp, Nessus, ZAP, Semgrep, Nmap XML, plus CSV bulk import. Automatic dedup against existing findings.
 - **Hardened by default** — TOTP MFA, login lockout, CSP, encrypted credential vault with a dedicated `VAULT_MASTER_KEY`, authenticated evidence downloads, full audit log.
 - **Red-team aware** — Kill-chain diagram editor on red-team engagements (a small DAG you draw to narrate the path you walked, embedded in the PDF). Not a BloodHound replacement — narrative, not enumeration.
-- **Scriptable** — every UI capability is also exposed via a DRF REST API with OpenAPI docs and per-user API keys.
+- **Scriptable** — core engagement and finding operations are exposed via a DRF REST API with OpenAPI docs and per-user API keys.
 
 ## Why I built this
 
@@ -28,7 +28,7 @@ I kept ending up in the same gap on engagements: scanner output lived in CSVs, r
 ```bash
 git clone https://github.com/jawad-salem/Vulnex.git
 cd Vulnex
-cp .env.example .env && docker compose up --build
+cp .env.demo.example .env && docker compose up --build
 ```
 
 Open <http://localhost:8000> after `web` finishes boot. The entrypoint migrates, collects static, seeds finding templates and OWASP methodology checklists, bootstraps a superuser if one doesn't exist, and (when `SEED_DEMO=1`, the default) populates a full demo client with two engagements, eight findings across every severity, evidence, recon hosts, an attack-path DAG, an activity log, and one generated PDF.
@@ -43,7 +43,7 @@ Open <http://localhost:8000> after `web` finishes boot. The entrypoint migrates,
 | `demo-reviewer` | `demo-password` | Reviewer |
 | `demo-client` | `demo-password` | Read-only client |
 
-> The shipped `.env.example` runs with `DJANGO_DEBUG=True` and a known-bad `DJANGO_SECRET_KEY` so a fresh clone boots without configuration. Rotate every secret before exposing the instance to the public internet.
+> The demo `.env.demo.example` runs with `DJANGO_DEBUG=True` and a known-bad `DJANGO_SECRET_KEY` so a fresh clone boots without configuration. Rotate every secret before exposing the instance to the public internet.
 
 ## Feature tour
 
@@ -120,7 +120,7 @@ For the request lifecycle, data model, report-generation pipeline, web-vs-API au
 
 ## REST API
 
-`/api/v1/` covers engagements, findings, evidence, hosts, credentials (vault reveal gated identically to the UI), and reports. Authenticate with a per-user **API key** (issue/revoke from the profile page; only the prefix is stored) or a **JWT** for SPA clients. Permissions reuse the same role decorators as the UI. Throttled to 1000 req/hr/user.
+`/api/v1/` covers engagements, findings, evidence, hosts, credentials (vault reveal gated identically to the UI), and reports. Authenticate with a per-user **API key** (issue/revoke from the profile page; only the prefix is stored) or a **JWT** for SPA clients. Permissions use the engagement role model, and review transitions share a service with the UI. Throttled to 1000 req/hr/user.
 
 - **OpenAPI schema** — `/api/schema/`
 - **Swagger UI** — `/api/docs/`
@@ -169,8 +169,9 @@ python -m venv .venv
 source .venv/bin/activate          # Linux/Mac
 .venv\Scripts\activate              # Windows
 
-pip install -r requirements.txt
-cp .env.example .env
+pip install -r requirements.txt -c requirements.lock
+cp .env.demo.example .env
+# For a clean installation: set SEED_DEMO=0 and clear DJANGO_BOOTSTRAP_PASSWORD.
 
 python manage.py migrate
 python manage.py seed_templates
@@ -183,7 +184,9 @@ python manage.py runserver
 ### Running the tests
 
 ```bash
-python manage.py test
+python manage.py test --settings=vulnex.test_settings
+python manage.py makemigrations --check --dry-run --settings=vulnex.test_settings
+# Run against your production environment configuration:
 python manage.py check --deploy
 ```
 
@@ -220,10 +223,35 @@ Vulnex/
 | `DATABASE_URL` | (compose injects Postgres) | Database URL; SQLite if unset. |
 | `VAULT_MASTER_KEY` | — | **Required in production.** Fernet key (44-char base64) for the credential vault. |
 | `SITE_URL` | `http://localhost:8000` | Base URL for invitation links. |
-| `SEED_DEMO` | `1` | Run `seed_demo` on first boot. Set to `0` for a clean install. |
-| `DJANGO_BOOTSTRAP_USERNAME` / `_PASSWORD` / `_EMAIL` | `admin` / `admin1` / `admin@example.com` | Superuser created on first boot if no superuser exists. |
-| `EMAIL_BACKEND` | Console | Email backend. SMTP works out of the box; see `.env.example`. |
+| `SEED_DEMO` | `0` (demo example: `1`) | Run `seed_demo` on first boot. Set to `0` for a clean install. |
+| `DJANGO_BOOTSTRAP_USERNAME` / `_PASSWORD` / `_EMAIL` | `admin` / blank / `admin@example.com` | Superuser created on first boot if no superuser exists. |
+| `EMAIL_BACKEND` | Console | Email backend. SMTP works out of the box; see `.env.demo.example`. |
 
 ## License
 
 [MIT](LICENSE).
+
+## Clean installation and refactoring status
+
+The quick start above explicitly opts into demo accounts. For an empty local
+installation, copy `.env.demo.example`, set `SEED_DEMO=0`, clear
+`DJANGO_BOOTSTRAP_PASSWORD`, and replace the development keys. Run
+`docker compose up --build`, then
+run `docker compose exec web python manage.py createsuperuser`. Compose binds to
+127.0.0.1 by default. Set `VULNEX_BIND_ADDRESS` explicitly when remote access is
+needed. The current Compose stack is still a local deployment template; review
+database credentials, HTTPS, backups, and vault keys before production use.
+
+Tests use a temporary database and temporary upload directories. The checked-in
+`requirements.lock` is a version snapshot of the development environment, applied
+as constraints during installation; CI checks Python 3.12 and 3.14 on Linux.
+
+Migration `reports.0003` moves report files from `media/reports/` to
+`protected_media/reports/`. Back up the database and both media directories before
+upgrading, stop writers during migration, and retain both volume mounts. The
+migration refuses conflicting destination files and is intentionally irreversible
+so rollback cannot publish private reports. After updating a native installation,
+run `python manage.py migrate` and `python manage.py collectstatic --noinput`.
+
+See [refactoring status](docs/REFACTORING.md) for completed work and remaining
+workflow improvements.

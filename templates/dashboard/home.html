@@ -1,165 +1,25 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load static %}
 {% block title %}Dashboard — Vulnex{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/dashboard.css' %}">{% endblock %}
 {% block content %}
-<div class="op-head">
-    <div class="op-head-main">
-        <div class="op-kicker">Operator Console</div>
-        <h1 class="op-greeting">{{ greeting }}, {{ user.first_name|default:user.username }}</h1>
-        <p class="op-subtitle">{{ active_engagements }} active engagement{{ active_engagements|pluralize }} · {{ attention_count }} finding{{ attention_count|pluralize }} need attention</p>
-    </div>
-    <div class="op-head-actions">
-        <a href="#recent-activity" class="btn">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2 6 4-12 2 6h6"/></svg>
-            Activity
-        </a>
-        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">+ New engagement</a>{% endif %}
-    </div>
-</div>
-
-<!-- ── Stat strip ── -->
-<div class="opstat-strip">
-    <div class="opstat">
-        <div class="opstat-label">Active engagements</div>
-        <div class="opstat-value">{{ active_engagements }}</div>
-        {% if in_test_count %}<div class="opstat-tag">{{ in_test_count }} in test</div>{% endif %}
-    </div>
-    <div class="opstat">
-        <div class="opstat-label">Open findings</div>
-        <div class="opstat-value">{{ open_findings_count }}</div>
-        <div class="opstat-sub">across all engagements</div>
-    </div>
-    <div class="opstat">
-        <div class="opstat-label">Critical</div>
-        <div class="opstat-value {% if critical_open %}is-critical{% endif %}">{{ critical_open }}</div>
-        <div class="opstat-sub {% if critical_open %}is-critical{% endif %}">{% if critical_open %}requires escalation{% else %}none open{% endif %}</div>
-    </div>
-    {% if not user.is_client %}
-    <div class="opstat">
-        <div class="opstat-label">Awaiting review</div>
-        <div class="opstat-value">{{ awaiting_review }}</div>
-        <div class="opstat-sub">in QA queue</div>
-    </div>
-    {% endif %}
-    <div class="opstat">
-        <div class="opstat-label">SLA overdue</div>
-        <div class="opstat-value {% if overdue_count %}is-warn{% endif %}">{{ overdue_count }}</div>
-        <div class="opstat-sub {% if overdue_count %}is-warn{% endif %}">{% if overdue_count %}past due date{% else %}all on track{% endif %}</div>
-    </div>
-</div>
-
-<!-- ── Triage queue ── -->
-<div class="card">
-    <div class="card-header">
-        <h2 class="card-title">Triage queue <span class="card-title-sub">highest-risk open findings</span></h2>
-        {% if recent_engagements %}<a href="{% url 'engagements:list' %}" class="card-link">View all →</a>{% endif %}
-    </div>
-    {% if triage_findings %}
-    <div class="table-wrap">
-        <table class="op-table">
-            <thead><tr><th>Finding</th><th>Severity</th><th>CVSS</th><th>SLA</th><th>Assignee</th></tr></thead>
-            <tbody>
-            {% for f in triage_findings %}
-            <tr>
-                <td>
-                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:52 }}</a>
-                    {% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}
-                </td>
-                <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
-                <td><span class="cvss-num" style="color:{{ f.severity_color }}">{{ f.cvss_score|floatformat:1 }}</span></td>
-                <td>
-                    {% if f.sla_status == 'overdue' %}<span class="sig sig--red">overdue</span>
-                    {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold">due soon</span>
-                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
-                    {% else %}<span class="text-muted">—</span>{% endif %}
-                </td>
-                <td>
-                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
-                    {% else %}<span class="text-muted">—</span>{% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="empty-state compact"><p class="text-secondary text-sm">No open findings to triage. 🎉</p></div>
-    {% endif %}
-</div>
-
-<!-- ── Engagements ── -->
-<div class="card">
-    <div class="card-header">
-        <h2 class="card-title">Engagements</h2>
-        <a href="{% url 'engagements:list' %}" class="card-link">View all →</a>
-    </div>
-    {% if recent_engagements %}
-    <div class="table-wrap">
-        <table class="op-table">
-            <thead><tr><th>Engagement</th><th>Client</th><th>Phase</th><th>Findings</th><th>Window</th></tr></thead>
-            <tbody>
-            {% for e in recent_engagements %}
-            <tr>
-                <td>
-                    <a href="{{ e.get_absolute_url }}" class="op-finding">{{ e.name|truncatechars:40 }}</a>
-                    <div class="op-finding-sub">{{ e.get_engagement_type_display }}</div>
-                </td>
-                <td>{{ e.client_name|default:"—" }}</td>
-                <td><span class="sig {% if e.status == 'exploitation' or e.status == 'post_exploitation' or e.status == 'reporting' %}sig--gold{% elif e.status == 'recon' or e.status == 'scanning' %}sig--blue{% elif e.status == 'completed' %}sig--green{% else %}sig--gray{% endif %}">{{ e.get_status_display }}</span></td>
-                <td class="text-mono">{{ e.finding_count }}</td>
-                <td class="op-window">{% if e.start_date %}{{ e.start_date|date:"M j" }}{% if e.end_date %} – {{ e.end_date|date:"M j, Y" }}{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
-        <p>No engagements yet.</p>
-        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>{% endif %}
-    </div>
-    {% endif %}
-</div>
-
-{% if total_findings > 0 %}
-<!-- ── Severity distribution ── -->
-<div class="card">
-    <div class="card-header"><h2 class="card-title">Severity distribution</h2></div>
-    <div class="sevdist-bar">
-        {% if severity_counts.critical %}<span class="sevdist-seg" style="flex:{{ severity_counts.critical }};background:var(--critical)"></span>{% endif %}
-        {% if severity_counts.high %}<span class="sevdist-seg" style="flex:{{ severity_counts.high }};background:var(--high)"></span>{% endif %}
-        {% if severity_counts.medium %}<span class="sevdist-seg" style="flex:{{ severity_counts.medium }};background:var(--medium)"></span>{% endif %}
-        {% if severity_counts.low %}<span class="sevdist-seg" style="flex:{{ severity_counts.low }};background:var(--low)"></span>{% endif %}
-        {% if severity_counts.info %}<span class="sevdist-seg" style="flex:{{ severity_counts.info }};background:var(--info)"></span>{% endif %}
-    </div>
-    <div class="sevdist-legend">
-        <span class="sevdist-item"><i style="background:var(--critical)"></i>Critical <b>{{ severity_counts.critical }}</b></span>
-        <span class="sevdist-item"><i style="background:var(--high)"></i>High <b>{{ severity_counts.high }}</b></span>
-        <span class="sevdist-item"><i style="background:var(--medium)"></i>Medium <b>{{ severity_counts.medium }}</b></span>
-        <span class="sevdist-item"><i style="background:var(--low)"></i>Low <b>{{ severity_counts.low }}</b></span>
-        <span class="sevdist-item"><i style="background:var(--info)"></i>Info <b>{{ severity_counts.info }}</b></span>
-    </div>
-</div>
-{% endif %}
-
-<!-- ── Recent activity ── -->
-<div class="card" id="recent-activity">
-    <div class="card-header"><h2 class="card-title">Recent activity</h2></div>
-    {% if recent_activity %}
-    <div class="opfeed">
-        {% for a in recent_activity|slice:":8" %}
-        <div class="opfeed-row">
-            <span class="opfeed-dot"></span>
-            <div class="opfeed-body">
-                <div class="opfeed-line"><b>{{ a.user|default:"system" }}</b> <span class="opfeed-action">{{ a.action|truncatechars:80 }}</span></div>
-            </div>
-            <span class="opfeed-time">{{ a.timestamp|timesince }}</span>
+<div class="dashboard-page">
+    {% include "dashboard/partials/header.html" %}
+    {% include "dashboard/partials/summary.html" %}
+    <div class="dashboard-layout">
+        <div class="dashboard-main">
+            {% include "dashboard/partials/triage.html" %}
+            {% include "dashboard/partials/engagements.html" %}
         </div>
-        {% endfor %}
+        <aside class="dashboard-rail" aria-label="Workspace context">
+            {% if not user.is_client %}<section class="rail-section">
+                <p class="eyebrow">Your workload</p>
+                <div class="finding-total">{{ my_assigned_count }} <span>assigned to you</span></div>
+                <p class="text-secondary">{{ my_assigned_overdue }} overdue · {{ due_soon_count }} due soon across your engagements</p>
+                <a class="rail-link" href="{% url 'engagements:list' %}">Open engagements ↗</a>
+            </section>{% endif %}
+            {% include "dashboard/partials/activity.html" %}
+        </aside>
     </div>
-    {% else %}
-    <div class="empty-state compact"><p class="text-secondary text-sm">No recent activity.</p></div>
-    {% endif %}
 </div>
 {% endblock %}

@@ -7,7 +7,6 @@ recreate the demo data only.
 """
 
 from datetime import timedelta
-from io import BytesIO
 
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile

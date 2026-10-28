@@ -17,9 +17,9 @@ RUN apt-get update \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-COPY requirements.txt /tmp/requirements.txt
+COPY requirements.txt requirements.lock /tmp/
 RUN pip install --upgrade pip \
-    && pip install -r /tmp/requirements.txt
+    && pip install -r /tmp/requirements.txt -c /tmp/requirements.lock
 
 
 # ── Runtime: slim image, non-root user, venv copied from builder ────────

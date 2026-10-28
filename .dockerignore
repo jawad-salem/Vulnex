@@ -56,3 +56,11 @@ htmlcov/
 
 # Celery runtime
 celerybeat-schedule*
+
+# Local Python environment
+myvenv/
+protected_media/
+*.egg-info/
+
+# Local UI verification artifacts
+artifacts/

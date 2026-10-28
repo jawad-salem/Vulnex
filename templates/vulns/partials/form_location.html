@@ -1,0 +1,40 @@
+<!-- Location with recon host link -->
+        <div class="editor-section">
+            <h3 class="section-title">Location</h3>
+            <p class="section-desc">Link to a discovered host from recon or enter details manually.</p>
+
+            <div class="form-group">
+                <label for="{{ form.discovered_host.id_for_label }}">Discovered host (from recon)</label>
+                {{ form.discovered_host }}
+                <span class="form-help">Selecting a host auto-fills the host and URL. Typing a URL auto-fills the endpoint path.</span>
+            </div>
+
+            <div class="form-row form-row--host">
+                <div class="form-group">
+                    <label for="{{ form.host.id_for_label }}">Host</label>
+                    {{ form.host }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.port.id_for_label }}">Port</label>
+                    {{ form.port }}
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="{{ form.url.id_for_label }}">URL</label>
+                {{ form.url }}
+            </div>
+            <div class="form-row form-row--location">
+                <div class="form-group">
+                    <label for="{{ form.endpoint.id_for_label }}">Endpoint / Path</label>
+                    {{ form.endpoint }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.http_method.id_for_label }}">HTTP Method</label>
+                    {{ form.http_method }}
+                </div>
+                <div class="form-group">
+                    <label for="{{ form.parameter.id_for_label }}">Parameter</label>
+                    {{ form.parameter }}
+                </div>
+            </div>
+        </div>

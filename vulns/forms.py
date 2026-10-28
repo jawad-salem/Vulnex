@@ -1,5 +1,4 @@
 from django import forms
-from django.conf import settings
 from .models import Finding, Evidence, FindingComment
 from recon.models import DiscoveredHost
 

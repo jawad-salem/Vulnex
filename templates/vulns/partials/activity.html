@@ -1,0 +1,22 @@
+{% load vulns_extras %}
+<!-- ── Activity ── -->
+    <div class="tab-panel" id="tab-activity" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Activity timeline</h2>
+            {% if timeline %}
+            <ol class="timeline">
+                {% for e in timeline %}
+                <li class="tl-item tl-{{ e.kind }}">
+                    <span class="tl-dot" aria-hidden="true"></span>
+                    <div class="tl-card">
+                        <div class="tl-head"><span class="tl-title">{{ e.title }}</span><span class="tl-time">{{ e.ts|date:"M j, Y · H:i" }}</span></div>
+                        <div class="tl-meta">{% if e.who %}{{ e.who }}{% else %}<span class="text-muted">system</span>{% endif %}{% if e.meta %} · {{ e.meta }}{% endif %}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ol>
+            {% else %}
+            <div class="empty-state compact"><p class="text-secondary text-sm">No activity recorded yet.</p></div>
+            {% endif %}
+        </div>
+    </div>

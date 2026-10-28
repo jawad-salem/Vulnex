@@ -1,143 +1,91 @@
-# Vulnex Architecture
+# Architecture
 
-A one-pager for anyone reading the code for the first time. The goal is to explain *why the project is laid out this way* and what happens on the most important request paths. Every claim here points at real code — when reality and this doc disagree, reality wins.
+Vulnex is a modular Django application with server-rendered templates and a DRF
+API. PostgreSQL is used in Compose; SQLite is supported for local development.
+Redis carries Celery tasks. The same application image runs the web server,
+worker and scheduler.
 
-## Why server-rendered Django
+## Domain boundaries
 
-Vulnex is intentionally a single Django project, server-rendered, with a hand-rolled CSS file (`static/css/main.css`) and small vanilla-JS sprinkles. There is no frontend framework, no build step, no separate API gateway.
+| App | Responsibility |
+| --- | --- |
+| accounts | Users, MFA, API keys and audit events |
+| engagements | Clients, engagement scope, membership, invitations and attack paths |
+| vulns | Findings, evidence, review, comments, imports and merging |
+| recon | Discovered hosts, scans, schedules and pipelines |
+| methodology | Methodology templates and engagement checklist progress |
+| credentials | Encrypted credential storage and audited reveal |
+| reports | Report branding, PDF generation and stored reports |
+| dashboard | Cross-engagement summaries and search |
+| api | HTTP serialization, authentication and permissions |
 
-That choice exists because pentesting workflows are read-heavy, form-driven, and printable — a finding form, a methodology checklist, a report preview. Server rendering keeps the loop *engagement → finding → review → PDF* in one process, with one auth model, one data store, and one deploy unit. The REST API is a parallel surface on top of the same models and querysets, not a separate service.
+## Request and task boundaries
 
-## App layout
+Browser and API requests authenticate independently and apply engagement
+membership permissions. Views handle HTTP input/output. Shared operations live in
+services; read models for the workspace live in selectors.
 
-```
-vulnex/                    # Django project (settings, root URLs, Celery)
-├── accounts/              # Custom User, MFA, audit log, API keys, role middleware
-├── engagements/           # Client → Engagement → Members → Notes → Activity log
-│                          # Attack-path DAG (path / node / edge) lives here too
-├── vulns/                 # Findings, evidence, comments, finding templates,
-│                          # scanner parsers (vulns/parsers.py) + import/merge
-│                          # services (vulns/services/)
-├── recon/                 # Recon scans, discovered hosts, scheduled scans, pipelines
-├── credentials/           # Encrypted credentials vault (Fernet)
-├── methodology/           # OWASP-style checklists scoped to engagements
-├── reports/               # Report templates + ReportLab PDF generator
-├── api/                   # DRF viewsets, OpenAPI schema, JWT + API-key auth
-├── dashboard/             # Cross-app landing view + global search
-├── templates/             # Server-rendered HTML (base.html owns layout + CSP nonces)
-├── static/css/main.css    # Single hand-rolled stylesheet
-└── docs/                  # API.md, ARCHITECTURE.md (this file), screenshots
-```
+- `engagements/services.py`: atomic engagement creation with lead membership and
+  activity; signed-off engagement edit validation.
+- `engagements/selectors.py`: scope, testing, review and retest work queues.
+- `vulns/services/workflow.py`: finding visibility and atomic review transitions.
+- `vulns/services/imports.py` and `merge.py`: import and merge operations.
+- `recon/services.py`: host-result merging used by views and Celery workers.
 
-One cross-cutting module lives at project level rather than in an app:
+This separation is incremental. Other mutations still live in views. See
+[refactoring status](REFACTORING.md) for remaining boundaries to extract.
 
-- `vulnex/celery.py` — the Celery app and task autodiscovery.
+## Roles and review
 
-## Data model
+Global admins can access all engagements. Other users receive lead, pentester,
+reviewer or client roles per engagement. Clients see approved findings; recon
+and the credential vault are internal sections.
 
-The domain has six anchor tables; everything else hangs off them.
+Review follows draft/changes requested ? in review ? approved/changes requested.
+Editors submit; leads and reviewers review. The shared transition service checks
+permissions and state under a database row lock and records an activity event.
+The API cannot write review state through ordinary finding updates.
 
-```
-Client ───< Engagement ───< EngagementMember >─── User
-              │                                      │
-              ├─< Finding ───< Evidence              ├─< AuditLog
-              │       └────< FindingComment          └─< APIKey
-              ├─< AttackPath ──< AttackPathNode
-              │           └───< AttackPathEdge
-              ├─< DiscoveredHost ──< ReconScan
-              ├─< Credential                     (Fernet-encrypted blob)
-              ├─< EngagementChecklist >── ChecklistItem ── ChecklistCategory ── Methodology
-              ├─< Report ───── ReportTemplate
-              └─< ActivityLog
-```
+The browser uses session authentication, CSRF and the OTP login flow. MFA
+middleware enforces enrollment for configured roles. JWT issuance currently
+checks enrollment, not a fresh OTP challenge. API keys and JWTs are authenticated
+by DRF after Django middleware. These mechanisms should not be described as
+identical MFA guarantees.
 
-Notes worth knowing if you're reading the code:
+## Files and reports
 
-- **`User` is custom** (`accounts.User`, `AbstractUser`). `User.role` is the source of truth for "what can this person do" outside an engagement (admin / engagement-lead / pentester / reviewer / client). `EngagementMember` is the per-engagement scoping layer on top of that.
-- **`Finding`** carries the ATT&CK / OWASP fields, severity, CVSS, status, dedup key, and the rendered/sanitised Markdown body. Bulk imports parse scanner output in `vulns/parsers.py`, then the import service (`vulns/services/imports.py`) dedups and writes `Finding` rows; views just handle the upload/preview flow.
-- **`AttackPath` / `AttackPathNode` / `AttackPathEdge`** form the kill-chain diagram — a small hand-drawn DAG (typically 5–10 nodes) the pentester sketches to narrate the path they walked, embedded in the PDF report. It is *not* a BloodHound-style enumeration engine, just a labelled diagram. Edges carry the ATT&CK technique tag and an optional finding link; the PDF generator walks the graph in BFS order.
-- **`Credential.secret_encrypted`** is a single Fernet ciphertext column. The key comes from `VAULT_MASTER_KEY` — see `SECURITY.md` for rotation and the pre-1.2 SECRET_KEY-derived fallback.
-- **`AuditLog`** is the append-only forensic trail for sensitive actions (login, role change, credential access, report download). It is never edited or deleted at the model layer.
+Public media stores assets such as client and report-kit logos. Evidence and
+report PDFs live under `PROTECTED_MEDIA_ROOT` and are downloaded through
+membership-checked views. Migration `reports.0003` relocates existing report
+files; follow the upgrade instructions in the README.
 
-## Request lifecycle
+PDF generation uses ReportLab and runs synchronously. Each generation creates a
+Report row and a file. There is no explicit revision or publication model yet:
+existing reports are available to engagement members, and generated content may
+include draft findings. Protected storage is separate from publication policy.
 
-A typical authenticated page request:
+## Frontend
 
-```mermaid
-flowchart LR
-    A[Browser] --> B[WhiteNoise / static]
-    A --> C[Django middleware stack]
-    C --> C1[Session]
-    C1 --> C2[CSRF]
-    C2 --> C3[Auth]
-    C3 --> C4[django-otp]
-    C4 --> C5[MFARequiredMiddleware]
-    C5 --> C7[CSP / clickjacking / permissions-policy]
-    C7 --> C8[django-axes]
-    C8 --> D[URLConf]
-    D --> E[App view]
-    E --> F[(Postgres)]
-    E --> G[Template + main.css]
-    G --> A
-    E -.async job.-> H[Celery + Redis]
-    H --> F
-```
+Django templates share `templates/base.html`, workspace navigation, and CSS.
+The engagement overview presents scope sign-off, methodology progress, findings
+awaiting review and remediated findings awaiting a first retest. Vanilla JS
+supports tabs, previews and the attack-path editor. There is no SPA framework.
 
-The middleware order is load-bearing — see `vulnex/settings.py:48` for the canonical list. A few specifics:
+See [frontend structure](FRONTEND.md) for template, CSS and JavaScript ownership,
+and for the optional real-browser checks.
 
-- **`MFARequiredMiddleware`** redirects an authenticated user with a confirmed TOTP device but no verified session to the verification step. It does *not* force enrollment for users who never set up TOTP — that's policy.
-- **`django-axes` is last on purpose** so failed logins from earlier middleware are still observed for lockout.
-- **CSP nonces** are emitted by `csp.middleware.CSPMiddleware` and consumed by every `<script nonce="{{ request.csp_nonce }}">` in `templates/base.html`. Adding inline JS without a nonce will silently break under CSP.
+## Deployment and tests
 
-## Authentication: web vs. API
+Compose starts PostgreSQL, Redis, Gunicorn, a Celery worker and Celery beat.
+The entrypoint runs migrations, collects static files and seeds reference data.
+Demo data is opt-in; automatic superuser creation requires an explicit password.
+Compose binds port 8000 to localhost by default.
 
-Two parallel auth surfaces, one user table:
+`requirements.lock` records development dependency versions and is applied as
+constraints. CI tests Python 3.12 and 3.14 on Linux, checks migration consistency,
+and gates tagged image releases. `vulnex.test_settings` provides a temporary
+SQLite database, disposable file directories, and a test-only vault key.
 
-| Surface | Identity | Sessions | MFA | Where |
-| --- | --- | --- | --- | --- |
-| Web UI | username + password | Django session cookie | TOTP via django-otp; lockout via django-axes | `accounts/views.py`, `MFARequiredMiddleware` |
-| REST API | JWT (preferred) or API key | Stateless | Inherited from issuing user's role/scope | `api/`, `rest_framework_simplejwt`, `accounts.APIKey` |
-
-API requests resolve to a `User` (via JWT subject or API-key lookup), and every viewset filters its queryset by the user's role and `EngagementMember` scope before serializing. There is no separate "API role" — the same role that gates the UI gates the API. See `docs/API.md` for the exact endpoints and auth examples.
-
-## Report generation pipeline
-
-PDF is the one place where the request path is genuinely heavy, so it has its own module (`reports/generator.py`) built on ReportLab.
-
-```mermaid
-flowchart TD
-    A[User clicks Generate] --> B[reports.views.generate]
-    B --> C[Resolve ReportTemplate + Engagement]
-    C --> D[Collect findings, evidence, attack paths,<br/>recon hosts, methodology coverage]
-    D --> E[markdown_to_platypus<br/>vulns/templatetags/vulns_extras.py]
-    E --> F[ReportLab SimpleDocTemplate<br/>cover → exec summary → findings →<br/>attack paths → appendix]
-    F --> G[(MEDIA_ROOT/protected/<br/>reports/&lt;hash&gt;.pdf)]
-    G --> H[Report row saved with file path + checksum]
-    H --> I[Authenticated download view streams the file]
-```
-
-A few non-obvious things:
-
-- **Markdown → ReportLab.** Finding bodies are stored as Markdown, sanitized with `bleach`, and converted to ReportLab `Paragraph` flowables by `markdown_to_platypus`. This is why CSP and the PDF use the same sanitizer surface — anything that passes for the web view also passes for the PDF.
-- **Severity colors are fixed.** Red means critical in every report. The `ReportTemplate` controls cover, header, and rule colors, but not severity chips — that's an intentional choice in `reports/generator.py`.
-- **Output lives in protected media.** `MEDIA_ROOT` has a `protected/` subtree that is *not* served by WhiteNoise. Downloads go through an authenticated Django view that checks `EngagementMember` membership before streaming.
-
-## Background work (Celery + Redis)
-
-Recon scans are scheduled via `recon.ScheduledScan` and dispatched as Celery tasks. The scan runs in the worker, writes `DiscoveredHost` rows, and updates the scan record. The web app polls the scan's status field for the dashboard.
-
-## Deployment shape
-
-Two supported topologies, both running the same image:
-
-- **Local Docker Compose** — `docker compose up`. Web (gunicorn) + db (postgres:16) + redis + celery worker + celery beat, all on a single network, with healthchecks and named volumes for static/media/protected-media/postgres.
-- **Native** — `python manage.py runserver` against a host-installed Postgres + Redis. Used during development.
-
-A GitHub Actions release workflow (`.github/workflows/release.yml`) publishes the Docker image to GHCR on a `v*` tag.
-
-## Things this doc doesn't cover
-
-- **Frontend interaction details** — read `templates/base.html` and `static/css/main.css`. The base template owns the sidebar, mobile toggle, toast handling, and keyboard shortcuts (`/`, `n`, `f`, `r`).
-- **Per-app URL maps** — `<app>/urls.py` in each app. The root URLConf is `vulnex/urls.py`.
-- **REST API surface** — `docs/API.md`, plus the live OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/`.
-- **Database migration history** — `<app>/migrations/`. There are no squashed migrations; every change is preserved.
+The current Compose configuration is intended for local use. A production profile,
+shared cache, dedicated initialization job, background report generation and
+backup/restore verification remain follow-up work.

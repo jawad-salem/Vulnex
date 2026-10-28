@@ -1,0 +1,14 @@
+/* Portfolio dashboard: primary queues and a compact activity rail. */
+.dashboard-layout { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:24px; align-items:start; }
+.dashboard-main, .dashboard-rail { min-width:0; }
+.dashboard-rail { border-left:1px solid var(--border); padding-left:24px; }
+.dashboard-summary { display:flex; flex-wrap:wrap; gap:20px 32px; padding:16px 0 20px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+.dashboard-summary .opstat { padding:0; border:0; min-width:100px; }
+.dashboard-summary .opstat-value { font-size:29px; }
+.dashboard-page .op-table td { padding-top:12px; padding-bottom:12px; }
+.dashboard-page .card-title-sub { display:block; margin:5px 0 0; }
+.dashboard-rail .opfeed-row { display:grid; grid-template-columns:8px minmax(0,1fr); gap:8px; padding:14px 0; }
+.dashboard-rail .opfeed-time { grid-column:2; }
+.dashboard-rail .opfeed-line { white-space:normal; overflow-wrap:anywhere; }
+@media (max-width:1100px) { .dashboard-layout { grid-template-columns:1fr; } .dashboard-rail { border-left:0; padding-left:0; display:grid; grid-template-columns:1fr 1fr; gap:24px; } }
+@media (max-width:600px) { .dashboard-rail { grid-template-columns:1fr; } .dashboard-summary { gap:22px; } .dashboard-summary .opstat { flex:1 0 40%; } .op-head { flex-direction:column; gap:16px; } }

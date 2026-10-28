@@ -1,25 +1,6 @@
 from functools import wraps
-from django.conf import settings
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.mixins import UserPassesTestMixin
-from django_otp import user_has_device
-
-
-def mfa_required_for_role(view_func):
-    """Per-view belt-and-suspenders for MFA. MFARequiredMiddleware already
-    enforces this globally; this decorator makes the requirement local and
-    explicit on security-sensitive views (useful if the middleware is ever
-    reordered or removed)."""
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect('accounts:login')
-        required = getattr(settings, 'MFA_REQUIRED_ROLES', [])
-        if request.user.role in required and not user_has_device(request.user, confirmed=True):
-            return redirect('accounts:mfa_setup')
-        return view_func(request, *args, **kwargs)
-    return _wrapped
 
 
 def role_required(*roles):
@@ -121,14 +102,3 @@ def engagement_edit_required(view_func):
         request.eng_role = member.role
         return view_func(request, *args, **kwargs)
     return _wrapped
-
-
-class AdminRequiredMixin(UserPassesTestMixin):
-    def test_func(self):
-        return self.request.user.is_authenticated and self.request.user.is_admin
-
-
-class PentesterRequiredMixin(UserPassesTestMixin):
-    def test_func(self):
-        return self.request.user.is_authenticated and self.request.user.is_pentester
-

@@ -25,7 +25,7 @@ services:
     build: .
     image: vulnex:local
     ports:
-      - "8000:8000"
+      - "${VULNEX_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY must be set in .env}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
@@ -37,9 +37,9 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       DJANGO_BOOTSTRAP_USERNAME: ${DJANGO_BOOTSTRAP_USERNAME:-admin}
-      DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-admin1}
+      DJANGO_BOOTSTRAP_PASSWORD: ${DJANGO_BOOTSTRAP_PASSWORD:-}
       DJANGO_BOOTSTRAP_EMAIL: ${DJANGO_BOOTSTRAP_EMAIL:-admin@example.com}
-      SEED_DEMO: ${SEED_DEMO:-1}
+      SEED_DEMO: ${SEED_DEMO:-0}
       # Email — pulled from the host .env (compose reads ./.env for ${...}).
       # Without these the container falls back to the console backend and
       # "sends" mail to its own logs instead of a real inbox.

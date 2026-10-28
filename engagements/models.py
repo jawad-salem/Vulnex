@@ -69,6 +69,7 @@ class Engagement(models.Model):
     in_scope = models.TextField(help_text='One target per line (IPs, domains, URLs)', blank=True)
     out_of_scope = models.TextField(help_text='Excluded targets, one per line', blank=True)
     rules_of_engagement = models.TextField(blank=True)
+    authorization_reference = models.CharField(max_length=500, blank=True, help_text="Reference to the externally approved authorization / RoE document.")
 
     # Rules-of-engagement sign-off — once signed, scope/RoE edits are locked
     # until a lead revokes the sign-off.

@@ -1,0 +1,19 @@
+<!-- ── Recent activity ── -->
+<div class="rail-section" id="recent-activity">
+    <div class="card-header"><h2 class="card-title">Recent activity</h2></div>
+    {% if recent_activity %}
+    <div class="opfeed">
+        {% for a in recent_activity|slice:":8" %}
+        <div class="opfeed-row">
+            <span class="opfeed-dot"></span>
+            <div class="opfeed-body">
+                <div class="opfeed-line"><b>{{ a.user|default:"system" }}</b> <span class="opfeed-action">{{ a.action|truncatechars:80 }}</span></div>
+            </div>
+            <span class="opfeed-time">{{ a.timestamp|timesince }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact"><p class="text-secondary text-sm">No recent activity.</p></div>
+    {% endif %}
+</div>

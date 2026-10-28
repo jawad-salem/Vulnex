@@ -5,7 +5,6 @@ client, outsider) on a representative subset of endpoints, plus the two
 non-session authentication paths (API key and JWT).
 """
 from django.test import Client as DjangoClient, TestCase, override_settings
-from django.urls import reverse
 from rest_framework.test import APIClient
 
 from accounts.models import APIKey, User
@@ -159,6 +158,17 @@ class APIKeyAuthTests(TestCase):
         self.api.credentials(HTTP_AUTHORIZATION=f'ApiKey {self.raw}')
         resp = self.api.get('/api/v1/engagements/')
         self.assertEqual(resp.status_code, 200)
+
+    def test_underscores_in_issued_prefix_and_secret_authenticate(self):
+        from unittest.mock import patch
+        with patch('accounts.models.secrets.token_urlsafe', side_effect=['ab_cd_12', 'secret_with_underscores']):
+            key, raw = APIKey.issue(user=self.user, name='underscore regression')
+        self.api.credentials(HTTP_AUTHORIZATION=f'ApiKey {raw}')
+        self.assertEqual(self.api.get('/api/v1/engagements/').status_code, 200)
+        key.refresh_from_db()
+        self.assertIsNotNone(key.last_used_at)
+        self.api.credentials(HTTP_AUTHORIZATION=f'ApiKey {raw}tampered')
+        self.assertEqual(self.api.get('/api/v1/engagements/').status_code, 401)
 
     def test_revoked_api_key_rejected(self):
         self.key.revoke()

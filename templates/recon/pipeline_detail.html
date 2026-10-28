@@ -56,6 +56,13 @@
             </div>
         </div>
 
+        {% for step, summary in pipeline.results_summary.items %}
+        {% if summary.blocked %}
+        <section class="card"><h2 class="card-title">Excluded targets: {{ step|step_label }}</h2>
+            <ul>{% for item in summary.blocked %}<li class="text-sm text-break">{{ item.target }}: {{ item.reason }}</li>{% endfor %}</ul>
+        </section>
+        {% endif %}
+        {% endfor %}
         <!-- Results Summary -->
         {% if pipeline.results_summary %}
         <div class="card">

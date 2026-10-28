@@ -1,8 +1,11 @@
 """ViewSets backing /api/v1/. Queryset scoping honours engagement membership —
 list results for non-admins are filtered to engagements the caller belongs to.
 """
+from django.core.exceptions import PermissionDenied as DjangoPermissionDenied, ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError
+from vulns.services.workflow import visible_findings, transition_review
+from drf_spectacular.utils import extend_schema
 from django.http import FileResponse
-from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -13,7 +16,8 @@ from credentials.models import Credential
 from engagements.models import Engagement
 from recon.models import DiscoveredHost
 from reports.models import Report
-from vulns.models import Evidence, Finding
+from reports.selectors import visible_reports
+from vulns.models import Finding
 
 from .permissions import (
     CredentialVaultPermission,
@@ -27,13 +31,8 @@ from .serializers import (
     EvidenceSerializer,
     FindingSerializer,
     ReportSerializer,
+    ReviewActionSerializer,
 )
-
-
-def _accessible_engagement_ids(user):
-    if user.role == 'admin':
-        return Engagement.objects.values_list('id', flat=True)
-    return Engagement.objects.filter(members__user=user).values_list('id', flat=True)
 
 
 class EngagementViewSet(viewsets.ModelViewSet):
@@ -55,15 +54,11 @@ class EngagementViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         if self.request.user.role not in ('admin', 'pentester'):
             raise PermissionDenied('Only admins or pentesters can create engagements.')
-        engagement = serializer.save(created_by=self.request.user)
-        AuditLog.record(
-            actor=self.request.user,
-            action=AuditLog.Action.ENGAGEMENT_CREATE,
-            target=str(engagement.pk),
-            details={'engagement': engagement.name, 'via': 'api'},
-        )
+        serializer.save(created_by=self.request.user)
 
     def perform_destroy(self, instance):
+        if not instance.user_is_lead(self.request.user):
+            raise PermissionDenied('Only the engagement lead can delete this.')
         AuditLog.record(
             actor=self.request.user,
             action=AuditLog.Action.ENGAGEMENT_DELETE,
@@ -76,7 +71,7 @@ class EngagementViewSet(viewsets.ModelViewSet):
     def findings(self, request, pk=None):
         engagement = self.get_object()
         if request.method == 'GET':
-            qs = engagement.findings.all()
+            qs = visible_findings(request.user, engagement.findings.all())
             return Response(FindingSerializer(qs, many=True).data)
         # POST — create finding under this engagement
         if not engagement.user_can_edit(request.user):
@@ -95,14 +90,23 @@ class FindingViewSet(viewsets.ModelViewSet):
     queryset = Finding.objects.none()
 
     def get_queryset(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return Finding.objects.none()
-        if user.role == 'admin':
-            return Finding.objects.all()
-        return Finding.objects.filter(
-            engagement_id__in=_accessible_engagement_ids(user),
-        )
+        return visible_findings(self.request.user)
+
+    @extend_schema(request=ReviewActionSerializer, responses=FindingSerializer)
+    @action(detail=True, methods=['post'], permission_classes=[IsEngagementMember])
+    def review(self, request, pk=None):
+        finding = self.get_object()
+        payload = ReviewActionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        notes = payload.validated_data['notes']
+        try:
+            finding = transition_review(actor=request.user, finding=finding,
+                                        target=payload.validated_data['state'], notes=notes)
+        except DjangoPermissionDenied as exc:
+            raise PermissionDenied(str(exc))
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages)
+        return Response(self.get_serializer(finding).data)
 
     def perform_create(self, serializer):
         engagement = serializer.validated_data['engagement']
@@ -138,7 +142,8 @@ class DiscoveredHostViewSet(viewsets.ReadOnlyModelViewSet):
         if user.role == 'admin':
             return DiscoveredHost.objects.all()
         return DiscoveredHost.objects.filter(
-            engagement_id__in=_accessible_engagement_ids(user),
+            engagement__members__user=user,
+            engagement__members__role__in=('lead', 'pentester', 'reviewer'),
         )
 
 
@@ -154,7 +159,8 @@ class CredentialViewSet(viewsets.ModelViewSet):
         if user.role == 'admin':
             return Credential.objects.all()
         return Credential.objects.filter(
-            engagement_id__in=_accessible_engagement_ids(user),
+            engagement__members__user=user,
+            engagement__members__role__in=('lead', 'pentester', 'reviewer'),
         )
 
     def perform_create(self, serializer):
@@ -201,14 +207,7 @@ class ReportViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Report.objects.none()
 
     def get_queryset(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return Report.objects.none()
-        if user.role == 'admin':
-            return Report.objects.all()
-        return Report.objects.filter(
-            engagement_id__in=_accessible_engagement_ids(user),
-        )
+        return visible_reports(self.request.user)
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
@@ -221,5 +220,8 @@ class ReportViewSet(viewsets.ReadOnlyModelViewSet):
             target=str(report.pk),
             details={'engagement': report.engagement.name, 'via': 'api'},
         )
-        report.file.open('rb')
+        try:
+            report.file.open('rb')
+        except FileNotFoundError:
+            return Response({'detail': 'Report file missing.'}, status=404)
         return FileResponse(report.file, content_type='application/pdf')

@@ -1,3 +1,7 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
+from engagements.services import create_engagement, ensure_scope_editable
+from django.db import transaction
+from vulns.services.workflow import visible_findings
 from django.conf import settings
 from django_otp import user_has_device
 from rest_framework import serializers
@@ -48,7 +52,7 @@ class EngagementSerializer(serializers.ModelSerializer):
         model = Engagement
         fields = [
             'id', 'name', 'client', 'client_name', 'engagement_type', 'status',
-            'description', 'in_scope', 'out_of_scope', 'rules_of_engagement',
+            'description', 'in_scope', 'out_of_scope', 'rules_of_engagement', 'authorization_reference',
             'start_date', 'end_date', 'created_at', 'updated_at',
             'scope_targets', 'finding_count', 'critical_count', 'high_count',
         ]
@@ -62,13 +66,29 @@ class EngagementSerializer(serializers.ModelSerializer):
         client = Client.objects.filter(name__iexact=name).first()
         return client or Client.objects.create(name=name)
 
+    @transaction.atomic
     def create(self, validated_data):
         client = self._resolve_client(validated_data)
         if client:
             validated_data['client'] = client
-        return super().create(validated_data)
+        actor = validated_data.pop('created_by')
+        return create_engagement(actor=actor, engagement=Engagement(**validated_data))
 
+    def validate(self, attrs):
+        if self.instance:
+            try:
+                ensure_scope_editable(self.instance)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.messages)
+        return attrs
+
+    @transaction.atomic
     def update(self, instance, validated_data):
+        instance = Engagement.objects.select_for_update().get(pk=instance.pk)
+        try:
+            ensure_scope_editable(instance)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
         client = self._resolve_client(validated_data)
         if client:
             validated_data['client'] = client
@@ -77,10 +97,23 @@ class EngagementSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['client_name'] = instance.client_name
+        request = self.context.get('request')
+        if request and request.user.role != 'admin' and instance.user_is_client(request.user):
+            findings = visible_findings(request.user, instance.findings.all())
+            data['finding_count'] = findings.count()
+            data['critical_count'] = findings.filter(severity='critical').count()
+            data['high_count'] = findings.filter(severity='high').count()
         return data
 
 
-class FindingSerializer(serializers.ModelSerializer):
+class ImmutableEngagementSerializer(serializers.ModelSerializer):
+    def validate_engagement(self, value):
+        if self.instance and value.pk != self.instance.engagement_id:
+            raise serializers.ValidationError('Records cannot be moved between engagements.')
+        return value
+
+
+class FindingSerializer(ImmutableEngagementSerializer):
     engagement = serializers.PrimaryKeyRelatedField(queryset=Engagement.objects.all())
     cvss_vector_string = serializers.CharField(read_only=True)
     severity = serializers.ChoiceField(choices=Finding.Severity.choices, required=False)
@@ -101,7 +134,7 @@ class FindingSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = [
-            'id', 'cvss_score', 'cvss_vector_string',
+            'id', 'cvss_score', 'cvss_vector_string', 'review_state',
             'created_at', 'updated_at',
         ]
 
@@ -109,6 +142,13 @@ class FindingSerializer(serializers.ModelSerializer):
 class EvidenceSerializer(serializers.ModelSerializer):
     finding = serializers.PrimaryKeyRelatedField(queryset=Finding.objects.all())
     file = serializers.FileField()
+
+    def validate_file(self, value):
+        from vulns.forms import EvidenceForm
+        form = EvidenceForm(files={'file': value})
+        if not form.is_valid():
+            raise serializers.ValidationError(form.errors.get('file', ['Invalid evidence upload.']))
+        return form.cleaned_data['file']
 
     class Meta:
         model = Evidence
@@ -128,7 +168,7 @@ class DiscoveredHostSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
 
 
-class CredentialSerializer(serializers.ModelSerializer):
+class CredentialSerializer(ImmutableEngagementSerializer):
     """Credential without its plaintext secret. Use ``reveal=true`` on retrieve
     to include the decrypted secret (logged via AuditLog.CREDENTIAL_REVEAL).
     """
@@ -171,6 +211,11 @@ class ReportSerializer(serializers.ModelSerializer):
         model = Report
         fields = [
             'id', 'engagement', 'title', 'report_type',
-            'generated_by', 'created_at',
+            'generated_by', 'created_at', 'published_at', 'published_by',
         ]
         read_only_fields = fields
+
+
+class ReviewActionSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(choices=['in_review', 'approved', 'changes_requested'])
+    notes = serializers.CharField(required=False, allow_blank=True, default='')

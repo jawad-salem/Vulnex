@@ -1,0 +1,13 @@
+            <header class="topbar">
+                <form method="get" action="{% url 'dashboard:search' %}" class="topbar-search">
+                    <svg class="topbar-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" name="q" class="topbar-search-input" placeholder="Search findings, engagements, hosts, hashes…" autocomplete="off" aria-label="Search the workspace">
+                    <span class="topbar-search-kbd">/</span>
+                </form>
+                <div class="topbar-right">
+                    {% if user.is_admin %}<a class="topbar-icon" href="{% url 'accounts:audit_log' %}" title="Security events" aria-label="Security events">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </a>
+                    {% endif %}<a class="topbar-avatar" href="{% url 'accounts:profile' %}" style="background:{{ user.avatar_color }}" title="{{ user.get_full_name|default:user.username }}">{{ user.initials }}</a>
+                </div>
+            </header>

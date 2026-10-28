@@ -70,7 +70,6 @@ def _resolve_template(engagement, template=None):
     """
     if template is not None:
         return template
-    from engagements.models import Client  # avoid circular import
     client = getattr(engagement, 'client', None)
     if client and client.default_report_template_id:
         return client.default_report_template

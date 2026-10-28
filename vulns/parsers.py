@@ -10,34 +10,6 @@ import defusedxml.ElementTree as ET
 from urllib.parse import urlparse
 
 
-# Shared severity ladder — every parser normalises its native label down to
-# one of these five values before returning a finding dict.
-VALID_SEVERITIES = {'critical', 'high', 'medium', 'low', 'info'}
-
-
-def _normalize_severity(raw, fallback='info'):
-    """Coerce an arbitrary tool severity label to our 5-tier ladder."""
-    if raw is None:
-        return fallback
-    s = str(raw).strip().lower()
-    if not s:
-        return fallback
-    if s in VALID_SEVERITIES:
-        return s
-    # Common aliases from Burp / Nessus / ZAP / Semgrep.
-    mapping = {
-        'informational': 'info',
-        'information': 'info',
-        'none': 'info',
-        'note': 'info',
-        'warning': 'medium',
-        'error': 'high',
-        'severe': 'high',
-        'moderate': 'medium',
-    }
-    return mapping.get(s, fallback)
-
-
 _CVSS_IMPACTS = {
     'critical': {'c': 'H', 'i': 'H', 'a': 'H'},
     'high': {'c': 'H', 'i': 'L', 'a': 'N'},
@@ -75,78 +47,6 @@ def _first_cwe(*sources):
             if m:
                 return f'CWE-{m.group(1)}'
     return ''
-
-
-def parse_nmap_xml(content: bytes) -> list[dict]:
-    """Parse Nmap XML output into findings."""
-    findings = []
-    root = ET.fromstring(content)
-
-    for host in root.findall('.//host'):
-        addr_el = host.find('address')
-        if addr_el is None:
-            continue
-        addr = addr_el.get('addr', 'unknown')
-        hostname = ''
-        hostnames_el = host.find('hostnames/hostname')
-        if hostnames_el is not None:
-            hostname = hostnames_el.get('name', '')
-
-        host_label = hostname or addr
-
-        for port in host.findall('.//port'):
-            portid = port.get('portid', '')
-            protocol = port.get('protocol', 'tcp')
-            state_el = port.find('state')
-            state = state_el.get('state', '') if state_el is not None else ''
-
-            if state != 'open':
-                continue
-
-            service_el = port.find('service')
-            service_name = service_el.get('name', 'unknown') if service_el is not None else 'unknown'
-            product = service_el.get('product', '') if service_el is not None else ''
-            version = service_el.get('version', '') if service_el is not None else ''
-
-            svc_detail = f"{product} {version}".strip() or service_name
-
-            findings.append({
-                'title': f'Open port {portid}/{protocol} ({service_name}) on {host_label}',
-                'description': (
-                    f'Port {portid}/{protocol} is open on {host_label} ({addr}).\n'
-                    f'Service: {svc_detail}'
-                ),
-                'affected_hosts': addr,
-                'severity': 'info',
-                'attack_vector': 'N',
-                'attack_complexity': 'L',
-                'privileges_required': 'N',
-                'user_interaction': 'N',
-                'confidentiality_impact': 'N',
-                'integrity_impact': 'N',
-                'availability_impact': 'N',
-            })
-
-        # Script results (e.g., vulners, vuln)
-        for script in host.findall('.//script'):
-            script_id = script.get('id', '')
-            output = script.get('output', '')
-            if 'vuln' in script_id.lower() and output:
-                findings.append({
-                    'title': f'Nmap script finding: {script_id} on {host_label}',
-                    'description': output[:2000],
-                    'affected_hosts': addr,
-                    'severity': 'medium',
-                    'attack_vector': 'N',
-                    'attack_complexity': 'L',
-                    'privileges_required': 'N',
-                    'user_interaction': 'N',
-                    'confidentiality_impact': 'L',
-                    'integrity_impact': 'N',
-                    'availability_impact': 'N',
-                })
-
-    return findings
 
 
 def parse_nuclei_json(content: bytes) -> list[dict]:

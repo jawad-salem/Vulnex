@@ -44,19 +44,13 @@
         nodes.forEach(function (n) {
             if (indegree[n.id] === 0) { depths[n.id] = 0; queue.push(n.id); }
         });
-        // Fallback: if every node has incoming (cycle), seed with the first.
-        if (queue.length === 0 && nodes.length) {
-            depths[nodes[0].id] = 0;
-            queue.push(nodes[0].id);
-        }
+        // Kahn traversal terminates even for imported legacy cycles.
         while (queue.length) {
             var cur = queue.shift();
             (outAdj[cur] || []).forEach(function (next) {
-                var d = (depths[cur] || 0) + 1;
-                if (depths[next] === undefined || d > depths[next]) {
-                    depths[next] = d;
-                    queue.push(next);
-                }
+                depths[next] = Math.max(depths[next] || 0, (depths[cur] || 0) + 1);
+                indegree[next] -= 1;
+                if (indegree[next] === 0) queue.push(next);
             });
         }
         nodes.forEach(function (n) {
@@ -100,14 +94,14 @@
         });
 
         var maxDepth = depthKeys[depthKeys.length - 1] || 0;
-        var colSpacing = (width - 160) / Math.max(maxDepth, 1);
+        var colSpacing = (width - 280) / Math.max(maxDepth, 1);
         var positions = {};
         depthKeys.forEach(function (d) {
             var col = byDepth[d];
             var rowSpacing = (height - 60) / (col.length + 1);
             col.forEach(function (n, i) {
                 positions[n.id] = {
-                    x: 80 + d * colSpacing,
+                    x: 140 + d * colSpacing,
                     y: 30 + (i + 1) * rowSpacing,
                 };
             });
@@ -133,13 +127,13 @@
             var p = document.createElement('p');
             p.className = 'text-secondary text-center';
             p.style.padding = '3rem';
-            p.textContent = 'No nodes yet — add one in the sidebar to start mapping the kill chain.';
+            p.textContent = 'No nodes yet — use Add node above to start mapping the attack path.';
             canvas.appendChild(p);
             return;
         }
 
-        var width = canvas.clientWidth || 800;
-        var height = Math.max(canvas.clientHeight || 480, Math.min(900, nodes.length * 70));
+        var width = Math.max(canvas.clientWidth || 800, nodes.length * 170, 720);
+        var height = Math.max(300, Math.min(700, nodes.length * 65));
 
         var root = svg('svg', {
             xmlns: SVG_NS,
@@ -163,14 +157,22 @@
         edges.forEach(function (e) {
             var p1 = positions[e.from], p2 = positions[e.to];
             if (!p1 || !p2) return;
+            var length = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+            var dx = (p2.x - p1.x) / length, dy = (p2.y - p1.y) / length;
             var line = svg('line', {
-                x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+                x1: p1.x + dx * 21, y1: p1.y + dy * 21, x2: p2.x - dx * 23, y2: p2.y - dy * 23,
                 stroke: '#cbd5e1', 'stroke-width': 1.5,
                 'marker-end': 'url(#ap-arrow)',
                 'class': 'ap-edge',
             }, root);
             if (e.finding_pk) {
                 line.style.cursor = 'pointer';
+                line.setAttribute('tabindex', '0');
+                line.setAttribute('role', 'link');
+                line.setAttribute('aria-label', e.technique + ': ' + e.finding_title);
+                line.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') window.location.href = findingUrlPrefix + e.finding_pk + '/';
+                });
                 line.addEventListener('click', function () {
                     window.location.href = findingUrlPrefix + e.finding_pk + '/';
                 });
@@ -198,6 +200,7 @@
             if (!p) return;
             var color = KIND_COLOR[n.kind] || '#64748b';
             var g = svg('g', { 'class': 'ap-node', transform: 'translate(' + p.x + ',' + p.y + ')' }, root);
+            svg('title', {}, g).textContent = n.label;
             svg('circle', { r: 18, fill: color, stroke: '#1f2638', 'stroke-width': 2 }, g);
             var lbl = svg('text', {
                 y: 36, 'text-anchor': 'middle', 'font-size': 12,

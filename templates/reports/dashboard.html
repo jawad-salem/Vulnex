@@ -81,6 +81,7 @@
         <div class="report-card__body">
             <div class="report-card__meta">
                 <span class="report-card__badge">{{ r.get_report_type_display }}</span>
+                <span class="badge">{% if r.published_at %}Published to client{% else %}Internal draft{% endif %}</span>
                 {% if group.stacked %}<span class="report-card__count" title="{{ group.stacked|length }} more in this run">+{{ group.stacked|length }}</span>{% endif %}
             </div>
             <div class="report-card__title">{{ r.title|default:r.get_report_type_display }}</div>
@@ -92,6 +93,24 @@
         </div>
         <a href="{% url 'reports:download' r.pk %}" class="btn btn-sm btn-primary report-card__cta">Download PDF</a>
     </article>
+    {% if can_publish %}
+    <details class="report-publication">
+        <summary>{% if r.published_at %}Manage client access{% else %}Publish to client{% endif %}</summary>
+        <form method="post" action="{% url 'reports:publish' r.pk %}">
+            {% csrf_token %}
+            {% if r.published_at %}
+            <p>Published {{ r.published_at|date:"M j, Y H:i" }} by {{ r.published_by|default:"Unknown" }}.</p>
+            <input type="hidden" name="action" value="withdraw">
+            <button class="btn" type="submit">Withdraw client access</button>
+            {% else %}
+            <p>Generated PDFs can contain draft findings and internal context. Review the downloaded file before sharing this version.</p>
+            <input type="hidden" name="action" value="publish">
+            <label><input type="checkbox" name="acknowledged" required> I reviewed this PDF and approve it for client access.</label>
+            <button class="btn btn-primary" type="submit">Publish this PDF</button>
+            {% endif %}
+        </form>
+    </details>
+    {% endif %}
     </div>
     {% if group.stacked %}
     <details class="report-card__stack-list">
@@ -109,7 +128,7 @@
 {% endwith %}
 {% endfor %}
 {% else %}
-<div class="card"><div class="empty-state compact"><p class="text-secondary text-sm">No reports generated yet.</p></div></div>
+<div class="card"><div class="empty-state compact"><p class="text-secondary text-sm">No reports available.</p></div></div>
 {% endif %}
 {% endblock %}
 {% block extra_js %}

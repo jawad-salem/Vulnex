@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Findings — {{ engagement.name }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
@@ -27,80 +28,16 @@
     </div>
 </div>
 
-<div class="filter-bar finding-filters" data-advanced-open="{% if sla_filter or assigned_filter or review_filter %}1{% else %}0{% endif %}">
-    <form method="get" class="finding-filters__form">
-        <div class="finding-filters__row finding-filters__row--primary">
-            <input type="text" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Search findings..." class="form-input search-input finding-filters__search">
-            <select name="severity" class="form-input" data-autosubmit-loading>
-                <option value="">All severities</option>
-                {% for val, label in severity_choices %}
-                <option value="{{ val }}" {% if request.GET.severity == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-            <select name="status" class="form-input" data-autosubmit-loading>
-                <option value="">All statuses</option>
-                {% for val, label in status_choices %}
-                <option value="{{ val }}" {% if request.GET.status == val %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-            <button type="button" class="btn finding-filters__toggle" data-filter-toggle aria-expanded="{% if sla_filter or assigned_filter or review_filter %}true{% else %}false{% endif %}">
-                <span class="finding-filters__toggle-label">More filters</span>
-                {% if sla_filter or assigned_filter or review_filter %}
-                <span class="finding-filters__toggle-dot" aria-hidden="true"></span>
-                {% endif %}
-                <svg class="finding-filters__chevron" viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 6 8 10 12 6"/></svg>
-            </button>
-            <button type="submit" class="btn btn-primary">Filter</button>
-        </div>
-        <div class="finding-filters__row finding-filters__row--advanced" data-filter-panel>
-            <label class="finding-filters__field">
-                <span class="finding-filters__field-label">SLA</span>
-                <select name="sla" class="form-input" data-autosubmit-loading>
-                    <option value="">All SLA</option>
-                    <option value="overdue" {% if sla_filter == 'overdue' %}selected{% endif %}>Overdue</option>
-                    <option value="due_soon" {% if sla_filter == 'due_soon' %}selected{% endif %}>Due soon (≤3d)</option>
-                    <option value="on_track" {% if sla_filter == 'on_track' %}selected{% endif %}>On track</option>
-                </select>
-            </label>
-            <label class="finding-filters__field">
-                <span class="finding-filters__field-label">Assignee</span>
-                <select name="assigned" class="form-input" data-autosubmit-loading>
-                    <option value="">All assignees</option>
-                    <option value="me" {% if assigned_filter == 'me' %}selected{% endif %}>Assigned to me</option>
-                    <option value="unassigned" {% if assigned_filter == 'unassigned' %}selected{% endif %}>Unassigned</option>
-                    {% for m in assignable_members %}
-                    <option value="{{ m.user.pk }}" {% if assigned_filter == m.user.pk|stringformat:"s" %}selected{% endif %}>{{ m.user }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            {% if not is_client %}
-            <label class="finding-filters__field">
-                <span class="finding-filters__field-label">Review</span>
-                <select name="review" class="form-input" data-autosubmit-loading>
-                    <option value="">All review states</option>
-                    {% for val, label in review_choices %}
-                    <option value="{{ val }}" {% if review_filter == val %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            {% endif %}
-        </div>
-    </form>
-</div>
-<script nonce="{{ request.csp_nonce }}">
-(function() {
-    var bar = document.querySelector('.finding-filters');
-    if (!bar) return;
-    var toggle = bar.querySelector('[data-filter-toggle]');
-    var panel = bar.querySelector('[data-filter-panel]');
-    if (!toggle || !panel) return;
-    if (bar.dataset.advancedOpen === '1') bar.classList.add('finding-filters--open');
-    toggle.addEventListener('click', function() {
-        var nowOpen = bar.classList.toggle('finding-filters--open');
-        toggle.setAttribute('aria-expanded', nowOpen ? 'true' : 'false');
-    });
-})();
-</script>
+<nav class="queue-nav" aria-label="Finding queues">
+    <a href="{% url 'vulns:list' engagement.pk %}" {% if not assigned_filter and not review_filter and not retest_filter %}aria-current="page"{% endif %}>All findings</a>
+    {% if not is_client %}
+    <a href="?assigned=me" {% if assigned_filter == 'me' %}aria-current="page"{% endif %}>Assigned to me</a>
+    <a href="?review=in_review" {% if review_filter == 'in_review' %}aria-current="page"{% endif %}>Review</a>
+    {% endif %}
+    <a href="?status=remediated&amp;retest=not_retested" {% if retest_filter == 'not_retested' and request.GET.status == 'remediated' %}aria-current="page"{% endif %}>Retest</a>
+</nav>
+{% include "vulns/partials/list_filters.html" %}
+
 
 <div class="card">
     {% if findings %}
@@ -121,7 +58,7 @@
             {% for f in findings %}
             <tr class="row-link" data-href="{{ f.get_absolute_url }}">
                 <td>
-                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title|truncatechars:54 }}</a>
+                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title }}</a>
                     {% if f.host %}<div class="op-finding-sub">{{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}
                 </td>
                 <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
@@ -147,8 +84,8 @@
     {% else %}
     <div class="empty-state">
         <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <p>No findings yet for this engagement.</p>
-        {% if can_edit %}
+        {% if has_filters %}<p>No findings match these filters.</p><a class="btn" href="{% url 'vulns:list' engagement.pk %}">Clear filters</a>{% else %}<p>No findings yet for this engagement.</p>{% endif %}
+        {% if can_edit and not has_filters %}
         <div class="btn-group" style="justify-content:center">
             <a href="{% url 'vulns:create' engagement.pk %}" class="btn btn-primary">Add first finding</a>
             <a href="{% url 'vulns:import' engagement.pk %}" class="btn">Import from tool</a>
@@ -158,3 +95,5 @@
     {% endif %}
 </div>
 {% endblock %}
+
+{% block extra_js %}<script src="{% static 'js/finding-list.js' %}" defer></script>{% endblock %}

@@ -43,12 +43,12 @@ echo "[entrypoint] collecting static files..."
 python manage.py collectstatic --noinput
 
 echo "[entrypoint] seeding finding templates and methodologies (idempotent)..."
-python manage.py seed_templates || true
-python manage.py seed_methodologies || true
+python manage.py seed_templates
+python manage.py seed_methodologies
 
 if [ "${SEED_DEMO:-0}" = "1" ] || [ "${SEED_DEMO:-}" = "true" ]; then
     echo "[entrypoint] seeding demo data (SEED_DEMO=$SEED_DEMO)..."
-    python manage.py seed_demo || true
+    python manage.py seed_demo
 fi
 
 echo "[entrypoint] ensuring a superuser exists..."
@@ -58,7 +58,10 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(is_superuser=True).exists():
     username = os.environ.get("DJANGO_BOOTSTRAP_USERNAME", "admin")
-    password = os.environ.get("DJANGO_BOOTSTRAP_PASSWORD", "admin1")
+    password = os.environ.get("DJANGO_BOOTSTRAP_PASSWORD", "")
+    if not password:
+        print("[entrypoint] no bootstrap password supplied; use manage.py createsuperuser")
+        raise SystemExit(0)
     email = os.environ.get("DJANGO_BOOTSTRAP_EMAIL", "admin@example.com")
     user = User.objects.create_superuser(username=username, email=email, password=password)
     if hasattr(user, "role"):

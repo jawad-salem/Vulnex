@@ -1,9 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Kill chains — {{ engagement.name }} — Vulnex{% endblock %}
+{% load static %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/killchain.css' %}">{% endblock %}
+{% block title %}Attack paths — {{ engagement.name }} — Vulnex{% endblock %}
 {% block content %}
 <div class="page-header">
     <div>
-        <h1 class="page-title">Kill chains</h1>
+        <h1 class="page-title">Attack paths</h1>
         <p class="page-subtitle">
             <a href="{% url 'engagements:detail' engagement.pk %}">{{ engagement.name }}</a>
             &middot; Document the path you walked from entry to objective for the report
@@ -12,9 +14,9 @@
     <a href="{% url 'engagements:detail' engagement.pk %}" class="btn">Back to engagement</a>
 </div>
 
-<div class="grid-2">
+<div class="path-list-layout">
     <div class="card">
-        <h2 class="card-title">Diagrams ({{ paths.count }})</h2>
+        <h2 class="card-title">Attack paths ({{ paths.count }})</h2>
         {% if paths %}
         <div class="detail-list">
             {% for p in paths %}
@@ -33,7 +35,7 @@
         </div>
         {% else %}
         <div class="empty-state">
-            <p class="text-secondary">No kill-chain diagrams yet.</p>
+            <p class="text-secondary">No attack paths yet.</p>
             <p class="text-xs text-muted mt-2">Sketch the path you walked from initial access to your objective so the report tells the story.</p>
         </div>
         {% endif %}
@@ -41,7 +43,7 @@
 
     {% if can_edit %}
     <div class="card">
-        <h2 class="card-title">New diagram</h2>
+        <h2 class="card-title">New attack path</h2>
         <form method="post">
             {% csrf_token %}
             <div class="form-group">
@@ -54,7 +56,7 @@
                 {{ form.description }}
             </div>
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Create diagram</button>
+                <button type="submit" class="btn btn-primary">Create attack path</button>
             </div>
         </form>
     </div>

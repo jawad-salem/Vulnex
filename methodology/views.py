@@ -1,9 +1,10 @@
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
-from engagements.models import Engagement, ActivityLog
+from engagements.models import ActivityLog
 from .models import Methodology, EngagementChecklist, ChecklistItem
 from accounts.decorators import engagement_access, engagement_edit_required
 
@@ -57,6 +58,7 @@ def methodology_dashboard(request, engagement_pk):
 
 @login_required
 @engagement_edit_required
+@require_POST
 def apply_methodology(request, engagement_pk, methodology_pk):
     engagement = request.engagement
     methodology = get_object_or_404(Methodology, pk=methodology_pk)
@@ -82,6 +84,7 @@ def apply_methodology(request, engagement_pk, methodology_pk):
 
 @login_required
 @engagement_edit_required
+@require_POST
 def update_checklist_item(request, engagement_pk, item_id):
     engagement = request.engagement
     checklist_item = get_object_or_404(ChecklistItem, pk=item_id)
@@ -100,6 +103,9 @@ def update_checklist_item(request, engagement_pk, item_id):
         if new_status == 'completed':
             ec.completed_by = request.user
             ec.completed_at = timezone.now()
+        else:
+            ec.completed_by = None
+            ec.completed_at = None
         ec.save()
 
     return redirect('methodology:dashboard', engagement_pk=engagement_pk)

@@ -72,7 +72,7 @@ class RotateVaultKeyCommandTests(TestCase):
 
         # Rotate to key_b
         with override_settings(VAULT_MASTER_KEY=key_b):
-            call_command('rotate_vault_key', '--old-key', key_a, '--new-key', key_b)
+            call_command('rotate_vault_key', f'--old-key={key_a}', f'--new-key={key_b}')
             cred.refresh_from_db()
             self.assertNotEqual(cred.secret_encrypted, ciphertext_a)
             # Plaintext survives the rotation when read under the new key
@@ -93,7 +93,7 @@ class RotateVaultKeyCommandTests(TestCase):
             original_ct = cred.secret_encrypted
 
         with self.assertRaises(CommandError):
-            call_command('rotate_vault_key', '--old-key', wrong_key, '--new-key', key_b)
+            call_command('rotate_vault_key', f'--old-key={wrong_key}', f'--new-key={key_b}')
 
         # Ciphertext unchanged — rotation was atomic
         cred.refresh_from_db()

@@ -1,6 +1,6 @@
 (function() {
     'use strict';
-    var endpoint = window.MARKDOWN_PREVIEW_URL;
+    var endpoint = document.querySelector('[data-markdown-url]')?.dataset.markdownUrl || window.MARKDOWN_PREVIEW_URL;
     var csrf = document.querySelector('input[name=csrfmiddlewaretoken]');
     if (!endpoint || !csrf) return;
     var token = csrf.value;

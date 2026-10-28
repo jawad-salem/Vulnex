@@ -34,7 +34,9 @@ def _engagement_from_obj(obj):
 
 def _engagement_from_view(view, request):
     """Pick up an engagement id from the URL kwargs for list/create actions."""
-    eng_pk = view.kwargs.get('engagement_pk') or view.kwargs.get('pk')
+    eng_pk = view.kwargs.get('engagement_pk')
+    if getattr(view, 'basename', None) == 'engagement':
+        eng_pk = eng_pk or view.kwargs.get('pk')
     if not eng_pk:
         return None
     try:
@@ -79,28 +81,6 @@ class IsEngagementEditor(BasePermission):
         if request.method in SAFE_METHODS:
             return eng.user_can_access(request.user)
         return eng.user_can_edit(request.user)
-
-
-class IsEngagementReviewer(BasePermission):
-    """Read for any member, write for lead/reviewer (or admin)."""
-
-    def has_permission(self, request, view):
-        if not request.user.is_authenticated:
-            return False
-        eng = _engagement_from_view(view, request)
-        if eng is None:
-            return True
-        if request.method in SAFE_METHODS:
-            return eng.user_can_access(request.user)
-        return eng.user_can_review(request.user)
-
-    def has_object_permission(self, request, view, obj):
-        eng = _engagement_from_obj(obj)
-        if eng is None:
-            return False
-        if request.method in SAFE_METHODS:
-            return eng.user_can_access(request.user)
-        return eng.user_can_review(request.user)
 
 
 class CredentialVaultPermission(BasePermission):

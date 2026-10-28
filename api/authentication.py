@@ -26,10 +26,12 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
         raw = raw.strip()
         if not raw.startswith('vlnx_'):
             raise exceptions.AuthenticationFailed('Malformed API key.')
-        parts = raw.split('_', 2)
-        if len(parts) != 3 or not parts[1] or not parts[2]:
+        # Issued prefixes are exactly eight URL-safe characters. Underscores
+        # are valid inside both prefix and secret, so splitting on '_' can
+        # reject otherwise valid randomly generated keys.
+        if len(raw) < 15 or raw[13] != '_':
             raise exceptions.AuthenticationFailed('Malformed API key.')
-        prefix = parts[1]
+        prefix = raw[5:13]
         try:
             key = APIKey.objects.select_related('user').get(key_prefix=prefix)
         except APIKey.DoesNotExist:

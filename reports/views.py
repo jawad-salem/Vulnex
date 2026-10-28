@@ -4,7 +4,11 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.cache import cache
-from django.http import HttpResponse
+from django.http import HttpResponse, FileResponse, Http404
+from django.views.decorators.http import require_POST
+from django.db import transaction
+from django.utils import timezone
+from .selectors import visible_reports
 from engagements.models import Engagement, ActivityLog
 from .models import Report, ReportTemplate
 from .forms import ReportGenerateForm, ReportTemplateForm
@@ -54,25 +58,16 @@ def _rate_limit_report(user_id: int) -> bool:
 @engagement_access(allow_client=True)
 def report_dashboard(request, engagement_pk):
     engagement = request.engagement
-    reports = list(engagement.reports.all())
-
-    STACK_WINDOW = 60
-    report_groups: list[dict] = []
-    for r in reports:
-        if report_groups:
-            prev = report_groups[-1]
-            same_type = prev['primary'].report_type == r.report_type
-            gap = (prev['primary'].created_at - r.created_at).total_seconds()
-            if same_type and 0 <= gap <= STACK_WINDOW:
-                prev['stacked'].append(r)
-                continue
-        report_groups.append({'primary': r, 'stacked': []})
+    reports = list(visible_reports(request.user, engagement.reports.all()))
+    # Each stored artifact has its own publication state and explicit controls.
+    report_groups = [{'primary': report, 'stacked': []} for report in reports]
 
     generate_form = ReportGenerateForm()
     context = {
         'engagement': engagement,
         'reports': reports,
         'report_groups': report_groups,
+        'can_publish': engagement.user_is_lead(request.user),
         'can_generate': request.eng_role in ('admin', 'lead', 'pentester'),
         'generate_form': generate_form,
         'templates': ReportTemplate.objects.all(),
@@ -82,6 +77,7 @@ def report_dashboard(request, engagement_pk):
 
 @login_required
 @engagement_edit_required
+@require_POST
 def generate_report(request, engagement_pk):
     engagement = request.engagement
     form = ReportGenerateForm(request.POST)
@@ -132,11 +128,14 @@ def generate_report(request, engagement_pk):
 
 @login_required
 def download_report(request, pk):
-    report = get_object_or_404(Report.objects.select_related('engagement'), pk=pk)
-    if not report.engagement.user_can_access(request.user):
-        messages.error(request, 'You are not a member of this engagement.')
-        return redirect('engagements:list')
-    response = HttpResponse(report.file.read(), content_type='application/pdf')
+    report = get_object_or_404(visible_reports(request.user).select_related('engagement'), pk=pk)
+    if not report.file:
+        raise Http404('Report file missing.')
+    try:
+        file = report.file.open('rb')
+    except FileNotFoundError:
+        raise Http404('Report file missing.')
+    response = FileResponse(file, content_type='application/pdf')
     response['Content-Disposition'] = _safe_content_disposition(
         report.file.name.split('/')[-1],
     )
@@ -151,7 +150,7 @@ def download_report(request, pk):
 
 
 @login_required
-@engagement_access(allow_client=True)
+@engagement_access(allow_client=False)
 def preview_report(request, engagement_pk):
     engagement = request.engagement
     report_type = request.GET.get('type', 'full')
@@ -241,3 +240,34 @@ def template_preview(request, pk):
     response = HttpResponse(pdf_bytes, content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="template-cover-preview.pdf"'
     return response
+
+
+@login_required
+@require_POST
+@transaction.atomic
+def publish_report(request, pk):
+    report = get_object_or_404(Report.objects.select_for_update().select_related('engagement'), pk=pk)
+    if not report.engagement.user_is_lead(request.user):
+        return HttpResponse('Only the engagement lead can publish or withdraw reports.', status=403)
+    action = request.POST.get('action')
+    if action == 'publish':
+        if request.POST.get('acknowledged') != 'on':
+            messages.error(request, 'Review this PDF and confirm that it is ready to share with the client.')
+        elif not report.file or not report.file.storage.exists(report.file.name):
+            messages.error(request, 'The report file is missing; generate a new report.')
+        elif not report.published_at:
+            report.published_at = timezone.now()
+            report.published_by = request.user
+            report.save(update_fields=['published_at', 'published_by'])
+            AuditLog.record(actor=request.user, action=AuditLog.Action.REPORT_PUBLICATION, target=str(report.pk), details={'operation':'publish', 'engagement':str(report.engagement_id)}, request=request)
+            messages.success(request, 'This report is now available to client members.')
+    elif action == 'withdraw':
+        if report.published_at:
+            report.published_at = None
+            report.published_by = None
+            report.save(update_fields=['published_at', 'published_by'])
+            AuditLog.record(actor=request.user, action=AuditLog.Action.REPORT_PUBLICATION, target=str(report.pk), details={'operation':'withdraw', 'engagement':str(report.engagement_id)}, request=request)
+            messages.success(request, 'Client access to this report has been withdrawn.')
+    else:
+        return HttpResponse('Invalid publication action.', status=400)
+    return redirect('reports:dashboard', engagement_pk=report.engagement_id)

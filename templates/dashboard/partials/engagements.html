@@ -1,0 +1,34 @@
+<!-- ── Engagements ── -->
+<div class="workspace-section">
+    <div class="card-header">
+        <h2 class="card-title">Engagements</h2>
+        <a href="{% url 'engagements:list' %}" class="card-link">View all →</a>
+    </div>
+    {% if recent_engagements %}
+    <div class="table-wrap">
+        <table class="op-table">
+            <thead><tr><th>Engagement</th><th>Client</th><th>Phase</th><th>Findings</th><th>Window</th></tr></thead>
+            <tbody>
+            {% for e in recent_engagements %}
+            <tr>
+                <td>
+                    <a href="{{ e.get_absolute_url }}" class="op-finding">{{ e.name|truncatechars:40 }}</a>
+                    <div class="op-finding-sub">{{ e.get_engagement_type_display }}</div>
+                </td>
+                <td>{{ e.client_name|default:"—" }}</td>
+                <td><span class="sig {% if e.status == 'exploitation' or e.status == 'post_exploitation' or e.status == 'reporting' %}sig--gold{% elif e.status == 'recon' or e.status == 'scanning' %}sig--blue{% elif e.status == 'completed' %}sig--green{% else %}sig--gray{% endif %}">{{ e.get_status_display }}</span></td>
+                <td class="text-mono">{{ e.visible_finding_count }}</td>
+                <td class="op-window">{% if e.start_date %}{{ e.start_date|date:"M j" }}{% if e.end_date %} – {{ e.end_date|date:"M j, Y" }}{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+        <p>No engagements yet.</p>
+        {% if user.is_pentester %}<a href="{% url 'engagements:create' %}" class="btn btn-primary">Create your first engagement</a>{% endif %}
+    </div>
+    {% endif %}
+</div>

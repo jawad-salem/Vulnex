@@ -1,0 +1,19 @@
+{% if engagement %}
+<nav class="workspace-nav" aria-label="Engagement workspace">
+    <a href="{% url 'engagements:detail' engagement.pk %}" data-workspace-section="engagements">Overview</a>
+    <a href="{% url 'engagements:detail' engagement.pk %}#scope">Scope</a>
+    {% if not is_client_role and not is_client %}
+    <a href="{% url 'recon:dashboard' engagement.pk %}" data-shortcut="r">Assets &amp; recon</a>
+    <a href="{% url 'methodology:dashboard' engagement.pk %}">Testing</a>
+    {% endif %}
+    <a href="{% url 'vulns:list' engagement.pk %}" data-shortcut="f">Findings</a>
+    {% if engagement.engagement_type == 'red_team' %}<a href="{% url 'engagements:attack_path_list' engagement.pk %}">Attack paths</a>{% endif %}
+    <a href="{% url 'reports:dashboard' engagement.pk %}">Reports</a>
+    {% if not is_client_role and not is_client %}
+    <details class="workspace-more"><summary>More</summary><div>
+    <a href="{% url 'credentials:list' engagement.pk %}">Vault</a>
+    </div></details>
+    {% endif %}
+</nav>
+{% if can_edit %}<a hidden data-shortcut="n" href="{% url 'vulns:create' engagement.pk %}">New finding</a>{% endif %}
+{% endif %}

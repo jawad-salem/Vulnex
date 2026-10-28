@@ -1,9 +1,8 @@
 """
 Celery tasks for asynchronous recon scanning, scheduling, and pipelines.
 """
-import json
 import logging
-import socket
+from .scope import current_scope, ScopeViolation
 
 from celery import shared_task
 from django.utils import timezone
@@ -11,30 +10,12 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-def _dedupe_targets_by_ip(targets):
-    """Remove targets that resolve to the same IP, keeping the first seen."""
-    seen_ips = {}
-    unique = []
-    for t in targets:
-        try:
-            ip = socket.gethostbyname(t)
-        except socket.gaierror:
-            unique.append(t)
-            continue
-        if ip not in seen_ips:
-            seen_ips[ip] = t
-            unique.append(t)
-        else:
-            logger.info(f'Skipping {t} — same IP ({ip}) as {seen_ips[ip]}')
-    return unique
-
-
 @shared_task(bind=True, max_retries=2, default_retry_delay=30)
 def run_scan_async(self, scan_id):
     """Run a single ReconScan asynchronously."""
-    from .models import ReconScan, DiscoveredHost
+    from .models import ReconScan
     from .scanners import run_scan
-    from .views import _merge_host
+    from .services import merge_host as _merge_host
 
     try:
         scan = ReconScan.objects.get(pk=scan_id)
@@ -47,7 +28,7 @@ def run_scan_async(self, scan_id):
     scan.save(update_fields=['status', 'started_at'])
 
     try:
-        results = run_scan(scan.scan_type, scan.target)
+        results = run_scan(scan.scan_type, scan.target, engagement_id=scan.engagement_id)
         scan.parsed_results = results
         scan.status = 'completed'
         scan.completed_at = timezone.now()
@@ -103,7 +84,7 @@ def run_pipeline(self, pipeline_id):
     """Execute a scan pipeline — runs steps sequentially, chaining results."""
     from .models import ScanPipeline, ReconScan
     from .scanners import run_scan
-    from .views import _merge_host
+    from .services import merge_host as _merge_host
     from engagements.models import ActivityLog
 
     try:
@@ -128,11 +109,17 @@ def run_pipeline(self, pipeline_id):
             step_results = []
             step_targets = list(targets)  # snapshot current targets
 
-            # Deduplicate by IP for scan steps — no point port-scanning
-            # the same server four times because four subdomains share it
-            if step in ('port_scan', 'tech_detect', 'dir_brute'):
-                step_targets = _dedupe_targets_by_ip(step_targets)
-
+            policy = current_scope(pipeline.engagement_id)
+            policy.check(pipeline.target)
+            blocked = []
+            permitted = []
+            for candidate in step_targets:
+                try:
+                    permitted.append(policy.check(candidate))
+                except ScopeViolation as exc:
+                    blocked.append({'target': candidate, 'reason': str(exc)})
+            step_targets = permitted
+            failed = 0
             for target in step_targets:
                 # Create a ReconScan record for each step+target
                 scan = ReconScan.objects.create(
@@ -146,7 +133,7 @@ def run_pipeline(self, pipeline_id):
                 )
 
                 try:
-                    results = run_scan(step, target)
+                    results = run_scan(step, target, engagement_id=pipeline.engagement_id)
                     scan.parsed_results = results
                     scan.status = 'completed'
                     scan.completed_at = timezone.now()
@@ -161,6 +148,7 @@ def run_pipeline(self, pipeline_id):
                     scan.error_message = str(e)
                     scan.completed_at = timezone.now()
                     scan.save(update_fields=['status', 'error_message', 'completed_at'])
+                    failed += 1
                     logger.warning(f'Pipeline step {step} failed for {target}: {e}')
 
             # Expand targets from subdomain results for subsequent steps
@@ -180,10 +168,14 @@ def run_pipeline(self, pipeline_id):
             results_summary[step] = {
                 'count': len(step_results),
                 'targets_scanned': len(step_targets),
+                'blocked': blocked,
+                'failed': failed,
             }
             # Save incremental results so the detail page shows progress mid-run
             pipeline.results_summary = results_summary
             pipeline.save(update_fields=['results_summary'])
+            if failed:
+                raise ValueError(f'{failed} scan(s) failed in step {step}; see scan errors.')
 
         pipeline.current_step = len(pipeline.steps)
         pipeline.status = 'completed'

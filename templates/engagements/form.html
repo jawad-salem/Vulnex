@@ -81,6 +81,11 @@
             <label for="{{ form.rules_of_engagement.id_for_label }}">Rules of engagement</label>
             {{ form.rules_of_engagement }}
         </div>
+        <div class="form-group">
+            <label for="{{ form.authorization_reference.id_for_label }}">Authorization document reference</label>
+            {{ form.authorization_reference }}
+            <span class="form-help">Document ID, approved version, or location in your document system. Client signing remains outside Vulnex.</span>
+        </div>
     </div>
 
     <div class="form-actions">

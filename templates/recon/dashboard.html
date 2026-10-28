@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Recon — {{ engagement.name }} — Vulnex{% endblock %}
 {% block breadcrumbs %}
 <nav class="breadcrumbs">
@@ -18,7 +19,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15"/></svg>
             Sync
         </a>
-        <button type="button" class="btn btn-primary" data-toggle-panel="newscanPanel" aria-expanded="false">▷ New scan</button>
+        <button type="button" class="btn btn-primary" data-toggle-panel="newscanPanel" aria-expanded="false" aria-controls="newscanPanel">▷ New scan</button>
     </div>
 </div>
 
@@ -32,6 +33,7 @@
 
 <!-- Collapsible "New scan" panel (revealed by the New scan button) -->
 <div class="newscan-panel" id="newscanPanel" hidden>
+    <p class="scan-scope-help">Scans require confirmed scope. Use one hostname or IPv4 address. Hosts must be explicitly in scope; use *.example.com to include subdomains. Exclusions take precedence. URL-only or port-limited scope cannot authorize these host-wide scanners. <a href="{% url 'engagements:detail' engagement.pk %}#scope">Review scope</a></p>
     <div class="grid-2">
         <div class="card">
             <h2 class="card-title mb-4">Single scan</h2>
@@ -55,7 +57,7 @@
     </div>
 </div>
 
-<div class="tabs">
+<div class="tabs" data-tabs>
     <div class="tab-nav" role="tablist">
         <button class="tab-btn active" data-tab="hosts" role="tab">Hosts{% if hosts %} <span class="tab-count">{{ hosts|length }}</span>{% endif %}</button>
         <button class="tab-btn" data-tab="scans" role="tab">Scan jobs{% if scans %} <span class="tab-count">{{ recon_stats.scans_run }}</span>{% endif %}</button>
@@ -178,35 +180,5 @@
 
 {% block extra_js %}
 {{ pipeline_presets|json_script:"pipeline-presets" }}
-<script nonce="{{ request.csp_nonce }}">
-(function() {
-    var tabs = document.querySelectorAll('.tab-btn');
-    var panels = document.querySelectorAll('.tab-panel');
-    function activate(name) {
-        tabs.forEach(function(t) { t.classList.toggle('active', t.dataset.tab === name); });
-        panels.forEach(function(p) { p.classList.toggle('active', p.id === 'tab-' + name); });
-    }
-    tabs.forEach(function(t) { t.addEventListener('click', function() { activate(this.dataset.tab); history.replaceState(null,'','#'+this.dataset.tab); }); });
-    document.querySelectorAll('[data-toggle-panel]').forEach(function(b){
-        b.addEventListener('click', function(){
-            var panel = document.getElementById(this.dataset.togglePanel);
-            if (!panel) return;
-            var willOpen = panel.hasAttribute('hidden');
-            if (willOpen) { panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden', ''); }
-            this.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-            if (willOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        });
-    });
-    var hash = (location.hash || '').replace('#', '');
-    if (hash && document.getElementById('tab-' + hash)) activate(hash);
-
-    var presets = JSON.parse(document.getElementById('pipeline-presets').textContent);
-    var select = document.querySelector('[name="preset"]');
-    var desc = document.getElementById('pipeline-desc');
-    if (select && desc) {
-        function upd() { var p = presets[select.value]; desc.textContent = p ? p.description : ''; }
-        select.addEventListener('change', upd); upd();
-    }
-})();
-</script>
+<script src="{% static 'js/recon-dashboard.js' %}" defer></script>
 {% endblock %}

@@ -1,0 +1,53 @@
+{% load vulns_extras %}
+<!-- ── Comments ── -->
+    <div class="tab-panel" id="tab-comments" role="tabpanel">
+        <div class="card">
+            <h2 class="card-title mb-3">Discussion</h2>
+            {% if comments %}
+            <ul class="discussion">
+                {% for c in comments %}
+                <li class="dcomment{% if c.parent_id %} dcomment--reply{% endif %}{% if c.internal_only %} dcomment--internal{% endif %}{% if c.is_review_feedback %} dcomment--review{% endif %}">
+                    <div class="dcomment__avatar" style="background:{% if c.author %}{{ c.author.avatar_color }}{% else %}var(--text-muted){% endif %}">{% if c.author %}{{ c.author.initials }}{% else %}?{% endif %}</div>
+                    <div class="dcomment__body">
+                        <div class="dcomment__head">
+                            <span class="dcomment__author">{{ c.author|default:"(deleted user)" }}</span>
+                            {% if c.author %}<span class="dcomment__role">{{ c.author.get_role_display }}</span>{% endif %}
+                            <span class="dcomment__time">{{ c.created_at|timesince }} ago{% if c.edited_at %} · edited{% endif %}</span>
+                            {% if c.internal_only %}<span class="badge badge-warn">Internal</span>{% endif %}
+                            {% if c.is_review_feedback %}<span class="badge badge-info">Review</span>{% endif %}
+                        </div>
+                        <div class="dcomment__text prose">{{ c.body|markdown }}</div>
+                        {% if c.user_can_edit or c.user_can_delete %}
+                        <div class="dcomment__actions">
+                            {% if c.user_can_edit %}<a class="text-xs" href="{% url 'vulns:comment_edit' c.pk %}">Edit</a>{% endif %}
+                            {% if c.user_can_delete %}<a class="text-xs text-danger" href="{% url 'vulns:comment_delete' c.pk %}">Delete</a>{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state compact">
+                <div class="empty-state__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+                <p class="empty-state__title">No comments yet</p>
+            </div>
+            {% endif %}
+
+            <form method="post" class="mt-4">
+                {% csrf_token %}
+                <input type="hidden" name="post_comment" value="1">
+                <div class="form-group">
+                    <label for="id_body">Add a comment</label>
+                    {{ comment_form.body }}
+                    {% if comment_form.body.errors %}<span class="form-error">{{ comment_form.body.errors|join:", " }}</span>{% endif %}
+                    <span class="form-help">Markdown supported.</span>
+                </div>
+                <div class="dcomment-form__opts">
+                    {% if comment_form.internal_only %}<label class="checkbox-row">{{ comment_form.internal_only }} Internal only</label>{% endif %}
+                    {% if comment_form.is_review_feedback %}<label class="checkbox-row">{{ comment_form.is_review_feedback }} Review feedback</label>{% endif %}
+                </div>
+                <button type="submit" class="btn btn-primary">Post comment</button>
+            </form>
+        </div>
+    </div>

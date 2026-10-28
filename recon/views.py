@@ -1,14 +1,16 @@
+from .services import merge_host as _merge_host
 import json
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from engagements.models import Engagement, ActivityLog
+from engagements.models import ActivityLog
 from .models import ReconScan, DiscoveredHost, ScheduledScan, ScanPipeline
 from .forms import ReconScanForm, NmapImportForm, DiscoveredHostForm, ScheduledScanForm, ScanPipelineForm
 from .parsers import parse_nmap_xml_to_hosts
 from .scanners import run_scan
+from .scope import validate_scan, ScopeViolation
 from accounts.decorators import engagement_access, engagement_edit_required
 
 
@@ -85,63 +87,6 @@ def recon_dashboard(request, engagement_pk):
     return render(request, 'recon/dashboard.html', context)
 
 
-def _merge_host(engagement, scan, result):
-    """Merge scan result into DiscoveredHost without overwriting other scan data."""
-    hostname = result.get('hostname', result.get('host', ''))
-    if not hostname:
-        return
-
-    host, created = DiscoveredHost.objects.get_or_create(
-        engagement=engagement,
-        hostname=hostname,
-        defaults={
-            'scan': scan,
-            'ip_address': result.get('ip') or None,
-            'ports': result.get('ports', []),
-            'technologies': result.get('technologies', []),
-        }
-    )
-
-    if not created:
-        # Merge rather than replace
-        changed = False
-
-        # Update IP if we got one and existing is empty
-        new_ip = result.get('ip')
-        if new_ip and not host.ip_address:
-            host.ip_address = new_ip
-            changed = True
-
-        # Merge ports (deduplicate by port number)
-        new_ports = result.get('ports', [])
-        if new_ports:
-            existing_port_nums = set()
-            for p in host.ports:
-                if isinstance(p, dict):
-                    existing_port_nums.add(p.get('port'))
-                else:
-                    existing_port_nums.add(p)
-            for p in new_ports:
-                port_num = p.get('port') if isinstance(p, dict) else p
-                if port_num not in existing_port_nums:
-                    host.ports.append(p)
-                    existing_port_nums.add(port_num)
-                    changed = True
-
-        # Merge technologies (deduplicate)
-        new_techs = result.get('technologies', [])
-        if new_techs:
-            existing_techs = set(host.technologies)
-            for t in new_techs:
-                if t not in existing_techs:
-                    host.technologies.append(t)
-                    existing_techs.add(t)
-                    changed = True
-
-        if changed:
-            host.save()
-
-
 @login_required
 @engagement_edit_required
 def start_scan(request, engagement_pk):
@@ -151,6 +96,11 @@ def start_scan(request, engagement_pk):
         if form.is_valid():
             scan_type = form.cleaned_data['scan_type']
             target = form.cleaned_data['target']
+            try:
+                target = validate_scan(engagement.pk, target)
+            except ScopeViolation as exc:
+                messages.error(request, str(exc))
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
 
             # Prevent duplicate: same type + target already completed
             existing = engagement.scans.filter(
@@ -180,7 +130,7 @@ def start_scan(request, engagement_pk):
             scan.save()
 
             try:
-                results = run_scan(scan.scan_type, scan.target)
+                results = run_scan(scan.scan_type, scan.target, engagement_id=engagement.pk)
                 scan.parsed_results = results
                 scan.status = 'completed'
                 scan.completed_at = timezone.now()
@@ -266,6 +216,11 @@ def create_scheduled_scan(request, engagement_pk):
     if request.method == 'POST':
         form = ScheduledScanForm(request.POST)
         if form.is_valid():
+            try:
+                validate_scan(engagement.pk, form.cleaned_data['target'])
+            except ScopeViolation as exc:
+                messages.error(request, str(exc))
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
             ss = form.save(commit=False)
             ss.engagement = engagement
             ss.created_by = request.user
@@ -289,6 +244,12 @@ def toggle_scheduled_scan(request, engagement_pk, pk):
     engagement = request.engagement
     ss = get_object_or_404(ScheduledScan, pk=pk, engagement=engagement)
     if request.method == 'POST':
+        if not ss.is_active:
+            try:
+                validate_scan(engagement.pk, ss.target)
+            except ScopeViolation as exc:
+                messages.error(request, str(exc))
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
         ss.is_active = not ss.is_active
         ss.save(update_fields=['is_active'])
         _sync_periodic_task(ss)
@@ -361,6 +322,11 @@ def start_pipeline(request, engagement_pk):
         if form.is_valid():
             preset_key = form.cleaned_data['preset']
             target = form.cleaned_data['target']
+            try:
+                target = validate_scan(engagement.pk, target)
+            except ScopeViolation as exc:
+                messages.error(request, str(exc))
+                return redirect('recon:dashboard', engagement_pk=engagement_pk)
             preset = ScanPipeline.PIPELINE_PRESETS[preset_key]
 
             pipeline = ScanPipeline.objects.create(
@@ -388,10 +354,10 @@ def start_pipeline(request, engagement_pk):
             except Exception:
                 # Celery not available — run synchronously
                 _run_pipeline_sync(pipeline)
-                messages.success(
-                    request,
-                    f'Pipeline "{preset["name"]}" completed: {pipeline.total_results} results.',
-                )
+                if pipeline.status == 'completed':
+                    messages.success(request, f'Pipeline completed: {pipeline.total_results} results.')
+                else:
+                    messages.error(request, f'Pipeline failed: {pipeline.error_message}')
 
             return redirect('recon:dashboard', engagement_pk=engagement_pk)
     return redirect('recon:dashboard', engagement_pk=engagement_pk)
@@ -402,13 +368,7 @@ def start_pipeline(request, engagement_pk):
 def pipeline_detail(request, engagement_pk, pk):
     engagement = request.engagement
     pipeline = get_object_or_404(ScanPipeline, pk=pk, engagement=engagement)
-    # Get scans that were created by this pipeline (matched by time window)
-    related_scans = engagement.scans.filter(
-        started_by=pipeline.started_by,
-        created_at__gte=pipeline.created_at,
-    )
-    if pipeline.completed_at:
-        related_scans = related_scans.filter(created_at__lte=pipeline.completed_at)
+    related_scans = engagement.scans.filter(pipeline=pipeline)
 
     context = {
         'engagement': engagement,
@@ -419,87 +379,12 @@ def pipeline_detail(request, engagement_pk, pk):
 
 
 def _run_pipeline_sync(pipeline):
-    """Run a pipeline synchronously (fallback when Celery is unavailable)."""
-    from .scanners import run_scan as scanner_run
+    """Use the exact worker execution path when no broker is available."""
+    from .tasks import run_pipeline
+    result = run_pipeline(str(pipeline.pk))
+    pipeline.refresh_from_db()
+    return result
 
-    pipeline.status = 'running'
-    pipeline.started_at = timezone.now()
-    pipeline.save(update_fields=['status', 'started_at'])
-
-    targets = [pipeline.target]
-    results_summary = {}
-
-    try:
-        for i, step in enumerate(pipeline.steps):
-            pipeline.current_step = i
-            pipeline.save(update_fields=['current_step'])
-
-            step_results = []
-            step_targets = list(targets)
-
-            # Deduplicate by IP — skip scanning the same server multiple times
-            if step in ('port_scan', 'tech_detect', 'dir_brute'):
-                from .tasks import _dedupe_targets_by_ip
-                step_targets = _dedupe_targets_by_ip(step_targets)
-
-            for target in step_targets:
-                scan = ReconScan.objects.create(
-                    engagement=pipeline.engagement,
-                    scan_type=step,
-                    target=target,
-                    started_by=pipeline.started_by,
-                    status='running',
-                    started_at=timezone.now(),
-                )
-                try:
-                    results = scanner_run(step, target)
-                    scan.parsed_results = results
-                    scan.status = 'completed'
-                    scan.completed_at = timezone.now()
-                    scan.save(update_fields=['parsed_results', 'status', 'completed_at'])
-                    for result in results:
-                        _merge_host(pipeline.engagement, scan, result)
-                    step_results.extend(results)
-                except Exception as e:
-                    scan.status = 'failed'
-                    scan.error_message = str(e)
-                    scan.completed_at = timezone.now()
-                    scan.save(update_fields=['status', 'error_message', 'completed_at'])
-
-            if step == 'subdomain':
-                for result in step_results:
-                    hostname = result.get('hostname', '')
-                    if hostname and hostname not in targets:
-                        targets.append(hostname)
-
-            if step == 'port_scan':
-                for result in step_results:
-                    host = result.get('host') or result.get('hostname', '')
-                    if host and host not in targets:
-                        targets.append(host)
-
-            results_summary[step] = {
-                'count': len(step_results),
-                'targets_scanned': len(step_targets),
-            }
-            # Save incremental results so the detail page shows progress mid-run
-            pipeline.results_summary = results_summary
-            pipeline.save(update_fields=['results_summary'])
-
-        pipeline.current_step = len(pipeline.steps)
-        pipeline.status = 'completed'
-        pipeline.completed_at = timezone.now()
-        pipeline.save(update_fields=['current_step', 'status', 'completed_at'])
-
-    except Exception as e:
-        pipeline.status = 'failed'
-        pipeline.error_message = str(e)
-        pipeline.completed_at = timezone.now()
-        pipeline.results_summary = results_summary
-        pipeline.save(update_fields=['status', 'error_message', 'completed_at', 'results_summary'])
-
-
-# ── Host management ──
 
 @login_required
 @engagement_access(allow_client=False)

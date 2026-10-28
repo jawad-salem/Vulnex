@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from engagements.models import Engagement
 import uuid
+from vulnex.storage import protected_storage
 
 
 HEX_COLOR_VALIDATOR = RegexValidator(
@@ -80,8 +81,10 @@ class Report(models.Model):
     engagement = models.ForeignKey(Engagement, on_delete=models.CASCADE, related_name='reports')
     title = models.CharField(max_length=300)
     report_type = models.CharField(max_length=20, choices=ReportType.choices, default=ReportType.FULL)
-    file = models.FileField(upload_to='reports/%Y/%m/', blank=True)
+    file = models.FileField(upload_to='reports/%Y/%m/', storage=protected_storage, blank=True)
     generated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='published_reports')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

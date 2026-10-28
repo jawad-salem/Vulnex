@@ -1,0 +1,42 @@
+<!-- ── Triage queue ── -->
+<div class="workspace-section">
+    <div class="card-header">
+        <h2 class="card-title">{{ queue_label }}</h2>
+        <span class="text-muted text-sm">Overdue first, then severity</span>
+    </div>
+    <nav class="queue-nav" aria-label="Your work queues">
+        {% for queue in queue_links %}<a href="?queue={{ queue.key }}" {% if selected_queue == queue.key %}aria-current="page"{% endif %}>{{ queue.label }} <span>{{ queue.count }}</span></a>{% endfor %}
+    </nav>
+    {% if triage_findings %}
+    <div class="table-wrap">
+        <table class="op-table">
+            <thead><tr><th>Finding</th><th>Severity</th><th>CVSS</th><th>SLA</th><th>Assignee</th></tr></thead>
+            <tbody>
+            {% for f in triage_findings %}
+            <tr>
+                <td>
+                    <a href="{{ f.get_absolute_url }}" class="op-finding">{{ f.title }}</a>
+                    {% if f.host %}<div class="op-finding-sub">{{ f.engagement.name }} · {{ f.host }}{% if f.port %}:{{ f.port }}{% endif %}</div>{% endif %}
+                </td>
+                <td><span class="sig sig--{{ f.severity }}">{{ f.get_severity_display }}</span></td>
+                <td><span class="cvss-num" style="color:{{ f.severity_color }}">{{ f.cvss_score|floatformat:1 }}</span></td>
+                <td>
+                    {% if f.sla_status == 'overdue' %}<span class="sig sig--red">overdue</span>
+                    {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold">due soon</span>
+                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td>
+                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "includes/pagination.html" %}
+    {% else %}
+    <div class="empty-state compact"><p class="text-secondary text-sm">Nothing waiting in this queue.</p></div>
+    {% endif %}
+</div>

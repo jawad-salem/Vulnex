@@ -8,11 +8,11 @@ Examples
 --------
 Rotate to a new key (new key read from settings.VAULT_MASTER_KEY)::
 
-    VAULT_MASTER_KEY=<new> python manage.py rotate_vault_key --old-key <old>
+    VAULT_MASTER_KEY=<new> python manage.py rotate_vault_key --old-key=<old>
 
 Explicit both::
 
-    python manage.py rotate_vault_key --old-key <old> --new-key <new>
+    python manage.py rotate_vault_key --old-key=<old> --new-key=<new>
 """
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings

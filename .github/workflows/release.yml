@@ -6,7 +6,10 @@ on:
       - "v*"
 
 jobs:
+  tests:
+    uses: ./.github/workflows/test.yml
   docker:
+    needs: tests
     name: Build and push image to GHCR
     runs-on: ubuntu-latest
     permissions:

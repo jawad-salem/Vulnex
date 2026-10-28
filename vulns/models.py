@@ -1,5 +1,5 @@
 from datetime import timedelta
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.urls import reverse
@@ -342,7 +342,28 @@ class Finding(models.Model):
         instance._loaded_severity = instance.severity
         return instance
 
+    REVIEW_CONTENT_FIELDS = (
+        'title', 'description', 'proof_of_concept', 'remediation', 'references',
+        'host', 'port', 'url', 'endpoint', 'http_method', 'parameter', 'affected_hosts',
+        'cwe_id', 'discovered_host_id', 'attack_vector', 'attack_complexity',
+        'privileges_required', 'user_interaction', 'scope', 'confidentiality_impact',
+        'integrity_impact', 'availability_impact',
+    )
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        # Approval applies to reviewed content, not arbitrary later edits or merges.
+        if not self._state.adding:
+            previous = type(self).objects.select_for_update().filter(pk=self.pk).values('review_state', *self.REVIEW_CONTENT_FIELDS).first()
+            written = kwargs.get('update_fields')
+            fields = [name for name in self.REVIEW_CONTENT_FIELDS if written is None or name in written or name.removesuffix('_id') in written]
+            if previous and previous['review_state'] in ('approved', 'in_review') and any(previous[name] != getattr(self, name) for name in fields):
+                self.review_state = 'draft'
+                self.reviewed_by = None
+                self.reviewed_at = None
+                self.review_notes = ''
+                if written is not None:
+                    kwargs['update_fields'] = set(written) | {'review_state', 'reviewed_by', 'reviewed_at', 'review_notes'}
         self.calculate_cvss()
         # Auto-set severity from CVSS
         if self.cvss_score >= 9.0:

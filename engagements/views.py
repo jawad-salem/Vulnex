@@ -1,3 +1,7 @@
+from .services import create_engagement, ensure_scope_editable
+from .selectors import engagement_work_queue, attack_path_context
+from django.core.exceptions import ValidationError
+from django.views.decorators.http import require_POST
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -155,6 +159,7 @@ def engagement_detail(request, pk):
         'sev_counts': sev_counts,
         'finding_total': finding_total,
         'resolved_count': resolved_count,
+        'work_queue': engagement_work_queue(engagement, request.user),
     }
     return render(request, 'engagements/detail.html', context)
 
@@ -166,25 +171,7 @@ def engagement_create(request):
         form = EngagementForm(request.POST)
         if form.is_valid():
             engagement = form.save(commit=False)
-            engagement.created_by = request.user
-            engagement.save()
-            # Auto-add creator as Lead
-            EngagementMember.objects.create(
-                engagement=engagement,
-                user=request.user,
-                role=EngagementMember.Role.LEAD,
-            )
-            ActivityLog.objects.create(
-                engagement=engagement, user=request.user,
-                action='Created engagement'
-            )
-            AuditLog.record(
-                actor=request.user,
-                action=AuditLog.Action.ENGAGEMENT_CREATE,
-                target=engagement.name,
-                details={'client': engagement.client_name, 'type': engagement.engagement_type},
-                request=request,
-            )
+            create_engagement(actor=request.user, engagement=engagement)
             messages.success(request, f'Engagement "{engagement.name}" created.')
             return redirect('engagements:detail', pk=engagement.pk)
     else:
@@ -197,14 +184,13 @@ def engagement_create(request):
 
 @login_required
 @engagement_edit_required
+@transaction.atomic
 def engagement_edit(request, pk):
-    engagement = request.engagement
-    if engagement.roe_signed_off:
-        messages.error(
-            request,
-            'Scope & rules of engagement are signed off and locked. '
-            'A lead must revoke the sign-off before editing.',
-        )
+    engagement = Engagement.objects.select_for_update().get(pk=request.engagement.pk)
+    try:
+        ensure_scope_editable(engagement)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0])
         return redirect('engagements:detail', pk=pk)
     if request.method == 'POST':
         form = EngagementForm(request.POST, instance=engagement)
@@ -250,6 +236,7 @@ def engagement_delete(request, pk):
 
 @login_required
 @engagement_edit_required
+@require_POST
 def engagement_update_status(request, pk):
     engagement = request.engagement
     new_status = request.POST.get('status')
@@ -268,38 +255,18 @@ def engagement_update_status(request, pk):
 @login_required
 @engagement_access()
 def toggle_roe_signoff(request, pk):
-    """Lead-only: sign off the rules of engagement (locking scope/RoE edits)
-    or revoke an existing sign-off."""
-    engagement = request.engagement
-    if not engagement.user_is_lead(request.user):
-        messages.error(request, 'Only the engagement lead can sign off the rules of engagement.')
-        return redirect('engagements:detail', pk=pk)
-    if request.method == 'POST':
-        if engagement.roe_signed_off:
-            engagement.roe_signed_off = False
-            engagement.roe_signed_off_by = None
-            engagement.roe_signed_off_at = None
-            engagement.save(update_fields=[
-                'roe_signed_off', 'roe_signed_off_by', 'roe_signed_off_at', 'updated_at',
-            ])
-            ActivityLog.objects.create(
-                engagement=engagement, user=request.user,
-                action='Revoked rules-of-engagement sign-off',
-            )
-            messages.success(request, 'Sign-off revoked — scope & RoE can be edited again.')
-        else:
-            engagement.roe_signed_off = True
-            engagement.roe_signed_off_by = request.user
-            engagement.roe_signed_off_at = timezone.now()
-            engagement.save(update_fields=[
-                'roe_signed_off', 'roe_signed_off_by', 'roe_signed_off_at', 'updated_at',
-            ])
-            ActivityLog.objects.create(
-                engagement=engagement, user=request.user,
-                action='Signed off the rules of engagement',
-            )
-            messages.success(request, 'Rules of engagement signed off — scope & RoE are now locked.')
+    from .services import confirm_scope
     from django.urls import reverse
+    if not request.engagement.user_is_lead(request.user):
+        return HttpResponse('Only the engagement lead can confirm scope.', status=403)
+    if request.method == 'POST':
+        try:
+            confirm_scope(actor=request.user, engagement=request.engagement,
+                          action=request.POST.get('action'), acknowledged=request.POST.get('acknowledged') == 'on',
+                          reason=request.POST.get('reason', ''))
+            messages.success(request, 'Scope confirmation updated.')
+        except ValidationError as exc:
+            messages.error(request, ' '.join(exc.messages))
     return redirect(reverse('engagements:detail', kwargs={'pk': pk}) + '#scope')
 
 
@@ -848,6 +815,14 @@ def attack_path_detail(request, pk, path_pk):
 
     can_edit = request.eng_role in ('admin', 'lead', 'pentester')
 
+    path_form = AttackPathForm(request.POST if request.method == 'POST' else None, instance=path)
+    if request.method == 'POST':
+        if not can_edit:
+            return HttpResponse('Editing is not permitted.', status=403)
+        if path_form.is_valid():
+            path_form.save()
+            ActivityLog.objects.create(engagement=engagement, user=request.user, action=f'Updated attack path: {path.name}'[:200])
+            return redirect('engagements:attack_path_detail', pk=pk, path_pk=path.pk)
     node_form = AttackPathNodeForm(engagement=engagement)
     edge_form = AttackPathEdgeForm(path=path)
 
@@ -857,6 +832,8 @@ def attack_path_detail(request, pk, path_pk):
         'node_form': node_form,
         'edge_form': edge_form,
         'kind_choices': AttackPathNode.Kind.choices,
+        'path_form': path_form,
+        **attack_path_context(path, request.user),
         'can_edit': can_edit,
     })
 
@@ -892,7 +869,7 @@ def attack_path_data(request, pk, path_pk):
             'finding_pk': str(e.finding_id) if e.finding_id else None,
             'finding_title': e.finding.title if e.finding_id else None,
         }
-        for e in path.edges.select_related('finding').all()
+        for e in attack_path_context(path, request.user)['path_edges']
     ]
     return JsonResponse({'nodes': nodes, 'edges': edges})
 
@@ -943,11 +920,12 @@ def attack_path_node_delete(request, pk, path_pk, node_pk):
 
 @login_required
 @engagement_edit_required
+@transaction.atomic
 def attack_path_edge_create(request, pk, path_pk):
     engagement = request.engagement
     if not _require_red_team(engagement):
         return redirect('engagements:detail', pk=engagement.pk)
-    path = _get_path(engagement, path_pk)
+    path = get_object_or_404(AttackPath.objects.select_for_update(), engagement=engagement, pk=path_pk)
     if request.method != 'POST':
         return redirect('engagements:attack_path_detail', pk=engagement.pk, path_pk=path.pk)
     form = AttackPathEdgeForm(request.POST, path=path)
