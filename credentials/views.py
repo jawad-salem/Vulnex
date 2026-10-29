@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse, HttpResponseBadRequest
+from django.views.decorators.cache import never_cache
 
 from accounts.decorators import engagement_access, engagement_edit_required
 from accounts.models import AuditLog
@@ -157,6 +158,7 @@ def credential_delete(request, engagement_pk, pk):
     })
 
 
+@never_cache
 @login_required
 @engagement_access(allow_client=False)
 def credential_reveal(request, engagement_pk, pk):

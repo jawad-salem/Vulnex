@@ -6,6 +6,8 @@ from rest_framework.exceptions import ValidationError
 from vulns.services.workflow import visible_findings, transition_review
 from drf_spectacular.utils import extend_schema
 from django.http import FileResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -147,6 +149,7 @@ class DiscoveredHostViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
 
+@method_decorator(never_cache, name='dispatch')
 class CredentialViewSet(viewsets.ModelViewSet):
     serializer_class = CredentialSerializer
     permission_classes = [CredentialVaultPermission]

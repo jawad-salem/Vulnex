@@ -17,6 +17,6 @@ django-csp>=4.0,<5.0
 djangorestframework>=3.15
 djangorestframework-simplejwt>=5.3
 drf-spectacular>=0.27
-bleach==6.3.0
+bleach==6.4.0
 markdown>=3.6
 

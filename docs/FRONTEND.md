@@ -146,3 +146,12 @@ Path publication/versioning and per-objective execution outcomes remain future w
 Apply the new migrations before running the updated application:
 `python manage.py migrate`. Production static files also require `collectstatic`.
 Validation uses the disposable test database; project data is not migrated by tests.
+
+
+## Reading and navigation refinements
+
+Workspace navigation exposes Vault directly for internal members. Work queues use
+one consistent selected state; routine on-track labels and dashboard assignee
+markers are neutral so severity and overdue work stand out. Table headers use
+sentence case, secondary finding text uses the UI font, and finding prose is 15px
+with a bounded reading width. Preserve those distinctions when adding screens.

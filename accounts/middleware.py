@@ -17,15 +17,14 @@ ALLOWED_PATH_PREFIXES = (
     '/media/',
     '/accounts/logout/',
     '/accounts/login/',
-    '/accounts/mfa/',
-    # JWT-bootstrap and schema only. The schema endpoint is needed because the
-    # docs UI fetches it during render. Every other /api/v1/ path is gated:
+    '/accounts/mfa/setup/',
+    '/accounts/mfa/verify/',
+    # JWT bootstrap only. Every other API path follows session MFA policy:
     # session-authed users land here as request.user, get redirected to MFA
     # setup; JWT/API-key clients hit Django middleware as AnonymousUser (DRF
     # authenticates per-request, after middleware) and pass through.
     '/api/v1/auth/token/',
     '/api/v1/auth/token/refresh/',
-    '/api/schema/',
 )
 
 
@@ -36,15 +35,17 @@ class MFARequiredMiddleware:
     def __call__(self, request):
         user = getattr(request, 'user', None)
         required = getattr(settings, 'MFA_REQUIRED_ROLES', [])
-        if (
-            user is not None
-            and user.is_authenticated
-            and getattr(user, 'role', None) in required
-            and not user_has_device(user, confirmed=True)
-        ):
+        if user is not None and user.is_authenticated:
             path = request.path
             if not any(path.startswith(p) for p in ALLOWED_PATH_PREFIXES):
-                return redirect('accounts:mfa_setup')
+                enrolled = user_has_device(user, confirmed=True)
+                if getattr(user, 'role', None) in required and not enrolled:
+                    return redirect('accounts:mfa_setup')
+                if enrolled and not user.is_verified():
+                    from django.contrib.auth import logout
+                    from django.contrib.auth.views import redirect_to_login
+                    logout(request)
+                    return redirect_to_login(request.get_full_path())
         return self.get_response(request)
 
 

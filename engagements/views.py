@@ -1,3 +1,4 @@
+from .selectors import assignable_clients
 from .services import create_engagement, ensure_scope_editable
 from .selectors import engagement_work_queue, attack_path_context
 from django.core.exceptions import ValidationError
@@ -168,17 +169,17 @@ def engagement_detail(request, pk):
 @role_required('admin', 'pentester')
 def engagement_create(request):
     if request.method == 'POST':
-        form = EngagementForm(request.POST)
+        form = EngagementForm(request.POST, user=request.user)
         if form.is_valid():
             engagement = form.save(commit=False)
             create_engagement(actor=request.user, engagement=engagement)
             messages.success(request, f'Engagement "{engagement.name}" created.')
             return redirect('engagements:detail', pk=engagement.pk)
     else:
-        form = EngagementForm()
+        form = EngagementForm(user=request.user)
     return render(request, 'engagements/form.html', {
         'form': form, 'title': 'New engagement',
-        'existing_clients': Client.objects.all(),
+        'existing_clients': assignable_clients(request.user),
     })
 
 
@@ -193,7 +194,7 @@ def engagement_edit(request, pk):
         messages.error(request, exc.messages[0])
         return redirect('engagements:detail', pk=pk)
     if request.method == 'POST':
-        form = EngagementForm(request.POST, instance=engagement)
+        form = EngagementForm(request.POST, instance=engagement, user=request.user)
         if form.is_valid():
             form.save()
             ActivityLog.objects.create(
@@ -203,10 +204,10 @@ def engagement_edit(request, pk):
             messages.success(request, 'Engagement updated.')
             return redirect('engagements:detail', pk=pk)
     else:
-        form = EngagementForm(instance=engagement)
+        form = EngagementForm(instance=engagement, user=request.user)
     return render(request, 'engagements/form.html', {
         'form': form, 'title': 'Edit engagement', 'engagement': engagement,
-        'existing_clients': Client.objects.all(),
+        'existing_clients': assignable_clients(request.user),
     })
 
 
@@ -683,7 +684,7 @@ def client_create(request):
 
 @login_required
 def client_edit(request, pk):
-    client = get_object_or_404(Client, pk=pk)
+    client = get_object_or_404(_clients_visible_to(request.user), pk=pk)
     if not _can_manage_clients(request.user):
         messages.error(request, 'You do not have permission to edit clients.')
         return redirect('engagements:client_detail', pk=pk)

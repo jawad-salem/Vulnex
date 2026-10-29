@@ -165,6 +165,14 @@ class FindingCommentForm(forms.ModelForm):
 
 
 class ToolImportForm(forms.Form):
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+
+    def clean_file(self):
+        upload = self.cleaned_data['file']
+        if upload.size > self.MAX_FILE_SIZE:
+            raise forms.ValidationError('Scanner imports must be 10 MB or smaller.')
+        return upload
+
     TOOL_CHOICES = [
         ('nuclei', 'Nuclei JSON'),
         ('nikto', 'Nikto JSON'),

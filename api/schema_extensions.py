@@ -23,3 +23,11 @@ class APIKeyAuthenticationScheme(OpenApiAuthenticationExtension):
                 'vlnx_<prefix>_<secret>`.'
             ),
         }
+
+
+class SecureJWTScheme(OpenApiAuthenticationExtension):
+    target_class = 'api.authentication.SecureJWTAuthentication'
+    name = 'jwtAuth'
+
+    def get_security_definition(self, auto_schema):
+        return {'type': 'http', 'scheme': 'bearer', 'bearerFormat': 'JWT'}

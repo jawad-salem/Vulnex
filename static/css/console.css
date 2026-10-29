@@ -9,18 +9,10 @@
     flex-wrap: wrap;
     margin-bottom: 22px;
 }
-.op-kicker {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 6px;
-}
 .op-greeting {
     font-family: var(--font);
     font-size: 26px;
-    font-weight: 800;
+    font-weight: 650;
     letter-spacing: -0.02em;
     color: var(--text-primary);
     line-height: 1.1;
@@ -46,17 +38,17 @@
 }
 .opstat:last-child { border-right: 0; }
 .opstat-label {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
     color: var(--text-muted);
     margin-bottom: 8px;
 }
 .opstat-value {
     font-family: var(--font);
     font-size: 30px;
-    font-weight: 800;
+    font-weight: 650;
     line-height: 1;
     letter-spacing: -0.02em;
     color: var(--text-primary);
@@ -95,11 +87,13 @@
 .card-link:hover { color: var(--accent-light); }
 
 /* Operator tables */
-.op-table th { padding: 8px 14px; }
+.op-table th { padding: 10px 14px; font-size:12px; text-transform:none; letter-spacing:0; background:var(--bg-secondary); }
+.op-table tbody tr:focus-within td { background:var(--bg-hover); }
+.status-on-track { color:var(--text-secondary); font-size:12px; white-space:nowrap; }
 .op-table td { padding: 12px 14px; vertical-align: middle; }
-.op-finding { font-weight: 600; font-size: 13.5px; color: var(--text-primary); }
+.op-finding { font-weight: 600; font-size: 14px; color: var(--text-primary); }
 .op-finding:hover { color: var(--accent); }
-.op-finding-sub { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.op-finding-sub { font-family: var(--font); font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 .op-window { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
 .cvss-num { font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
 
@@ -129,8 +123,10 @@
 .sig--blue     { color: var(--low);      background: color-mix(in srgb, var(--low) 15%, transparent); }
 .sig--gray     { color: var(--text-secondary); background: color-mix(in srgb, var(--text-secondary) 13%, transparent); }
 
-/* Mini avatar (table assignee) */
+/* Neutral assignee markers keep severity as the strongest table signal. */
 .mini-avatar {
+    background:var(--bg-tertiary);
+    border:1px solid var(--border);
     width: 26px;
     height: 26px;
     border-radius: 7px;
@@ -350,7 +346,7 @@
     margin-bottom: 18px;
 }
 .eng-detail-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.eng-detail-title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.eng-detail-title { font-size: 24px; font-weight: 650; letter-spacing: -0.02em; }
 .eng-detail-meta {
     display: flex;
     align-items: center;

@@ -79,8 +79,6 @@
         if (!current) current = links.find(link => new URL(link.href).pathname.split('/')[1] === location.pathname.split('/')[1]);
         if (current) {
             current.setAttribute('aria-current', 'page');
-            const more = current.closest('details');
-            if (more) more.open = true;
         }
     }
     markWorkspace();

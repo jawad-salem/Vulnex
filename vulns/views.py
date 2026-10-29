@@ -1,6 +1,8 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 from .services.workflow import transition_review, visible_findings
 import csv
+from vulnex.exports import csv_cell
+from django.utils.http import content_disposition_header
 import json
 from datetime import datetime, time, timedelta
 from django.shortcuts import render, get_object_or_404, redirect
@@ -775,15 +777,13 @@ def export_csv(request, engagement_pk):
         findings = findings.filter(review_state=Finding.ReviewState.APPROVED)
 
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.csv"'
+    response['Content-Disposition'] = content_disposition_header(True, f'{engagement.name}_findings.csv')
 
     writer = csv.writer(response)
     writer.writerow(EXPORT_FIELDS)
     for f in findings:
         writer.writerow([
-            getattr(f, field) if field != 'cvss_vector_string'
-            else f.cvss_vector_string
-            for field in EXPORT_FIELDS
+            csv_cell(getattr(f, field)) for field in EXPORT_FIELDS
         ])
     return response
 
@@ -810,7 +810,7 @@ def export_json(request, engagement_pk):
         json.dumps(data, indent=2),
         content_type='application/json',
     )
-    response['Content-Disposition'] = f'attachment; filename="{engagement.name}_findings.json"'
+    response['Content-Disposition'] = content_disposition_header(True, f'{engagement.name}_findings.json')
     return response
 
 

@@ -1,6 +1,13 @@
 import base64
 import csv
+from vulnex.exports import csv_cell
 import io
+
+from django.core import signing
+from django.utils.crypto import constant_time_compare
+from django.db import transaction
+from django.views.decorators.cache import never_cache
+from .mfa import verify_code
 
 import qrcode
 from django.conf import settings
@@ -10,7 +17,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django_otp import devices_for_user, user_has_device
+from django_otp import user_has_device, login as otp_login
 from django_otp.plugins.otp_static.models import StaticDevice, StaticToken
 from django_otp.plugins.otp_totp.models import TOTPDevice
 
@@ -33,6 +40,9 @@ class CustomLoginView(LoginView):
         user = form.get_user()
         if user_has_device(user, confirmed=True):
             # Defer auth_login() until the second factor is verified.
+            self.request.session.cycle_key()
+            self.request.session['mfa_pending_proof'] = signing.dumps(
+                user.get_session_auth_hash(), salt='mfa-password-proof')
             self.request.session['mfa_pending_user_id'] = user.pk
             self.request.session['mfa_pending_backend'] = getattr(
                 user, 'backend', 'django.contrib.auth.backends.ModelBackend',
@@ -100,14 +110,16 @@ def _qr_png_data_uri(totp_device):
     return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
 
 
+@never_cache
 @login_required
+@transaction.atomic
 def mfa_setup(request):
     existing = TOTPDevice.objects.filter(user=request.user, confirmed=True).first()
     if existing:
         messages.info(request, 'MFA is already enabled.')
         return redirect('accounts:profile')
 
-    device, _ = TOTPDevice.objects.get_or_create(
+    device, _ = TOTPDevice.objects.select_for_update().get_or_create(
         user=request.user, confirmed=False,
         defaults={'name': 'default'},
     )
@@ -119,6 +131,7 @@ def mfa_setup(request):
             if device.verify_token(code):
                 device.confirmed = True
                 device.save()
+                otp_login(request, device)
                 static_device, _ = StaticDevice.objects.get_or_create(
                     user=request.user, name='backup',
                 )
@@ -150,6 +163,7 @@ def mfa_setup(request):
     })
 
 
+@never_cache
 def mfa_verify(request):
     pending_pk = request.session.get('mfa_pending_user_id')
     if not pending_pk:
@@ -161,16 +175,29 @@ def mfa_verify(request):
         request.session.pop('mfa_pending_user_id', None)
         return redirect('accounts:login')
 
+    try:
+        proof = signing.loads(request.session.get('mfa_pending_proof', ''),
+                              salt='mfa-password-proof', max_age=300)
+        valid_proof = constant_time_compare(proof, user.get_session_auth_hash())
+    except signing.BadSignature:
+        valid_proof = False
+    if not valid_proof:
+        for key in ('mfa_pending_user_id', 'mfa_pending_backend', 'mfa_pending_proof', 'mfa_next'):
+            request.session.pop(key, None)
+        return redirect('accounts:login')
+
     if request.method == 'POST':
         form = MFACodeForm(request.POST)
         if form.is_valid():
             code = form.cleaned_data['code'].strip()
-            matched = any(d.verify_token(code) for d in devices_for_user(user, confirmed=True))
+            matched = verify_code(user, code)
             if matched:
                 user.backend = request.session.pop(
                     'mfa_pending_backend', 'django.contrib.auth.backends.ModelBackend',
                 )
                 auth_login(request, user)
+                otp_login(request, matched)
+                request.session.pop('mfa_pending_proof', None)
                 next_url = request.session.pop('mfa_next', None) or settings.LOGIN_REDIRECT_URL
                 request.session.pop('mfa_pending_user_id', None)
                 return redirect(next_url)
@@ -189,6 +216,7 @@ def mfa_verify(request):
     })
 
 
+@never_cache
 @login_required
 def mfa_disable(request):
     required = getattr(settings, 'MFA_REQUIRED_ROLES', [])
@@ -350,9 +378,9 @@ def audit_log(request):
         for log in logs_qs[:5000]:
             writer.writerow([
                 log.timestamp.isoformat(),
-                log.actor.username if log.actor else 'system',
+                csv_cell(log.actor.username) if log.actor else 'system',
                 log.get_action_display(),
-                log.target,
+                csv_cell(log.target),
                 log.details,
             ])
         return response
@@ -367,6 +395,7 @@ def audit_log(request):
     })
 
 
+@never_cache
 @login_required
 def api_key_list(request):
     keys = APIKey.objects.filter(user=request.user)
@@ -376,6 +405,7 @@ def api_key_list(request):
     })
 
 
+@never_cache
 @login_required
 def api_key_create(request):
     if request.method != 'POST':

@@ -86,3 +86,15 @@ def attack_path_context(path, user):
     if nodes and any(n.pk not in reached for n in nodes): issues.append('Some nodes are not reachable from an entry point.')
     return {'path_nodes': nodes, 'path_edges': edges, 'path_issues': issues,
             'path_objectives': objectives, 'path_connected': bool(nodes) and not issues}
+
+
+def assignable_clients(user):
+    """Existing client linkage cannot grant access to another team's records."""
+    from django.db.models import Q
+    from .models import Client
+    if user.role == 'admin':
+        return Client.objects.all()
+    return Client.objects.filter(
+        Q(engagements__isnull=True) |
+        Q(engagements__members__user=user, engagements__members__role='lead')
+    ).distinct()

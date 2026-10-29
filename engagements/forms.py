@@ -81,7 +81,8 @@ class EngagementForm(forms.ModelForm):
             'rules_of_engagement': forms.Textarea(attrs={'rows': 4}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        self.actor = user
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk and self.instance.client_id:
             self.fields['client_name'].initial = self.instance.client.name
@@ -102,6 +103,11 @@ class EngagementForm(forms.ModelForm):
         name = (self.cleaned_data.get('client_name') or '').strip()
         if not name:
             raise forms.ValidationError('Client is required.')
+        if self.actor:
+            from .selectors import assignable_clients
+            existing = Client.objects.filter(name__iexact=name).first()
+            if existing and not assignable_clients(self.actor).filter(pk=existing.pk).exists():
+                raise forms.ValidationError('This client is not available for this engagement.')
         return name
 
     def save(self, commit=True):

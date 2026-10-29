@@ -64,7 +64,7 @@ def render_markdown(raw: str) -> str:
         protocols=ALLOWED_PROTOCOLS,
         strip=True,
     )
-    clean = bleach.linkify(clean, parse_email=True)
+    clean = bleach.linkify(clean, parse_email=False)
     return clean
 
 

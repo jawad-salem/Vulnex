@@ -325,14 +325,14 @@ class APIMFAGateTests(TestCase):
         self.assertEqual(resp.status_code, 401)
         self.assertIn('MFA setup', resp.json().get('detail', ''))
 
-    def test_token_issued_with_confirmed_totp_device(self):
+    def test_token_requires_code_even_with_confirmed_totp_device(self):
         from django_otp.plugins.otp_totp.models import TOTPDevice
         TOTPDevice.objects.create(user=self.user, name='dev', confirmed=True)
         resp = self.api.post('/api/v1/auth/token/', {
             'username': 'pt', 'password': 'pw',
         }, format='json')
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn('access', resp.json())
+        self.assertEqual(resp.status_code, 401)
+        self.assertNotIn('access', resp.json())
 
     def test_unconfirmed_totp_device_does_not_satisfy_gate(self):
         from django_otp.plugins.otp_totp.models import TOTPDevice

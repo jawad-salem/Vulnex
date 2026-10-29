@@ -19,11 +19,11 @@
     <div class="opstat">
         <div class="opstat-label">Awaiting review</div>
         <div class="opstat-value">{{ awaiting_review }}</div>
-        <div class="opstat-sub">in QA queue</div>
+        <div class="opstat-sub">waiting for peer review</div>
     </div>
     {% endif %}
     <div class="opstat">
-        <div class="opstat-label">SLA overdue</div>
+        <div class="opstat-label">Overdue findings</div>
         <div class="opstat-value {% if overdue_count %}is-warn{% endif %}">{{ overdue_count }}</div>
         <div class="opstat-sub {% if overdue_count %}is-warn{% endif %}">{% if overdue_count %}past due date{% else %}all on track{% endif %}</div>
     </div>

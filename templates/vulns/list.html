@@ -66,13 +66,13 @@
                 <td><span class="badge badge-{{ f.status }}">{{ f.get_status_display }}</span></td>
                 {% if not is_client %}<td><span class="badge badge-{{ f.review_state }}">{{ f.get_review_state_display }}</span></td>{% endif %}
                 <td>
-                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
+                    {% if f.assigned_to %}<span class="mini-avatar" role="img" aria-label="Assigned to {{ f.assigned_to }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
                     {% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
                 <td>
                     {% if f.sla_status == 'overdue' %}<span class="sig sig--red" title="Due {{ f.due_date|date:'M d, Y' }}">overdue</span>
                     {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold" title="Due {{ f.due_date|date:'M d, Y' }}">due soon</span>
-                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
+                    {% elif f.sla_status == 'on_track' %}<span class="status-on-track">On track</span>
                     {% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
             </tr>

@@ -4,6 +4,10 @@ Clients authenticate by sending ``Authorization: ApiKey vlnx_<prefix>_<secret>``
 The raw key is never stored — only the SHA-256 hash and a non-secret prefix
 used to pick the right row. See ``accounts.models.APIKey`` for key issuance.
 """
+from django.conf import settings
+from django_otp import user_has_device
+from django_otp.models import Device
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.utils import timezone
 from rest_framework import authentication, exceptions
 
@@ -48,3 +52,19 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
 
     def authenticate_header(self, request):
         return self.keyword
+
+
+class SecureJWTAuthentication(JWTAuthentication):
+    def get_user(self, validated_token):
+        user = super().get_user(validated_token)
+        if validated_token.get('auth_version') != 2:
+            raise exceptions.AuthenticationFailed('Please sign in again.')
+        enrolled = user_has_device(user, confirmed=True)
+        if user.role in settings.MFA_REQUIRED_ROLES and not enrolled:
+            raise exceptions.AuthenticationFailed('MFA setup is required.')
+        device_id = validated_token.get('otp_device')
+        if enrolled or device_id:
+            device = Device.from_persistent_id(device_id) if device_id else None
+            if device is None or device.user_id != user.pk or not device.confirmed:
+                raise exceptions.AuthenticationFailed('MFA verification is required. Please sign in again.')
+        return user

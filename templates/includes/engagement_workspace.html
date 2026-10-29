@@ -10,9 +10,7 @@
     {% if engagement.engagement_type == 'red_team' %}<a href="{% url 'engagements:attack_path_list' engagement.pk %}">Attack paths</a>{% endif %}
     <a href="{% url 'reports:dashboard' engagement.pk %}">Reports</a>
     {% if not is_client_role and not is_client %}
-    <details class="workspace-more"><summary>More</summary><div>
-    <a href="{% url 'credentials:list' engagement.pk %}">Vault</a>
-    </div></details>
+    <a class="workspace-vault" href="{% url 'credentials:list' engagement.pk %}">Vault</a>
     {% endif %}
 </nav>
 {% if can_edit %}<a hidden data-shortcut="n" href="{% url 'vulns:create' engagement.pk %}">New finding</a>{% endif %}

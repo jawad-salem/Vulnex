@@ -10,7 +10,7 @@
     {% if triage_findings %}
     <div class="table-wrap">
         <table class="op-table">
-            <thead><tr><th>Finding</th><th>Severity</th><th>CVSS</th><th>SLA</th><th>Assignee</th></tr></thead>
+            <thead><tr><th>Finding</th><th>Severity</th><th>CVSS</th><th>Due status</th><th>Assignee</th></tr></thead>
             <tbody>
             {% for f in triage_findings %}
             <tr>
@@ -23,11 +23,11 @@
                 <td>
                     {% if f.sla_status == 'overdue' %}<span class="sig sig--red">overdue</span>
                     {% elif f.sla_status == 'due_soon' %}<span class="sig sig--gold">due soon</span>
-                    {% elif f.sla_status == 'on_track' %}<span class="sig sig--green">on track</span>
+                    {% elif f.sla_status == 'on_track' %}<span class="status-on-track">On track</span>
                     {% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
                 <td>
-                    {% if f.assigned_to %}<span class="mini-avatar" style="background:{{ f.assigned_to.avatar_color }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
+                    {% if f.assigned_to %}<span class="mini-avatar" role="img" aria-label="Assigned to {{ f.assigned_to }}" title="{{ f.assigned_to }}">{{ f.assigned_to.initials }}</span>
                     {% else %}<span class="text-muted">—</span>{% endif %}
                 </td>
             </tr>

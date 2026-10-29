@@ -25,6 +25,14 @@ class ReconScanForm(forms.ModelForm):
 
 
 class NmapImportForm(forms.Form):
+    MAX_FILE_SIZE = 10 * 1024 * 1024
+
+    def clean_file(self):
+        upload = self.cleaned_data['file']
+        if upload.size > self.MAX_FILE_SIZE:
+            raise forms.ValidationError('Scanner imports must be 10 MB or smaller.')
+        return upload
+
     file = forms.FileField(label='Nmap XML file')
 
     def __init__(self, *args, **kwargs):

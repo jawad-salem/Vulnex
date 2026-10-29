@@ -366,8 +366,9 @@ class MFATests(TestCase):
         self.assertTrue(TOTPDevice.objects.filter(user=self.pentester).exists())
 
     def test_client_can_disable_mfa(self):
-        TOTPDevice.objects.create(user=self.client_user, name='default', confirmed=True)
-        self.client.login(username='cli', password='testpass1')
+        device = TOTPDevice.objects.create(user=self.client_user, name='default', confirmed=True)
+        self.client.post(reverse('accounts:login'), {'username':'cli', 'password':'testpass1'})
+        self.client.post(reverse('accounts:mfa_verify'), {'code':_current_totp(device)})
         resp = self.client.post(reverse('accounts:mfa_disable'))
         self.assertEqual(resp.status_code, 302)
         self.assertFalse(TOTPDevice.objects.filter(user=self.client_user).exists())
@@ -436,8 +437,9 @@ class AuditLogCoverageTests(TestCase):
 
     def test_mfa_disabled_logged(self):
         from django_otp.plugins.otp_totp.models import TOTPDevice
-        TOTPDevice.objects.create(user=self.lead, name='default', confirmed=True)
-        self.client.login(username='lead', password='testpass1')
+        device = TOTPDevice.objects.create(user=self.lead, name='default', confirmed=True)
+        self.client.post(reverse('accounts:login'), {'username':'lead', 'password':'testpass1'})
+        self.client.post(reverse('accounts:mfa_verify'), {'code':_current_totp(device)})
         self.client.post(reverse('accounts:mfa_disable'))
         row = self._only(AuditLog.Action.MFA_DISABLED)
         self.assertEqual(row.actor, self.lead)

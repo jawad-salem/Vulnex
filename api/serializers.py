@@ -6,7 +6,7 @@ from django.conf import settings
 from django_otp import user_has_device
 from rest_framework import serializers
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
 from credentials.models import Credential
 from engagements.models import Engagement
@@ -16,24 +16,31 @@ from vulns.models import Evidence, Finding
 
 
 class MFAAwareTokenObtainPairSerializer(TokenObtainPairSerializer):
-    """JWT issuance honours the same MFA policy the UI enforces. Users in
-    ``settings.MFA_REQUIRED_ROLES`` must have a confirmed TOTP device before
-    they can mint programmatic tokens — otherwise password-only login would
-    bypass the whole MFA gate via the API."""
+    """Authenticate both factors before creating any JWTs."""
+    otp_code = serializers.CharField(required=False, write_only=True, max_length=32)
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        required = getattr(settings, 'MFA_REQUIRED_ROLES', []) or []
-        if (
-            getattr(self.user, 'role', None) in required
-            and not user_has_device(self.user, confirmed=True)
-        ):
-            raise AuthenticationFailed(
-                'MFA setup is required before issuing API tokens. '
-                'Sign in to the web UI and complete TOTP setup first.',
-                code='mfa_required',
-            )
-        return data
+        from accounts.mfa import verify_code
+        from rest_framework_simplejwt.serializers import TokenObtainSerializer
+        TokenObtainSerializer.validate(self, attrs)
+        enrolled = user_has_device(self.user, confirmed=True)
+        if self.user.role in settings.MFA_REQUIRED_ROLES and not enrolled:
+            raise AuthenticationFailed('MFA setup is required before issuing API tokens.', code='mfa_required')
+        device = verify_code(self.user, attrs.get('otp_code', '')) if enrolled else None
+        if enrolled and device is None:
+            raise AuthenticationFailed('A valid MFA code is required.', code='mfa_required')
+        refresh = self.get_token(self.user)
+        refresh['auth_version'] = 2
+        refresh['otp_device'] = device.persistent_id if device else None
+        return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+
+
+class SecureTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        from .authentication import SecureJWTAuthentication
+        token = self.token_class(attrs['refresh'])
+        SecureJWTAuthentication().get_user(token)
+        return super().validate(attrs)
 
 
 class EngagementSerializer(serializers.ModelSerializer):
@@ -64,6 +71,10 @@ class EngagementSerializer(serializers.ModelSerializer):
             return None
         from engagements.models import Client
         client = Client.objects.filter(name__iexact=name).first()
+        if client:
+            from engagements.selectors import assignable_clients
+            if not assignable_clients(self.context['request'].user).filter(pk=client.pk).exists():
+                raise serializers.ValidationError({'client_name': 'This client is not available for this engagement.'})
         return client or Client.objects.create(name=name)
 
     @transaction.atomic
@@ -186,6 +197,14 @@ class CredentialSerializer(ImmutableEngagementSerializer):
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'masked_secret']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        engagement = attrs.get('engagement') or getattr(self.instance, 'engagement', None)
+        host = attrs.get('host') or getattr(self.instance, 'host', None)
+        if host and engagement and host.engagement_id != engagement.pk:
+            raise serializers.ValidationError({'host': 'Host must belong to this engagement.'})
+        return attrs
 
     def create(self, validated_data):
         plaintext = validated_data.pop('secret', '')

@@ -7,8 +7,8 @@
 body { font-size:14px; }
 .main-content { min-width:0; }
 .page-body { max-width:1360px; margin-inline:auto; }
-.workspace-nav { display:flex; flex-wrap:wrap; gap:4px 20px; padding:0; margin:8px 0 20px; border-bottom:1px solid var(--border); }
-.workspace-nav a { padding:12px 0; color:var(--text-secondary); font-size:13px; border-bottom:2px solid transparent; }
+.workspace-nav { display:flex; flex-wrap:wrap; gap:4px 22px; padding:0; margin:8px 0 20px; border-bottom:1px solid var(--border); }
+.workspace-nav a { padding:12px 0; color:var(--text-secondary); font-size:14px; border-bottom:2px solid transparent; }
 .workspace-nav a:hover, .workspace-nav a[aria-current="page"] { color:var(--accent-light); border-bottom-color:var(--accent); }
 .workspace-context { padding:18px 20px; }
 .workspace-context .sidebar-section-title { padding:0 0 8px; }
@@ -56,13 +56,14 @@ body { font-size:14px; }
 
 /* Status communicates progress; severity retains the strongest color. */
 .badge-open, .badge-confirmed, .badge-draft, .badge-not_retested { background:rgba(154,166,181,.10); color:var(--text-muted); border-color:rgba(154,166,181,.18); }
-.queue-nav, .editor-index { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+.queue-nav, .editor-index { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:20px; }
+.queue-nav { padding:5px; background:var(--bg-secondary); border:1px solid var(--border-light); border-radius:8px; }
 .queue-nav a, .editor-index a { padding:9px 12px; border-radius:5px; color:var(--text-secondary); font-size:13px; }
-.queue-nav a[aria-current], .queue-nav a:hover, .editor-index a:hover { background:var(--accent-bg); color:var(--accent-light); }
-.workspace-more { position:relative; margin-left:auto; }
-.workspace-more summary { padding:12px 0; cursor:pointer; color:var(--text-secondary); }
-.workspace-more > div { position:absolute; right:0; top:100%; z-index:40; min-width:150px; background:var(--bg-card); border:1px solid var(--border); padding:8px 16px; border-radius:6px; }
-.workspace-more a { display:block; }
+.queue-nav a:hover, .editor-index a:hover { background:var(--bg-hover); color:var(--text-primary); }
+.queue-nav a[aria-current] { background:var(--bg-tertiary); color:var(--text-primary); box-shadow:inset 0 -2px var(--accent); }
+.queue-nav a { min-height:40px; display:inline-flex; align-items:center; gap:8px; }
+.queue-nav a span { font-size:12px; font-variant-numeric:tabular-nums; color:var(--text-secondary); }
+.workspace-vault { margin-left:auto; }
 .op-table .op-finding { display:block; min-width:180px; max-width:52ch; white-space:normal; overflow-wrap:anywhere; line-height:1.5; }
 .op-finding-sub { white-space:normal; overflow-wrap:anywhere; }
 .finding-section > summary { cursor:pointer; font-weight:600; padding:8px 0; }

@@ -11,7 +11,8 @@ from .views import (
     FindingViewSet,
     ReportViewSet,
 )
-from .serializers import MFAAwareTokenObtainPairSerializer
+from .serializers import MFAAwareTokenObtainPairSerializer, SecureTokenRefreshSerializer
+from django.views.decorators.cache import never_cache
 
 
 class _StaffAPIRootView(APIRootView):
@@ -37,8 +38,8 @@ router.register(r'reports', ReportViewSet, basename='report')
 
 urlpatterns = [
     path('v1/', include(router.urls)),
-    path('v1/auth/token/', MFAAwareTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('v1/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('v1/auth/token/', never_cache(MFAAwareTokenObtainPairView.as_view()), name='token_obtain_pair'),
+    path('v1/auth/token/refresh/', never_cache(TokenRefreshView.as_view(serializer_class=SecureTokenRefreshSerializer)), name='token_refresh'),
     path(
         'schema/',
         SpectacularAPIView.as_view(permission_classes=[IsStaffOrPentester]),

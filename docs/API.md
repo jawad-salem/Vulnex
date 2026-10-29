@@ -32,13 +32,14 @@ hash and a short non-secret prefix; successful requests update `last_used_at`.
 
 ### JWT (for interactive apps / SPAs)
 
-Exchange username + password for a short-lived access token and a refresh
-token:
+Exchange username + password and, when MFA is enrolled, a current TOTP or backup
+code (`otp_code`) for a short-lived access token and a refresh token. Required-role
+users must finish MFA setup first:
 
 ```bash
 curl -X POST https://HOST/api/v1/auth/token/ \
   -H 'Content-Type: application/json' \
-  -d '{"username":"alice","password":"..."}'
+  -d '{"username":"alice","password":"...","otp_code":"123456"}'
 ```
 
 Response:
@@ -50,6 +51,11 @@ Response:
 Use `Authorization: Bearer <access>` on subsequent requests. Refresh before
 expiry (30 min) by POSTing the refresh token to
 `/api/v1/auth/token/refresh/`; refresh tokens rotate; the old token is not blacklisted by the current configuration.
+
+Tokens issued before the 2026-10-29 security update are rejected; sign in again.
+Access and refresh tokens become invalid after password changes, removal of their
+verified MFA device, or new MFA enrollment for a password-only token. API keys
+remain separately revocable credentials and do not require a code per request.
 
 ### Session (for the browser)
 

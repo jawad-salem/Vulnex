@@ -255,7 +255,7 @@ if 'test' in sys.argv:
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'api.authentication.APIKeyAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'api.authentication.SecureJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -281,6 +281,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
+    'CHECK_REVOKE_TOKEN': True,
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
